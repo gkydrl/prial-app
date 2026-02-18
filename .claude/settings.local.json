@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-expo-app mobile --template blank-typescript --yes)",
+      "Bash(npm install:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npm config set:*)",
+      "Bash(npx expo install:*)",
+      "Bash(git init)",
+      "Bash(git add -A)",
+      "Bash(git --version:*)",
+      "Bash(/opt/homebrew/bin/git --version)",
+      "Bash(/usr/local/bin/git --version)"
+    ]
+  }
+}
