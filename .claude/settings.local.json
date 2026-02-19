@@ -10,7 +10,13 @@
       "Bash(git add -A)",
       "Bash(git --version:*)",
       "Bash(/opt/homebrew/bin/git --version)",
-      "Bash(/usr/local/bin/git --version)"
+      "Bash(/usr/local/bin/git --version)",
+      "Bash(git push:*)",
+      "Bash(git remote add:*)",
+      "Bash(ssh-keygen:*)",
+      "Bash(ssh:*)",
+      "Bash(ssh-add:*)",
+      "Bash(git remote set-url:*)"
     ]
   }
 }
