@@ -22,13 +22,11 @@ target_metadata = Base.metadata
 def get_migration_url() -> str:
     """
     Migration için bağlantı URL'si döner.
-    start.sh tarafından postgresql+asyncpg:// → postgresql:// dönüşümü
-    yapılır; env.py de aynı dönüşümü uygular.
+    DATABASE_MIGRATION_URL varsa onu, yoksa DATABASE_URL'yi kullanır.
+    asyncpg ile async bağlantı kullanılır — URL'de dönüşüm yapılmaz.
     """
     from app.config import settings
-    url = os.getenv("DATABASE_MIGRATION_URL") or settings.database_url
-    url = url.replace("postgresql+asyncpg://", "postgresql://")
-    return url
+    return os.getenv("DATABASE_MIGRATION_URL") or settings.database_url
 
 
 def run_migrations_offline() -> None:
