@@ -21,14 +21,13 @@ target_metadata = Base.metadata
 
 def get_migration_url() -> str:
     """
-    Migration için doğrudan bağlantı URL'si döner.
-    DATABASE_MIGRATION_URL varsa onu, yoksa DATABASE_URL'yi kullanır.
-    Supabase'de migration'lar için Transaction Pooler değil,
-    Direct Connection kullanmak gerekir.
+    Migration için bağlantı URL'si döner.
+    start.sh tarafından postgresql+asyncpg:// → postgresql:// dönüşümü
+    yapılır; env.py de aynı dönüşümü uygular.
     """
     from app.config import settings
     url = os.getenv("DATABASE_MIGRATION_URL") or settings.database_url
-    # asyncpg → psycopg2 dönüşümü gerekmez, asyncpg ile devam ediyoruz
+    url = url.replace("postgresql+asyncpg://", "postgresql://")
     return url
 
 
