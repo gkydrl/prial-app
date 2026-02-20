@@ -23,10 +23,12 @@ def get_migration_url() -> str:
     """
     Migration için bağlantı URL'si döner.
     DATABASE_MIGRATION_URL varsa onu, yoksa DATABASE_URL'yi kullanır.
-    asyncpg ile async bağlantı kullanılır — URL'de dönüşüm yapılmaz.
+    ?sslmode=require URL'den temizlenir, SSL connect_args ile yönetilir.
     """
     from app.config import settings
-    return os.getenv("DATABASE_MIGRATION_URL") or settings.database_url
+    url = os.getenv("DATABASE_MIGRATION_URL") or settings.database_url
+    url = url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+    return url
 
 
 def run_migrations_offline() -> None:
@@ -56,6 +58,7 @@ async def run_async_migrations() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"ssl": True},
     )
 
     async with connectable.connect() as connection:

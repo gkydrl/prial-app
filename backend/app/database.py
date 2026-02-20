@@ -2,11 +2,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
+
+def _clean_url(url: str) -> str:
+    """?sslmode=require parametresini URL'den temizler, SSL connect_args ile yönetilir."""
+    return url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+
+
 engine = create_async_engine(
-    settings.database_url,
+    _clean_url(settings.database_url),
     pool_size=settings.database_pool_size,
     max_overflow=settings.database_max_overflow,
     echo=settings.debug,
+    connect_args={"ssl": True},
 )
 
 AsyncSessionLocal = async_sessionmaker(
