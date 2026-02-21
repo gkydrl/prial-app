@@ -1,11 +1,23 @@
+import ssl
+
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 
 def _clean_url(url: str) -> str:
-    """?sslmode=require parametresini URL'den temizler, SSL connect_args ile yönetilir."""
-    return url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+    """sslmode query param'ını URL'den temizler, SSL connect_args ile yönetilir."""
+    for param in ("?sslmode=require", "&sslmode=require", "?sslmode=disable", "&sslmode=disable"):
+        url = url.replace(param, "")
+    return url
+
+
+def _make_ssl_context() -> ssl.SSLContext:
+    """Railway gibi self-signed cert kullanan DB'ler için: şifreli ama cert doğrulamasız."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
 engine = create_async_engine(
@@ -13,7 +25,7 @@ engine = create_async_engine(
     pool_size=settings.database_pool_size,
     max_overflow=settings.database_max_overflow,
     echo=settings.debug,
-    connect_args={"ssl": True},
+    connect_args={"ssl": _make_ssl_context()},
 )
 
 AsyncSessionLocal = async_sessionmaker(
