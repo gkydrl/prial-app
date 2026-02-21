@@ -1,3 +1,4 @@
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
@@ -23,10 +24,11 @@ def _build_url(url: str) -> str:
 
 engine = create_async_engine(
     _build_url(settings.database_url),
-    pool_size=settings.database_pool_size,
-    max_overflow=settings.database_max_overflow,
     echo=settings.debug,
-    # Railway pgbouncer transaction-mode ile uyumluluk için prepared statement cache'i kapat
+    # Railway pgbouncer (transaction mode) uyumluluğu:
+    # - NullPool: her request yeni bağlantı alır, pgbouncer zaten pooling yapar
+    # - statement_cache_size=0: asyncpg prepared statement kullanmaz
+    poolclass=NullPool,
     connect_args={"statement_cache_size": 0},
 )
 
