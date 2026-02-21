@@ -61,3 +61,18 @@ app.include_router(discover.router, prefix="/api/v1")
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": settings.app_version}
+
+
+@app.get("/debug/db")
+async def debug_db():
+    """Geçici: DB bağlantısını test eder ve hatayı döndürür."""
+    import traceback
+    from sqlalchemy import text
+    from app.database import engine
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(text("SELECT version()"))
+            row = result.fetchone()
+            return {"status": "ok", "pg_version": str(row[0])}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
