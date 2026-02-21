@@ -11,7 +11,14 @@ scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Uygulama başlarken
+    # Veritabanı tablolarını oluştur (henüz yoksa)
+    from app.database import engine, Base
+    import app.models  # noqa: F401 — tüm modeller Base.metadata'ya kayıtlı olsun
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Fiyat takip zamanlayıcısı
     from app.services.price_tracker import check_all_prices
 
     scheduler.add_job(
