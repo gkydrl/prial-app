@@ -6,7 +6,17 @@ from app.config import settings
 
 
 def _clean_url(url: str) -> str:
-    """sslmode query param'ını URL'den temizler, SSL connect_args ile yönetilir."""
+    """
+    Railway / Heroku tarzı postgres:// URL'lerini asyncpg formatına çevirir
+    ve sslmode query param'ını kaldırır (SSL connect_args ile yönetilir).
+    """
+    # postgres:// → postgresql+asyncpg://
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    # sslmode query param'larını temizle
     for param in ("?sslmode=require", "&sslmode=require", "?sslmode=disable", "&sslmode=disable"):
         url = url.replace(param, "")
     return url
