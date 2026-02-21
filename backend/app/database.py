@@ -6,17 +6,18 @@ from app.config import settings
 
 def _build_url(url: str) -> str:
     """
-    Railway / Heroku tarzı postgres:// URL'lerini asyncpg formatına çevirir.
-    sslmode query param'ını korur — asyncpg bunu connect_args üzerinden değil
-    URL'de desteklemez, bu yüzden tamamen kaldırıyoruz ve SSL'i devre dışı bırakıyoruz.
-    Railway internal network'te SSL gerekmez.
+    Railway / Heroku tarzı postgres:// URL'lerini psycopg3 async formatına çevirir.
+    psycopg3 (postgresql+psycopg) Railway pgbouncer transaction mode ile uyumludur.
     """
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif url.startswith("postgresql://") and "+asyncpg" not in url:
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # asyncpg URL'i varsa da psycopg'ye çevir
+    url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
 
-    # asyncpg sslmode URL param'ını desteklemez — kaldır
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://") and "+psycopg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    # sslmode query param'larını temizle (connect_args ile yönetilir)
     for param in ("?sslmode=require", "&sslmode=require", "?sslmode=disable", "&sslmode=disable"):
         url = url.replace(param, "")
     return url
@@ -26,10 +27,10 @@ engine = create_async_engine(
     _build_url(settings.database_url),
     echo=settings.debug,
     # Railway pgbouncer (transaction mode) uyumluluğu:
-    # - NullPool: her request yeni bağlantı alır, pgbouncer zaten pooling yapar
-    # - statement_cache_size=0: asyncpg prepared statement kullanmaz
+    # - NullPool: pgbouncer zaten pooling yapıyor, SQLAlchemy pool'u gereksiz
+    # - prepare_threshold=None: psycopg3 server-side prepared statement kullanmaz
     poolclass=NullPool,
-    connect_args={"statement_cache_size": 0},
+    connect_args={"prepare_threshold": None},
 )
 
 AsyncSessionLocal = async_sessionmaker(
