@@ -11,13 +11,6 @@ scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Veritabanı tablolarını oluştur (henüz yoksa)
-    from app.database import engine, Base
-    import app.models  # noqa: F401
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     # Fiyat takip zamanlayıcısı
     from app.services.price_tracker import check_all_prices
 
@@ -62,4 +55,25 @@ app.include_router(discover.router, prefix="/api/v1")
 async def health():
     return {"status": "ok", "version": settings.app_version}
 
+
+@app.get("/debug/db")
+async def debug_db():
+    import traceback
+    from sqlalchemy import text
+    from app.database import engine
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(text("SELECT version()"))
+            row = result.fetchone()
+            # Tablo listesini de al
+            tables = await conn.execute(text(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+            ))
+            return {
+                "status": "ok",
+                "pg_version": str(row[0]),
+                "tables": [r[0] for r in tables.fetchall()],
+            }
+    except Exception as e:
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()[-2000:]}
 
