@@ -8,19 +8,24 @@ from app.services.scraper.base import BaseScraper, ScrapedProduct
 from app.services.scraper.trendyol import TrendyolScraper
 from app.services.scraper.hepsiburada import HepsiburadaScraper
 from app.services.scraper.amazon import AmazonScraper
+from app.services.scraper.universal_scraper import UniversalScraper
 
+# Bilinen siteler — sırayla denenir
 SCRAPERS: list[BaseScraper] = [
     TrendyolScraper(),
     HepsiburadaScraper(),
     AmazonScraper(),
 ]
 
+_universal = UniversalScraper()
+
 
 def get_scraper(url: str) -> BaseScraper:
+    """Bilinen siteler için özel scraper, bilinmeyenler için UniversalScraper döner."""
     for scraper in SCRAPERS:
         if scraper.can_handle(url):
             return scraper
-    raise ValueError(f"Desteklenmeyen mağaza URL'i: {url}")
+    return _universal
 
 
 async def scrape_url(url: str) -> ScrapedProduct:
