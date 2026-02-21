@@ -26,6 +26,8 @@ engine = create_async_engine(
     pool_size=settings.database_pool_size,
     max_overflow=settings.database_max_overflow,
     echo=settings.debug,
+    # Railway pgbouncer transaction-mode ile uyumluluk için prepared statement cache'i kapat
+    connect_args={"statement_cache_size": 0},
 )
 
 AsyncSessionLocal = async_sessionmaker(
