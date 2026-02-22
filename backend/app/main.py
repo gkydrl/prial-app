@@ -72,7 +72,6 @@ async def debug_db():
         async with engine.connect() as conn:
             result = await conn.execute(text("SELECT version()"))
             row = result.fetchone()
-            # Tablo listesini de al
             tables = await conn.execute(text(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
             ))
@@ -83,4 +82,33 @@ async def debug_db():
             }
     except Exception as e:
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()[-2000:]}
+
+
+@app.post("/debug/register")
+async def debug_register():
+    """Register akışını test eder ve gerçek hatayı döndürür."""
+    import traceback
+    from app.database import AsyncSessionLocal
+    from app.models.user import User
+    from app.core.security import hash_password, create_access_token, create_refresh_token
+    from sqlalchemy import select
+
+    try:
+        async with AsyncSessionLocal() as session:
+            existing = await session.execute(select(User).where(User.email == "debug@prial.app"))
+            found = existing.scalar_one_or_none()
+            if found:
+                return {"status": "exists", "user_id": str(found.id)}
+
+            user = User(
+                email="debug@prial.app",
+                password_hash=hash_password("Debug1234"),
+                full_name="Debug User",
+            )
+            session.add(user)
+            await session.flush()
+            await session.commit()
+            return {"status": "created", "user_id": str(user.id)}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()[-3000:]}
 
