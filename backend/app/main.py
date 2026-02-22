@@ -84,6 +84,19 @@ async def debug_db():
         return {"status": "error", "error": str(e), "traceback": traceback.format_exc()[-2000:]}
 
 
+@app.get("/debug/versions")
+async def debug_versions():
+    import importlib.metadata
+    packages = ["bcrypt", "passlib", "psycopg", "asyncpg", "sqlalchemy"]
+    versions = {}
+    for pkg in packages:
+        try:
+            versions[pkg] = importlib.metadata.version(pkg)
+        except Exception:
+            versions[pkg] = "not found"
+    return versions
+
+
 @app.post("/debug/register")
 async def debug_register():
     """Register akışını test eder ve gerçek hatayı döndürür."""
