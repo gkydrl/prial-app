@@ -12,7 +12,9 @@ from sqlalchemy import select
 from app.config import settings
 from app.database import get_db
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt>=4.1 passlib'in detect_wrap_bug testinde ValueError fırlatır.
+# truncate_error=False ile bu davranışı devre dışı bırakıyoruz.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__truncate_error=False)
 bearer_scheme = HTTPBearer()
 
 
