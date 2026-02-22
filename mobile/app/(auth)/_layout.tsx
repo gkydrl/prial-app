@@ -3,8 +3,11 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function AuthLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
 
-  if (isAuthenticated) {
+  // Sadece onboarding tamamlandıysa tabs'a yönlendir
+  // Onboarding bitmemişse auth grubunda kalmaya devam et (onboarding ekranı için)
+  if (isAuthenticated && hasCompletedOnboarding) {
     return <Redirect href="/(tabs)" />;
   }
 

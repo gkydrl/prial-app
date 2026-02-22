@@ -24,7 +24,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email.trim(), password, fullName.trim() || undefined);
-      router.replace('/(tabs)');
+      router.replace('/(auth)/onboarding');
     } catch (e: any) {
       Alert.alert('Kayıt Başarısız', e.response?.data?.detail ?? 'Kayıt oluşturulamadı');
     } finally {

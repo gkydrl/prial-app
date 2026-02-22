@@ -3,17 +3,23 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// setNotificationHandler web'de çalışmaz — sadece native'de çağır
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  // Web'de push notification desteklenmiyor
+  if (Platform.OS === 'web') return null;
+
   if (!Device.isDevice) {
     console.log('Simulator/Emülatörde push notification çalışmaz.');
     return null;

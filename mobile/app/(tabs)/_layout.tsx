@@ -5,9 +5,14 @@ import { Colors } from '@/constants/colors';
 
 export default function TabsLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
 
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (!hasCompletedOnboarding) {
+    return <Redirect href="/(auth)/onboarding" />;
   }
 
   return (

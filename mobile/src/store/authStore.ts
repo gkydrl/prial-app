@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from '@/api/auth';
-import { setTokens, clearTokens, getAccessToken, getRefreshToken } from '@/utils/storage';
+import { setTokens, clearTokens, getAccessToken, getRefreshToken, getOnboardingDone, setOnboardingDone } from '@/utils/storage';
 import type { UserResponse } from '@/types/api';
 
 interface AuthState {
@@ -9,6 +9,7 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isHydrated: boolean;
+  hasCompletedOnboarding: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
@@ -16,6 +17,7 @@ interface AuthState {
   setTokens: (access: string, refresh: string) => void;
   updateUser: (partial: Partial<UserResponse>) => void;
   hydrate: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -24,6 +26,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: null,
   isAuthenticated: false,
   isHydrated: false,
+  hasCompletedOnboarding: false,
 
   login: async (email, password) => {
     const { data } = await authApi.login(email, password);
@@ -57,12 +60,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   hydrate: async () => {
     try {
-      const [access, refresh] = await Promise.all([getAccessToken(), getRefreshToken()]);
+      const [access, refresh, onboardingDone] = await Promise.all([
+        getAccessToken(),
+        getRefreshToken(),
+        getOnboardingDone(),
+      ]);
       if (!access) {
         set({ isHydrated: true });
         return;
       }
-      set({ accessToken: access, refreshToken: refresh });
+      set({ accessToken: access, refreshToken: refresh, hasCompletedOnboarding: onboardingDone });
       const { data: user } = await authApi.me();
       set({ user, isAuthenticated: true });
     } catch {
@@ -71,5 +78,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       set({ isHydrated: true });
     }
+  },
+
+  completeOnboarding: async () => {
+    await setOnboardingDone();
+    set({ hasCompletedOnboarding: true });
   },
 }));

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { registerForPushNotificationsAsync } from '@/utils/notifications';
@@ -10,6 +11,7 @@ export function useNotifications() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (Platform.OS === 'web') return;
 
     // Push token al ve backend'e gönder
     registerForPushNotificationsAsync().then((token) => {
