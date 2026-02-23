@@ -27,8 +27,8 @@ async def preview_product(
 
     try:
         scraped = await scrape_url(payload.url)
-    except Exception:
-        raise HTTPException(status_code=422, detail="Ürün bilgileri alınamadı. Linki kontrol et.")
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Scraper hatası: {type(e).__name__}: {e}")
 
     if not scraped.current_price:
         raise HTTPException(status_code=422, detail="Ürün fiyatı bulunamadı.")
