@@ -28,20 +28,20 @@ function formatPrice(price: number): string {
 export function OnboardingModal({ visible, onDismiss }: Props) {
   const [url, setUrl] = useState('');
   const [previewing, setPreviewing] = useState(false);
-  const [previewError, setPreviewError] = useState('');
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [preview, setPreview] = useState<ProductPreviewResponse | null>(null);
   const [sliderValue, setSliderValue] = useState(0);
+  const [manualPrice, setManualPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
 
-  // URL değişince debounce ile preview çek
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     setPreview(null);
-    setPreviewError('');
+    setPreviewFailed(false);
 
     const trimmed = url.trim();
     if (!trimmed || trimmed.length < 10) return;
@@ -51,14 +51,11 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
       try {
         const { data } = await productsApi.preview(trimmed);
         setPreview(data);
-        // Slider başlangıcı: mevcut fiyatın %70'i
-        const initial = Math.round(data.current_price * 0.7);
-        setSliderValue(initial);
-        setPreviewError('');
-      } catch (e: any) {
-        const detail = e.response?.data?.detail ?? 'Ürün bilgileri alınamadı';
-        setPreviewError(typeof detail === 'string' ? detail : 'Ürün bilgileri alınamadı');
+        setSliderValue(Math.round(data.current_price * 0.7));
+        setPreviewFailed(false);
+      } catch {
         setPreview(null);
+        setPreviewFailed(true);
       } finally {
         setPreviewing(false);
       }
@@ -74,12 +71,21 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
     onDismiss();
   };
 
+  const targetPrice = preview
+    ? sliderValue
+    : parseFloat(manualPrice.replace(',', '.'));
+
+  const canSubmit =
+    url.trim().length > 10 &&
+    !previewing &&
+    (preview ? sliderValue > 0 : (!isNaN(targetPrice) && targetPrice > 0));
+
   const handleSetAlarm = async () => {
-    if (!url.trim() || !preview) return;
+    if (!canSubmit) return;
 
     setSubmitting(true);
     try {
-      await productsApi.add(url.trim(), sliderValue);
+      await productsApi.add(url.trim(), targetPrice);
       await completeOnboarding();
       onDismiss();
       router.push('/(tabs)/alarms');
@@ -140,37 +146,40 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
               <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '500' }}>
                 Ürün Linki
               </Text>
-              <TextInput
-                value={url}
-                onChangeText={setUrl}
-                placeholder="https://trendyol.com/..."
-                placeholderTextColor="#4B5563"
-                autoCapitalize="none"
-                keyboardType="url"
-                style={{
-                  backgroundColor: '#262626',
-                  borderRadius: 12,
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  color: '#FFFFFF',
-                  fontSize: 15,
-                  borderWidth: 1,
-                  borderColor: previewing ? '#6C47FF' : previewError ? '#EF4444' : '#333333',
-                }}
-              />
-
-              {/* Loading / Error under input */}
-              {previewing && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
-                  <ActivityIndicator size="small" color="#6C47FF" />
-                  <Text style={{ color: '#9CA3AF', fontSize: 13 }}>Ürün bilgileri alınıyor...</Text>
-                </View>
-              )}
-              {!previewing && previewError ? (
-                <Text style={{ color: '#EF4444', fontSize: 13, paddingHorizontal: 4 }}>
-                  {previewError}
-                </Text>
-              ) : null}
+              <View style={{ position: 'relative' }}>
+                <TextInput
+                  value={url}
+                  onChangeText={setUrl}
+                  placeholder="https://trendyol.com/..."
+                  placeholderTextColor="#4B5563"
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  style={{
+                    backgroundColor: '#262626',
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingRight: previewing ? 44 : 16,
+                    paddingVertical: 14,
+                    color: '#FFFFFF',
+                    fontSize: 15,
+                    borderWidth: 1,
+                    borderColor: previewing ? '#6C47FF' : '#333333',
+                  }}
+                />
+                {previewing && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      right: 14,
+                      top: 0,
+                      bottom: 0,
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ActivityIndicator size="small" color="#6C47FF" />
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Preview Card */}
@@ -200,7 +209,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
               </View>
             )}
 
-            {/* Slider */}
+            {/* Slider (preview başarılıysa) */}
             {preview && !previewing && (
               <View style={{ gap: 8 }}>
                 <Slider
@@ -221,22 +230,44 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
                   {' '}altına düşünce bildir
                 </Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#6B7280', fontSize: 12 }}>
-                    {formatPrice(minPrice)} ₺
-                  </Text>
-                  <Text style={{ color: '#6B7280', fontSize: 12 }}>
-                    {formatPrice(maxPrice)} ₺
-                  </Text>
+                  <Text style={{ color: '#6B7280', fontSize: 12 }}>{formatPrice(minPrice)} ₺</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 12 }}>{formatPrice(maxPrice)} ₺</Text>
                 </View>
+              </View>
+            )}
+
+            {/* Manuel fiyat (preview başarısızsa fallback) */}
+            {previewFailed && !previewing && (
+              <View style={{ gap: 6 }}>
+                <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '500' }}>
+                  Hedef Fiyat (₺)
+                </Text>
+                <TextInput
+                  value={manualPrice}
+                  onChangeText={setManualPrice}
+                  placeholder="örn. 1500"
+                  placeholderTextColor="#4B5563"
+                  keyboardType="decimal-pad"
+                  style={{
+                    backgroundColor: '#262626',
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    color: '#FFFFFF',
+                    fontSize: 15,
+                    borderWidth: 1,
+                    borderColor: '#333333',
+                  }}
+                />
               </View>
             )}
 
             {/* Alarm Kur button */}
             <TouchableOpacity
               onPress={handleSetAlarm}
-              disabled={submitting || !preview || previewing}
+              disabled={submitting || !canSubmit}
               style={{
-                backgroundColor: preview && !previewing ? '#6C47FF' : '#333333',
+                backgroundColor: canSubmit ? '#6C47FF' : '#333333',
                 borderRadius: 14,
                 paddingVertical: 16,
                 alignItems: 'center',
@@ -247,7 +278,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
               ) : (
                 <Text
                   style={{
-                    color: preview && !previewing ? '#FFFFFF' : '#6B7280',
+                    color: canSubmit ? '#FFFFFF' : '#6B7280',
                     fontSize: 16,
                     fontWeight: '700',
                   }}
