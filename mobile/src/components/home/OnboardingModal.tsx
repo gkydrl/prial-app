@@ -14,7 +14,7 @@ import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
 import { productsApi } from '@/api/products';
 import { useAuthStore } from '@/store/authStore';
-import type { ProductPreviewResponse } from '@/types/api';
+import { fetchProductPreview, type PreviewResult } from '@/utils/productPreview';
 
 interface Props {
   visible: boolean;
@@ -29,7 +29,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
   const [url, setUrl] = useState('');
   const [previewing, setPreviewing] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
-  const [preview, setPreview] = useState<ProductPreviewResponse | null>(null);
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [sliderValue, setSliderValue] = useState(0);
   const [manualPrice, setManualPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -49,9 +49,9 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
     debounceRef.current = setTimeout(async () => {
       setPreviewing(true);
       try {
-        const { data } = await productsApi.preview(trimmed);
-        setPreview(data);
-        setSliderValue(Math.round(data.current_price * 0.7));
+        const result = await fetchProductPreview(trimmed);
+        setPreview(result);
+        setSliderValue(Math.round(result.current_price * 0.7));
         setPreviewFailed(false);
       } catch {
         setPreview(null);
