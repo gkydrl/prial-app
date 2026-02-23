@@ -1,7 +1,8 @@
 import re
 from decimal import Decimal
-from playwright.async_api import async_playwright
-from app.services.scraper.base import BaseScraper, ScrapedProduct
+import httpx
+from bs4 import BeautifulSoup
+from app.services.scraper.base import BaseScraper, ScrapedProduct, scraper_api_url
 
 
 class HepsiburadaScraper(BaseScraper):
@@ -11,63 +12,49 @@ class HepsiburadaScraper(BaseScraper):
         return "hepsiburada.com" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+        proxy_url = scraper_api_url(url, render=True)
 
-            await page.set_extra_http_headers({
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                )
-            })
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(proxy_url)
+            resp.raise_for_status()
 
-            try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_selector("[data-test-id='price-current-price']", timeout=10000)
+        soup = BeautifulSoup(resp.text, "lxml")
 
-                title = await page.text_content("h1[itemprop='name']") or ""
+        title_el = soup.select_one("h1[itemprop='name']") or soup.select_one("h1.product-name")
+        title = title_el.get_text(strip=True) if title_el else ""
 
-                price_text = await page.text_content("[data-test-id='price-current-price']") or ""
-                current_price = self._parse_price(price_text)
+        price_el = soup.select_one("[data-test-id='price-current-price']") or \
+                   soup.select_one(".price-value")
+        current_price = self._parse_price(price_el.get_text(strip=True) if price_el else "0")
 
-                original_price = None
-                orig_el = await page.query_selector("[data-test-id='price-original-price']")
-                if orig_el:
-                    orig_text = await orig_el.text_content() or ""
-                    original_price = self._parse_price(orig_text)
+        original_price = None
+        orig_el = soup.select_one("[data-test-id='price-original-price']") or \
+                  soup.select_one(".price-old-value")
+        if orig_el:
+            original_price = self._parse_price(orig_el.get_text(strip=True))
 
-                image_url = None
-                img_el = await page.query_selector(".product-image img")
-                if img_el:
-                    image_url = await img_el.get_attribute("src")
+        image_url = None
+        img_el = soup.select_one(".product-image img") or soup.select_one("[data-test-id='product-image'] img")
+        if img_el:
+            image_url = img_el.get("src") or img_el.get("data-src")
 
-                in_stock = True
-                stock_el = await page.query_selector("[data-test-id='add-to-cart-button']")
-                if not stock_el:
-                    in_stock = False
+        in_stock = bool(soup.select_one("[data-test-id='add-to-cart-button']"))
 
-                store_product_id = self._extract_product_id(url)
-
-                return ScrapedProduct(
-                    title=title.strip(),
-                    url=url,
-                    store=self.store_name,
-                    current_price=current_price,
-                    original_price=original_price,
-                    image_url=image_url,
-                    store_product_id=store_product_id,
-                    in_stock=in_stock,
-                )
-            finally:
-                await browser.close()
+        return ScrapedProduct(
+            title=title,
+            url=url,
+            store=self.store_name,
+            current_price=current_price,
+            original_price=original_price,
+            image_url=image_url,
+            store_product_id=self._extract_product_id(url),
+            in_stock=in_stock,
+        )
 
     def _parse_price(self, text: str) -> Decimal:
         cleaned = re.sub(r"[^\d,]", "", text).replace(",", ".")
         parts = cleaned.split(".")
         if len(parts) > 2:
-            # Binlik ayracı nokta, ondalık virgül: 1.299,00 → 1299.00
             cleaned = "".join(parts[:-1]) + "." + parts[-1]
         return Decimal(cleaned) if cleaned else Decimal("0")
 

@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     scrape_interval_minutes: int = 30
     scrape_concurrency: int = 5
     playwright_headless: bool = True
+    scraper_api_key: str = ""
 
     # CORS
     allowed_origins: str = "http://localhost:3000,http://localhost:8081"

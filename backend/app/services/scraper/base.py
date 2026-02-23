@@ -1,6 +1,17 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from decimal import Decimal
+from urllib.parse import urlencode
+import os
+
+
+def scraper_api_url(target_url: str, render: bool = False) -> str:
+    """Verilen URL'yi ScraperAPI proxy'si üzerinden geçirecek URL üretir."""
+    api_key = os.getenv("SCRAPER_API_KEY", "")
+    params: dict = {"api_key": api_key, "url": target_url}
+    if render:
+        params["render"] = "true"
+    return "http://api.scraperapi.com?" + urlencode(params)
 
 
 @dataclass

@@ -1,7 +1,8 @@
 import re
 from decimal import Decimal
-from playwright.async_api import async_playwright
-from app.services.scraper.base import BaseScraper, ScrapedProduct
+import httpx
+from bs4 import BeautifulSoup
+from app.services.scraper.base import BaseScraper, ScrapedProduct, scraper_api_url
 
 
 class AmazonScraper(BaseScraper):
@@ -11,75 +12,57 @@ class AmazonScraper(BaseScraper):
         return "amazon.com.tr" in url or "amazon.com" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-                locale="tr-TR",
-            )
-            page = await context.new_page()
+        proxy_url = scraper_api_url(url, render=True)
 
-            try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_selector("#productTitle", timeout=10000)
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(proxy_url)
+            resp.raise_for_status()
 
-                title = await page.text_content("#productTitle") or ""
+        soup = BeautifulSoup(resp.text, "lxml")
 
-                # Amazon fiyat yapısı karmaşık, birden fazla seçici dene
-                current_price = None
-                for selector in [
-                    ".a-price-whole",
-                    "#priceblock_ourprice",
-                    "#priceblock_dealprice",
-                    ".priceToPay .a-price-whole",
-                ]:
-                    el = await page.query_selector(selector)
-                    if el:
-                        text = await el.text_content() or ""
-                        current_price = self._parse_price(text)
-                        break
+        title_el = soup.select_one("#productTitle")
+        title = title_el.get_text(strip=True) if title_el else ""
 
-                if current_price is None:
-                    current_price = Decimal("0")
+        current_price = Decimal("0")
+        for selector in [
+            ".priceToPay .a-price-whole",
+            ".a-price-whole",
+            "#priceblock_ourprice",
+            "#priceblock_dealprice",
+        ]:
+            el = soup.select_one(selector)
+            if el:
+                current_price = self._parse_price(el.get_text(strip=True))
+                if current_price > 0:
+                    break
 
-                # Mağaza fiyatı (was price)
-                original_price = None
-                orig_el = await page.query_selector(".a-text-price .a-offscreen")
-                if orig_el:
-                    orig_text = await orig_el.text_content() or ""
-                    original_price = self._parse_price(orig_text)
+        original_price = None
+        orig_el = soup.select_one(".a-text-price .a-offscreen")
+        if orig_el:
+            original_price = self._parse_price(orig_el.get_text(strip=True))
 
-                image_url = None
-                img_el = await page.query_selector("#landingImage")
-                if img_el:
-                    image_url = await img_el.get_attribute("src")
+        image_url = None
+        img_el = soup.select_one("#landingImage")
+        if img_el:
+            image_url = img_el.get("src") or img_el.get("data-src")
 
-                in_stock = True
-                oos_el = await page.query_selector("#availability .a-color-price")
-                if oos_el:
-                    oos_text = (await oos_el.text_content() or "").lower()
-                    if "stokta yok" in oos_text or "out of stock" in oos_text:
-                        in_stock = False
+        in_stock = True
+        avail_el = soup.select_one("#availability .a-color-price")
+        if avail_el:
+            avail_text = avail_el.get_text(strip=True).lower()
+            if "stokta yok" in avail_text or "out of stock" in avail_text:
+                in_stock = False
 
-                store_product_id = self._extract_asin(url)
-
-                return ScrapedProduct(
-                    title=title.strip(),
-                    url=url,
-                    store=self.store_name,
-                    current_price=current_price,
-                    original_price=original_price,
-                    image_url=image_url,
-                    store_product_id=store_product_id,
-                    in_stock=in_stock,
-                )
-            finally:
-                await context.close()
-                await browser.close()
+        return ScrapedProduct(
+            title=title,
+            url=url,
+            store=self.store_name,
+            current_price=current_price,
+            original_price=original_price,
+            image_url=image_url,
+            store_product_id=self._extract_asin(url),
+            in_stock=in_stock,
+        )
 
     def _parse_price(self, text: str) -> Decimal:
         cleaned = re.sub(r"[^\d,]", "", text).replace(",", ".")

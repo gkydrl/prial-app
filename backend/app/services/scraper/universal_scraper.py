@@ -9,9 +9,9 @@ from decimal import Decimal, InvalidOperation
 from urllib.parse import urlparse
 
 import anthropic
-from playwright.async_api import async_playwright
+import httpx
 
-from app.services.scraper.base import BaseScraper, ScrapedProduct
+from app.services.scraper.base import BaseScraper, ScrapedProduct, scraper_api_url
 
 logger = logging.getLogger(__name__)
 
@@ -95,46 +95,43 @@ class UniversalScraper(BaseScraper):
         )
 
     async def _fetch_page(self, url: str) -> tuple[str, str | None]:
-        """Playwright ile sayfayı açar; metin içeriğini ve og:image URL'ini döndürür."""
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+        """ScraperAPI üzerinden sayfayı çeker; metin içeriğini ve og:image URL'ini döndürür."""
+        from bs4 import BeautifulSoup
 
-            await page.set_extra_http_headers({
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
-            })
+        proxy_url = scraper_api_url(url, render=True)
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(proxy_url)
+            resp.raise_for_status()
 
+        soup = BeautifulSoup(resp.text, "lxml")
+
+        # og:image veya ürün görseli
+        og_image: str | None = None
+        for selector, attr in _IMAGE_SELECTORS:
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(2000)  # JS render bekle
+                tag_name, *attrs_parts = selector.split("[")
+                if attrs_parts:
+                    attr_str = attrs_parts[0].rstrip("]")
+                    attr_key, attr_val = attr_str.split("=", 1)
+                    attr_val = attr_val.strip("'\"")
+                    el = soup.find(tag_name or True, {attr_key: attr_val})
+                else:
+                    el = soup.select_one(selector)
+                if el:
+                    og_image = el.get(attr)  # type: ignore[arg-type]
+                    if og_image:
+                        break
+            except Exception:
+                continue
 
-                # Gürültülü script/style içeriklerini temizleyerek metin al
-                await page.evaluate(
-                    "document.querySelectorAll('script,style,nav,footer').forEach(el => el.remove())"
-                )
-                text = await page.inner_text("body")
-                text = text[:8000]  # Token sınırı
+        # Gürültüyü temizle: script, style, nav, footer
+        for tag in soup(["script", "style", "nav", "footer"]):
+            tag.decompose()
 
-                # og:image veya ürün görseli
-                og_image: str | None = None
-                for selector, attr in _IMAGE_SELECTORS:
-                    try:
-                        el = await page.query_selector(selector)
-                        if el:
-                            og_image = await el.get_attribute(attr)
-                            if og_image:
-                                break
-                    except Exception:
-                        continue
+        text = soup.get_text(separator=" ", strip=True)
+        text = text[:8000]  # Token sınırı
 
-                return text, og_image
-            finally:
-                await browser.close()
+        return text, og_image
 
     async def _extract_with_llm(self, url: str, content: str) -> dict:
         """Claude Haiku ile sayfa içeriğinden ürün bilgilerini çıkarır."""
