@@ -12,13 +12,6 @@ class TrendyolScraper(BaseScraper):
         return "trendyol.com" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
-        product_id = self._extract_product_id(url)
-
-        if product_id:
-            result = await self._scrape_via_api(url, product_id)
-            if result:
-                return result
-
         return await self._scrape_via_html(url)
 
     async def _scrape_via_api(self, url: str, product_id: str) -> ScrapedProduct | None:
