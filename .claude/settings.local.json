@@ -32,7 +32,9 @@
       "Bash(export PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\")",
       "Bash(pod install:*)",
       "Bash(gem contents:*)",
-      "Bash(git -C /Users/Gokay/Desktop/Prial status)"
+      "Bash(git -C /Users/Gokay/Desktop/Prial status)",
+      "Bash(curl:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMjRkNGU0Yy1mODJkLTRmOGYtOWU3OC0wYjBkMTBhZmY3OTQiLCJleHAiOjE3NzE4OTA2MzIsInR5cGUiOiJhY2Nlc3MifQ.4yOp2AjDtE4pquCLv7NEEZz52b0YKzuTYBMLTtaJcZw\" __NEW_LINE_4005c0d8678fd4e9__ curl -s -X POST \"https://prial-app-production.up.railway.app/api/v1/products/preview\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" -d '{\"\"\"\"url\"\"\"\":\"\"\"\"https://www.trendyol.com/arzum/ok004-okka-minio-turk-kahvesi-makinesi-bakir-p-146157\"\"\"\"}')"
     ]
   }
 }
