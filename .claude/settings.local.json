@@ -25,7 +25,14 @@
       "Bash(node -e:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(npx expo:*)",
+      "Bash(pkill:*)",
+      "Bash(pod install)",
+      "Bash(export PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\")",
+      "Bash(pod install:*)",
+      "Bash(gem contents:*)",
+      "Bash(git -C /Users/Gokay/Desktop/Prial status)"
     ]
   }
 }

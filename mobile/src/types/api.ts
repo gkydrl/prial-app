@@ -111,6 +111,12 @@ export interface TopDropResponse {
 
 // ─── API Responses ───────────────────────────────────────────────────────────
 
+export interface ProductPreviewResponse {
+  title: string;
+  current_price: number;
+  image_url: string | null;
+}
+
 export interface AddProductResponse {
   message: string;
   alarm_id?: string;

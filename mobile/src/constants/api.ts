@@ -12,6 +12,7 @@ export const ENDPOINTS = {
   USER_FIREBASE_TOKEN: '/users/me/firebase-token',
 
   // Products
+  PRODUCT_PREVIEW: '/products/preview',
   PRODUCT_ADD: '/products/add',
   PRODUCT_DETAIL: (id: string) => `/products/${id}`,
   PRODUCT_HISTORY: (id: string) => `/products/${id}/price-history`,

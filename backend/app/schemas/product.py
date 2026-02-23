@@ -38,6 +38,16 @@ class ProductAddRequest(BaseModel):
     target_price: Decimal = Field(gt=0, description="Alarm kurulacak hedef fiyat")
 
 
+class ProductPreviewRequest(BaseModel):
+    url: str = Field(description="E-ticaret ürün sayfası URL'i")
+
+
+class ProductPreviewResponse(BaseModel):
+    title: str
+    current_price: Decimal
+    image_url: str | None
+
+
 class PriceHistoryPoint(BaseModel):
     price: Decimal
     recorded_at: datetime

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScrollView, View, Text, FlatList, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHome } from '@/hooks/useHome';
@@ -6,12 +7,22 @@ import { DealCard } from '@/components/home/DealCard';
 import { TopDropCard } from '@/components/home/TopDropCard';
 import { ProductCard } from '@/components/product/ProductCard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { OnboardingModal } from '@/components/home/OnboardingModal';
+import { useAuthStore } from '@/store/authStore';
 
 export default function HomeScreen() {
   const { dailyDeals, topDrops, mostAlarmed, isLoading, refresh } = useHome();
+  const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
+  const [modalDismissed, setModalDismissed] = useState(false);
+
+  const showOnboarding = !hasCompletedOnboarding && !modalDismissed;
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+      <OnboardingModal
+        visible={showOnboarding}
+        onDismiss={() => setModalDismissed(true)}
+      />
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}

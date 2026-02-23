@@ -8,11 +8,36 @@ from app.models.user import User
 from app.models.product import Product, ProductStore
 from app.models.alarm import Alarm, AlarmStatus
 from app.models.price_history import PriceHistory
-from app.schemas.product import ProductResponse, ProductAddRequest, PriceHistoryPoint
+from app.schemas.product import ProductResponse, ProductAddRequest, PriceHistoryPoint, ProductPreviewRequest, ProductPreviewResponse
 from app.schemas.alarm import AlarmResponse
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+@router.post("/preview", response_model=ProductPreviewResponse)
+async def preview_product(
+    payload: ProductPreviewRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    URL'yi scrape eder ve ürün bilgisini döner. Veritabanına kaydetmez.
+    """
+    from app.services.scraper.dispatcher import scrape_url
+
+    try:
+        scraped = await scrape_url(payload.url)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Ürün bilgileri alınamadı. Linki kontrol et.")
+
+    if not scraped.current_price:
+        raise HTTPException(status_code=422, detail="Ürün fiyatı bulunamadı.")
+
+    return ProductPreviewResponse(
+        title=scraped.title,
+        current_price=scraped.current_price,
+        image_url=scraped.image_url,
+    )
 
 
 @router.post("/add", response_model=dict)

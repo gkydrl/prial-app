@@ -1,8 +1,11 @@
 import client from './client';
 import { ENDPOINTS } from '@/constants/api';
-import type { AddProductResponse, PriceHistoryPoint, ProductResponse } from '@/types/api';
+import type { AddProductResponse, PriceHistoryPoint, ProductPreviewResponse, ProductResponse } from '@/types/api';
 
 export const productsApi = {
+  preview: (url: string) =>
+    client.post<ProductPreviewResponse>(ENDPOINTS.PRODUCT_PREVIEW, { url }),
+
   add: (url: string, target_price: number) =>
     client.post<AddProductResponse>(ENDPOINTS.PRODUCT_ADD, { url, target_price }),
 
