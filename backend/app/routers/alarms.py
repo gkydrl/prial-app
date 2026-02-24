@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.user import User
 from app.models.alarm import Alarm, AlarmStatus
-from app.models.product import Product
+from app.models.product import Product, ProductStore
 from app.schemas.alarm import AlarmResponse, AlarmUpdate
 from app.core.security import get_current_user
 
@@ -22,7 +22,10 @@ async def list_alarms(
 ):
     query = (
         select(Alarm)
-        .options(selectinload(Alarm.product), selectinload(Alarm.product_store))
+        .options(
+            selectinload(Alarm.product).selectinload(Product.stores),
+            selectinload(Alarm.product_store),
+        )
         .where(Alarm.user_id == current_user.id)
     )
     if status:
