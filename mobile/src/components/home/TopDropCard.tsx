@@ -2,38 +2,47 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { TopDropResponse } from '@/types/api';
 
-const STORE_LABELS: Record<string, string> = {
-  trendyol: 'Trendyol',
-  hepsiburada: 'Hepsiburada',
-  amazon: 'Amazon',
-  n11: 'N11',
-  ciceksepeti: 'Çiçeksepeti',
-  mediamarkt: 'MediaMarkt',
-  teknosa: 'Teknosa',
-  vatan: 'Vatan',
-  other: 'Diğer',
-};
+/** URL'den okunabilir ürün adı türetir */
+function nameFromUrl(url: string): string {
+  try {
+    const segments = new URL(url).pathname.split('/').filter(Boolean);
+    // En uzun segment genellikle ürün slug'ıdır
+    const slug = segments.sort((a, b) => b.length - a.length)[0] ?? '';
+    const cleaned = slug
+      .replace(/-p-\d+$/, '')       // Trendyol: -p-146157
+      .replace(/-hb-\d+$/, '')      // Hepsiburada: -hb-XXX
+      .replace(/-\d+$/, '')         // genel sayısal suffix
+      .replace(/-/g, ' ')
+      .trim();
+    if (!cleaned) return 'Ürün';
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1, 42);
+  } catch {
+    return 'Ürün';
+  }
+}
 
 export function TopDropCard({ item }: { item: TopDropResponse }) {
   const { store, price_now, price_24h_ago, drop_percent } = item;
 
   const nowStr = price_now.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
   const agoStr = price_24h_ago.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
+  const productName = nameFromUrl(store.url);
 
   return (
     <View
       style={{
         width: 160,
-        height: 220,
+        height: 200,
         backgroundColor: '#0F172A',
         borderRadius: 12,
         overflow: 'hidden',
       }}
     >
+      {/* Görsel alanı — 140px (%65) */}
       <View
         style={{
           width: '100%',
-          height: 130,
+          height: 140,
           backgroundColor: '#052E16',
           alignItems: 'center',
           justifyContent: 'center',
@@ -49,39 +58,40 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
         </Text>
       </View>
 
-      <View style={{ flex: 1, padding: 8 }}>
+      {/* Yazı alanı — 60px (%35) */}
+      <View
+        style={{
+          height: 60,
+          paddingHorizontal: 8,
+          paddingVertical: 6,
+          justifyContent: 'space-between',
+        }}
+      >
         <Text
-          style={{
-            color: '#FFFFFF',
-            fontSize: 12,
-            fontFamily: 'Inter_600SemiBold',
-            lineHeight: 16,
-            marginBottom: 4,
-          }}
+          style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 15 }}
           numberOfLines={1}
         >
-          {STORE_LABELS[store.store]}
+          {productName}
         </Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ gap: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text
               style={{
                 color: '#6B7280',
-                fontSize: 11,
+                fontSize: 10,
                 fontFamily: 'Inter_400Regular',
                 textDecorationLine: 'line-through',
               }}
             >
               {agoStr}
             </Text>
-            <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_700Bold' }}>
               {nowStr}
             </Text>
           </View>
-
           <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="notifications-outline" size={16} color="#6C47FF" />
+            <Ionicons name="notifications-outline" size={15} color="#6C47FF" />
           </TouchableOpacity>
         </View>
       </View>

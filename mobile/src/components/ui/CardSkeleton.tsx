@@ -31,20 +31,19 @@ export function CardSkeleton() {
     <View
       style={{
         width: 160,
-        height: 220,
+        height: 200,
         backgroundColor: '#0F172A',
         borderRadius: 12,
         overflow: 'hidden',
       }}
     >
-      {/* Görsel alanı */}
-      <SkeletonBox width="100%" height={130} borderRadius={0} />
+      {/* Görsel alanı — 140px */}
+      <SkeletonBox width="100%" height={140} borderRadius={0} />
 
-      {/* İçerik */}
-      <View style={{ padding: 8, gap: 6, flex: 1, justifyContent: 'center' }}>
-        <SkeletonBox width="90%" height={11} />
-        <SkeletonBox width="70%" height={11} />
-        <SkeletonBox width="50%" height={14} borderRadius={4} />
+      {/* Yazı alanı — 60px */}
+      <View style={{ height: 60, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
+        <SkeletonBox width="85%" height={11} />
+        <SkeletonBox width="55%" height={13} borderRadius={4} />
       </View>
     </View>
   );

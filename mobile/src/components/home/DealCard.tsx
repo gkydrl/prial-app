@@ -35,16 +35,17 @@ export function DealCard({ store }: { store: ProductStoreResponse }) {
     <View
       style={{
         width: 160,
-        height: 220,
+        height: 200,
         backgroundColor: '#0F172A',
         borderRadius: 12,
         overflow: 'hidden',
       }}
     >
+      {/* Görsel alanı — 140px (%65) */}
       <View
         style={{
           width: '100%',
-          height: 130,
+          height: 140,
           backgroundColor: bgColor,
           alignItems: 'center',
           justifyContent: 'center',
@@ -55,14 +56,10 @@ export function DealCard({ store }: { store: ProductStoreResponse }) {
         </Text>
       </View>
 
-      <View style={{ flex: 1, padding: 8 }}>
+      {/* Yazı alanı — 60px (%35) */}
+      <View style={{ height: 60, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
         <Text
-          style={{
-            color: '#9CA3AF',
-            fontSize: 11,
-            fontFamily: 'Inter_400Regular',
-            marginBottom: 4,
-          }}
+          style={{ color: '#9CA3AF', fontSize: 11, fontFamily: 'Inter_400Regular' }}
           numberOfLines={1}
         >
           {store.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}

@@ -21,7 +21,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
       activeOpacity={0.85}
       style={{
         width: 160,
-        height: 220,
+        height: 200,
         backgroundColor: '#0F172A',
         borderRadius: 12,
         overflow: 'hidden',
@@ -29,21 +29,20 @@ export function ProductCard({ product, store }: ProductCardProps) {
     >
       <Image
         source={{ uri: product.image_url ?? undefined }}
-        style={{ width: '100%', height: 130 }}
+        style={{ width: '100%', height: 140 }}
         contentFit="cover"
         placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
       />
 
-      <View style={{ flex: 1, padding: 8 }}>
+      <View style={{ height: 60, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
         <Text
           style={{
             color: '#FFFFFF',
-            fontSize: 12,
+            fontSize: 11,
             fontFamily: 'Inter_600SemiBold',
-            lineHeight: 16,
-            marginBottom: 4,
+            lineHeight: 15,
           }}
-          numberOfLines={2}
+          numberOfLines={1}
         >
           {product.title}
         </Text>
