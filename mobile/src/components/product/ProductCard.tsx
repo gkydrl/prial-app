@@ -27,38 +27,36 @@ export function ProductCard({ product, store }: ProductCardProps) {
         overflow: 'hidden',
       }}
     >
-      {/* Ürün görseli */}
       <Image
         source={{ uri: product.image_url ?? undefined }}
-        style={{ width: '100%', height: 110 }}
+        style={{ width: '100%', height: 130 }}
         contentFit="cover"
         placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
       />
 
-      {/* İçerik */}
-      <View style={{ flex: 1, padding: 10, justifyContent: 'space-between' }}>
+      <View style={{ flex: 1, padding: 8 }}>
         <Text
           style={{
             color: '#FFFFFF',
             fontSize: 12,
             fontFamily: 'Inter_600SemiBold',
-            lineHeight: 17,
+            lineHeight: 16,
+            marginBottom: 4,
           }}
           numberOfLines={2}
         >
           {product.title}
         </Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <View style={{ gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {!!activeStore?.discount_percent && (
               <View
                 style={{
                   backgroundColor: '#22C55E',
                   borderRadius: 4,
-                  paddingHorizontal: 6,
+                  paddingHorizontal: 5,
                   paddingVertical: 2,
-                  alignSelf: 'flex-start',
                 }}
               >
                 <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
@@ -75,7 +73,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
             onPress={() => router.push(`/product/${product.id}`)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="bell-outline" size={18} color="#6C47FF" />
+            <Ionicons name="notifications-outline" size={16} color="#6C47FF" />
           </TouchableOpacity>
         </View>
       </View>

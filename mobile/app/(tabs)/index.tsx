@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { ScrollView, View, Text, RefreshControl } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useHome } from '@/hooks/useHome';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import { DealCard } from '@/components/home/DealCard';
 import { TopDropCard } from '@/components/home/TopDropCard';
 import { ProductCard } from '@/components/product/ProductCard';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { CardSkeletonRow } from '@/components/ui/CardSkeleton';
 import { OnboardingModal } from '@/components/home/OnboardingModal';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,6 +28,34 @@ export default function HomeScreen() {
         onDismiss={() => setModalDismissed(true)}
       />
 
+      {/* Üst bar: logo + arama ikonu */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+        }}
+      >
+        <Text
+          style={{
+            color: '#6C47FF',
+            fontSize: 20,
+            fontFamily: 'Inter_700Bold',
+            letterSpacing: -0.5,
+          }}
+        >
+          prial
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.push('/discover/search')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="search-outline" size={22} color="#9CA3AF" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
@@ -38,16 +67,6 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Header */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 28, fontFamily: 'Inter_700Bold' }}>
-            Prial
-          </Text>
-          <Text style={{ color: '#6B7280', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
-            Fiyatlar düşüyor, alarm kuruyoruz
-          </Text>
-        </View>
-
         {/* Günün İndirimleri */}
         <View style={{ marginBottom: 24 }}>
           <SectionHeader
@@ -55,10 +74,8 @@ export default function HomeScreen() {
             subtitle="Bugün en çok indirim yapılan ürünler"
             onSeeAll={() => router.push('/(tabs)/discover')}
           />
-          {isLoading && dailyDeals.length === 0 ? (
-            <View style={{ height: 220, alignItems: 'center', justifyContent: 'center' }}>
-              <LoadingSpinner />
-            </View>
+          {isLoading ? (
+            <CardSkeletonRow count={3} />
           ) : (
             <ScrollView
               horizontal
@@ -79,10 +96,8 @@ export default function HomeScreen() {
             subtitle="Son 24 saatte fiyatı en çok gerileyen ürünler"
             onSeeAll={() => router.push('/(tabs)/discover')}
           />
-          {isLoading && topDrops.length === 0 ? (
-            <View style={{ height: 220, alignItems: 'center', justifyContent: 'center' }}>
-              <LoadingSpinner />
-            </View>
+          {isLoading ? (
+            <CardSkeletonRow count={3} />
           ) : (
             <ScrollView
               horizontal
@@ -103,10 +118,8 @@ export default function HomeScreen() {
             subtitle="Kullanıcıların alarm kurduğu popüler ürünler"
             onSeeAll={() => router.push('/(tabs)/discover')}
           />
-          {isLoading && mostAlarmed.length === 0 ? (
-            <View style={{ height: 220, alignItems: 'center', justifyContent: 'center' }}>
-              <LoadingSpinner />
-            </View>
+          {isLoading ? (
+            <CardSkeletonRow count={3} />
           ) : (
             <ScrollView
               horizontal

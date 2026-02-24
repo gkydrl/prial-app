@@ -30,11 +30,10 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
         overflow: 'hidden',
       }}
     >
-      {/* Düşüş görseli */}
       <View
         style={{
           width: '100%',
-          height: 110,
+          height: 130,
           backgroundColor: '#052E16',
           alignItems: 'center',
           justifyContent: 'center',
@@ -50,22 +49,22 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
         </Text>
       </View>
 
-      {/* İçerik */}
-      <View style={{ flex: 1, padding: 10, justifyContent: 'space-between' }}>
+      <View style={{ flex: 1, padding: 8 }}>
         <Text
           style={{
             color: '#FFFFFF',
             fontSize: 12,
             fontFamily: 'Inter_600SemiBold',
-            lineHeight: 17,
+            lineHeight: 16,
+            marginBottom: 4,
           }}
-          numberOfLines={2}
+          numberOfLines={1}
         >
           {STORE_LABELS[store.store]}
         </Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <View style={{ gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ gap: 1 }}>
             <Text
               style={{
                 color: '#6B7280',
@@ -82,7 +81,7 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
           </View>
 
           <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="bell-outline" size={18} color="#6C47FF" />
+            <Ionicons name="notifications-outline" size={16} color="#6C47FF" />
           </TouchableOpacity>
         </View>
       </View>

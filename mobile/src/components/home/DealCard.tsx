@@ -41,11 +41,10 @@ export function DealCard({ store }: { store: ProductStoreResponse }) {
         overflow: 'hidden',
       }}
     >
-      {/* Mağaza rengi alanı */}
       <View
         style={{
           width: '100%',
-          height: 110,
+          height: 130,
           backgroundColor: bgColor,
           alignItems: 'center',
           justifyContent: 'center',
@@ -56,25 +55,28 @@ export function DealCard({ store }: { store: ProductStoreResponse }) {
         </Text>
       </View>
 
-      {/* İçerik */}
-      <View style={{ flex: 1, padding: 10, justifyContent: 'space-between' }}>
+      <View style={{ flex: 1, padding: 8 }}>
         <Text
-          style={{ color: '#9CA3AF', fontSize: 11, fontFamily: 'Inter_400Regular' }}
-          numberOfLines={2}
+          style={{
+            color: '#9CA3AF',
+            fontSize: 11,
+            fontFamily: 'Inter_400Regular',
+            marginBottom: 4,
+          }}
+          numberOfLines={1}
         >
           {store.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
         </Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <View style={{ gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {!!store.discount_percent && (
               <View
                 style={{
                   backgroundColor: '#22C55E',
                   borderRadius: 4,
-                  paddingHorizontal: 6,
+                  paddingHorizontal: 5,
                   paddingVertical: 2,
-                  alignSelf: 'flex-start',
                 }}
               >
                 <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
@@ -88,7 +90,7 @@ export function DealCard({ store }: { store: ProductStoreResponse }) {
           </View>
 
           <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="bell-outline" size={18} color="#6C47FF" />
+            <Ionicons name="notifications-outline" size={16} color="#6C47FF" />
           </TouchableOpacity>
         </View>
       </View>
