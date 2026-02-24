@@ -1,32 +1,45 @@
 import { View, Text, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import type { TopDropResponse } from '@/types/api';
 
-/** URL'den okunabilir ürün adı türetir */
+/** URL'den ürün adı türetir, her kelimeyi capitalize eder */
 function nameFromUrl(url: string): string {
   try {
     const segments = new URL(url).pathname.split('/').filter(Boolean);
-    // En uzun segment genellikle ürün slug'ıdır
     const slug = segments.sort((a, b) => b.length - a.length)[0] ?? '';
     const cleaned = slug
-      .replace(/-p-\d+$/, '')       // Trendyol: -p-146157
-      .replace(/-hb-\d+$/, '')      // Hepsiburada: -hb-XXX
-      .replace(/-\d+$/, '')         // genel sayısal suffix
+      .replace(/-p-\d+$/, '')
+      .replace(/-hb-\d+$/, '')
+      .replace(/-\d+$/, '')
       .replace(/-/g, ' ')
       .trim();
     if (!cleaned) return 'Ürün';
-    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1, 42);
+    return cleaned
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+      .slice(0, 42);
   } catch {
     return 'Ürün';
   }
 }
 
+function capitalize(str: string): string {
+  return str
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 export function TopDropCard({ item }: { item: TopDropResponse }) {
-  const { store, price_now, price_24h_ago, drop_percent } = item;
+  const { product, store, price_now, price_24h_ago, drop_percent } = item;
 
   const nowStr = price_now.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
   const agoStr = price_24h_ago.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
-  const productName = nameFromUrl(store.url);
+  const productName = product?.title
+    ? capitalize(product.title)
+    : nameFromUrl(store.url);
 
   return (
     <View
@@ -38,27 +51,37 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
         overflow: 'hidden',
       }}
     >
-      {/* Görsel alanı — 140px (%65) */}
-      <View
-        style={{
-          width: '100%',
-          height: 140,
-          backgroundColor: '#052E16',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4,
-        }}
-      >
-        <Ionicons name="trending-down" size={28} color="#22C55E" />
-        <Text style={{ color: '#22C55E', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
-          %{drop_percent.toFixed(1)}
-        </Text>
-        <Text style={{ color: '#6B7280', fontSize: 11, fontFamily: 'Inter_400Regular' }}>
-          24 saatte düştü
-        </Text>
+      {/* Görsel alanı — 140px */}
+      <View style={{ width: '100%', height: 140 }}>
+        <Image
+          source={{ uri: product?.image_url ?? undefined }}
+          style={{ width: '100%', height: 140 }}
+          contentFit="cover"
+          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+        />
+        {/* Drop badge — sol üst köşe */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            backgroundColor: '#22C55E',
+            borderRadius: 6,
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 2,
+          }}
+        >
+          <Ionicons name="trending-down" size={10} color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+            -{drop_percent.toFixed(1)}%
+          </Text>
+        </View>
       </View>
 
-      {/* Yazı alanı — 60px (%35) */}
+      {/* Yazı alanı — 60px */}
       <View
         style={{
           height: 60,

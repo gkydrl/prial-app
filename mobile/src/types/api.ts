@@ -102,6 +102,7 @@ export interface AlarmUpdatePayload {
 // ─── Home ────────────────────────────────────────────────────────────────────
 
 export interface TopDropResponse {
+  product: ProductResponse;
   store: ProductStoreResponse;
   price_24h_ago: number;
   price_now: number;

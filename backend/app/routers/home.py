@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
@@ -44,6 +45,7 @@ async def top_drops(limit: int = 20, db: AsyncSession = Depends(get_db)):
 
     result = await db.execute(
         select(ProductStore, subquery.c.min_price, subquery.c.max_price)
+        .options(selectinload(ProductStore.product).selectinload(Product.stores))
         .join(subquery, ProductStore.id == subquery.c.product_store_id)
         .where(subquery.c.max_price > subquery.c.min_price)
         .order_by(desc(subquery.c.max_price - subquery.c.min_price))
@@ -53,6 +55,7 @@ async def top_drops(limit: int = 20, db: AsyncSession = Depends(get_db)):
 
     return [
         {
+            "product": row[0].product,
             "store": row[0],
             "price_24h_ago": row[2],
             "price_now": row[1],
