@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, RefreshControl } from 'react-native';
+import { ScrollView, View, Image, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ import { CardSkeletonRow } from '@/components/ui/CardSkeleton';
 import { OnboardingModal } from '@/components/home/OnboardingModal';
 import { useAuthStore } from '@/store/authStore';
 
-const BG = '#080810';
+const BG = '#0A1628';
 
 export default function HomeScreen() {
   const { dailyDeals, topDrops, mostAlarmed, isLoading, refresh } = useHome();
@@ -28,31 +28,26 @@ export default function HomeScreen() {
         onDismiss={() => setModalDismissed(true)}
       />
 
-      {/* Üst bar: logo + arama ikonu */}
+      {/* Üst bar: logo + bildirim ikonu */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingVertical: 10,
         }}
       >
-        <Text
-          style={{
-            color: '#6C47FF',
-            fontSize: 20,
-            fontFamily: 'Inter_700Bold',
-            letterSpacing: -0.5,
-          }}
-        >
-          prial
-        </Text>
+        <Image
+          source={require('../../../assets/images/logo.png')}
+          style={{ width: 90, height: 36 }}
+          resizeMode="contain"
+        />
         <TouchableOpacity
-          onPress={() => router.push('/discover/search')}
+          onPress={() => router.push('/(tabs)/alarms')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="search-outline" size={22} color="#9CA3AF" />
+          <Ionicons name="notifications-outline" size={22} color="#9CA3AF" />
         </TouchableOpacity>
       </View>
 
