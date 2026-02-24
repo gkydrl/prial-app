@@ -2,6 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
@@ -19,7 +20,11 @@ async def list_alarms(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Alarm).where(Alarm.user_id == current_user.id)
+    query = (
+        select(Alarm)
+        .options(selectinload(Alarm.product), selectinload(Alarm.product_store))
+        .where(Alarm.user_id == current_user.id)
+    )
     if status:
         query = query.where(Alarm.status == status)
     query = query.order_by(Alarm.created_at.desc())
