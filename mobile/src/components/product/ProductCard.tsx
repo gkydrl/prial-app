@@ -1,10 +1,7 @@
-import React from 'react';
 import { TouchableOpacity, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Card } from '@/components/ui/Card';
-import { PriceText } from '@/components/ui/PriceText';
-import { DiscountBadge } from '@/components/ui/Badge';
+import { Ionicons } from '@expo/vector-icons';
 import type { ProductResponse, ProductStoreResponse } from '@/types/api';
 
 interface ProductCardProps {
@@ -15,31 +12,73 @@ interface ProductCardProps {
 export function ProductCard({ product, store }: ProductCardProps) {
   const activeStore = store ?? product.stores[0];
 
+  const price = activeStore?.current_price;
+  const priceStr = price != null ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : '-';
+
   return (
     <TouchableOpacity
       onPress={() => router.push(`/product/${product.id}`)}
       activeOpacity={0.85}
+      style={{
+        width: 160,
+        height: 220,
+        backgroundColor: '#0F172A',
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
     >
-      <Card className="w-44">
-        <Image
-          source={{ uri: product.image_url ?? undefined }}
-          style={{ width: '100%', height: 140 }}
-          contentFit="cover"
-          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-        />
-        <View className="p-3 gap-1">
-          {activeStore?.discount_percent && (
-            <DiscountBadge percent={activeStore.discount_percent} />
-          )}
-          <Text className="text-white text-sm font-medium" numberOfLines={2}>
-            {product.title}
-          </Text>
-          <PriceText value={activeStore?.current_price} size="md" />
-          {activeStore?.original_price && activeStore.original_price !== activeStore.current_price && (
-            <PriceText value={activeStore.original_price} size="sm" dimmed />
-          )}
+      {/* Ürün görseli */}
+      <Image
+        source={{ uri: product.image_url ?? undefined }}
+        style={{ width: '100%', height: 110 }}
+        contentFit="cover"
+        placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+      />
+
+      {/* İçerik */}
+      <View style={{ flex: 1, padding: 10, justifyContent: 'space-between' }}>
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 12,
+            fontFamily: 'Inter_600SemiBold',
+            lineHeight: 17,
+          }}
+          numberOfLines={2}
+        >
+          {product.title}
+        </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <View style={{ gap: 4 }}>
+            {!!activeStore?.discount_percent && (
+              <View
+                style={{
+                  backgroundColor: '#22C55E',
+                  borderRadius: 4,
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                  %{activeStore.discount_percent}
+                </Text>
+              </View>
+            )}
+            <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>
+              {priceStr}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => router.push(`/product/${product.id}`)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="bell-outline" size={18} color="#6C47FF" />
+          </TouchableOpacity>
         </View>
-      </Card>
+      </View>
     </TouchableOpacity>
   );
 }
