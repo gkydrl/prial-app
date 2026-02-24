@@ -48,7 +48,7 @@ export default function DiscoverScreen() {
               <Text
                 style={{
                   color: activeTime === filter ? '#FFFFFF' : '#6B7280',
-                  fontWeight: '500',
+                  fontFamily: 'Inter_500Medium',
                   fontSize: 14,
                 }}
               >
@@ -80,7 +80,7 @@ export default function DiscoverScreen() {
               <Text
                 style={{
                   color: activeSort === filter ? '#FFFFFF' : '#6B7280',
-                  fontWeight: '500',
+                  fontFamily: 'Inter_500Medium',
                   fontSize: 14,
                 }}
               >

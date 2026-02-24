@@ -57,11 +57,11 @@ export function AlarmSetupSheet({ productId, currentPrice, onSuccess, sheetRef }
 
   const formContent = (
     <>
-      <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' }}>Fiyat Alarmı Kur</Text>
+      <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>Fiyat Alarmı Kur</Text>
       {currentPrice && (
         <Text style={{ color: '#9CA3AF', fontSize: 14 }}>
           Güncel fiyat:{' '}
-          <Text style={{ color: '#FFFFFF', fontWeight: '500' }}>₺{currentPrice.toFixed(2)}</Text>
+          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_500Medium' }}>₺{currentPrice.toFixed(2)}</Text>
         </Text>
       )}
       <Input

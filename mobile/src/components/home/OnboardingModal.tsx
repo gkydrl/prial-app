@@ -133,7 +133,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
 
             {/* Header */}
             <View style={{ gap: 6 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '700' }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
                 İlk alarmını kur
               </Text>
               <Text style={{ color: '#9CA3AF', fontSize: 14, lineHeight: 20 }}>
@@ -143,7 +143,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
 
             {/* URL Input */}
             <View style={{ gap: 6 }}>
-              <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '500' }}>
+              <Text style={{ color: '#9CA3AF', fontSize: 13, fontFamily: 'Inter_500Medium' }}>
                 Ürün Linki
               </Text>
               <View style={{ position: 'relative' }}>
@@ -195,14 +195,14 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
                 }}
               >
                 <Text
-                  style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}
+                  style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}
                   numberOfLines={2}
                 >
                   {preview.title}
                 </Text>
                 <Text style={{ color: '#9CA3AF', fontSize: 13 }}>
                   Mevcut fiyat:{' '}
-                  <Text style={{ color: '#6C47FF', fontWeight: '700' }}>
+                  <Text style={{ color: '#6C47FF', fontFamily: 'Inter_700Bold' }}>
                     {formatPrice(preview.current_price)} ₺
                   </Text>
                 </Text>
@@ -224,7 +224,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
                   style={{ width: '100%', height: 40 }}
                 />
                 <Text style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center' }}>
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>
+                  <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_700Bold' }}>
                     {formatPrice(sliderValue)} ₺
                   </Text>
                   {' '}altına düşünce bildir
@@ -239,7 +239,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
             {/* Manuel fiyat (preview başarısızsa fallback) */}
             {previewFailed && !previewing && (
               <View style={{ gap: 6 }}>
-                <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '500' }}>
+                <Text style={{ color: '#9CA3AF', fontSize: 13, fontFamily: 'Inter_500Medium' }}>
                   Hedef Fiyat (₺)
                 </Text>
                 <TextInput
@@ -280,7 +280,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
                   style={{
                     color: canSubmit ? '#FFFFFF' : '#6B7280',
                     fontSize: 16,
-                    fontWeight: '700',
+                    fontFamily: 'Inter_700Bold',
                   }}
                 >
                   Alarm Kur

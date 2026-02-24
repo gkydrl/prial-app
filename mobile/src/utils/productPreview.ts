@@ -21,7 +21,7 @@ export async function fetchProductPreview(url: string): Promise<PreviewResult> {
   return result;
 }
 
-/** <script type="application/ld+json"> içindeki Product verisini parse eder */
+/** <script type="application/ld+json"> içindeki Product/ProductGroup verisini parse eder */
 function parseLdJson(html: string): PreviewResult | null {
   const scriptRe = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
@@ -32,21 +32,32 @@ function parseLdJson(html: string): PreviewResult | null {
       const items: any[] = Array.isArray(data) ? data : [data];
 
       for (const item of items) {
-        if (item?.['@type'] !== 'Product') continue;
+        const type = item?.['@type'];
+        if (type !== 'Product' && type !== 'ProductGroup') continue;
 
+        // Fiyat: offers.price → offers.lowPrice → hasVariant[0].offers.price
         const offers = item.offers ?? {};
-        const price = parseFloat(
-          (offers.price ?? offers.lowPrice ?? '').toString().replace(',', '.')
-        );
+        let rawPrice =
+          offers.price ??
+          offers.lowPrice ??
+          item.hasVariant?.[0]?.offers?.price ??
+          '';
+        const price = parseFloat(rawPrice.toString().replace(',', '.'));
         if (!price || isNaN(price)) continue;
 
+        // Görsel: string | string[] | ImageObject { contentUrl: string[] }
         const imageRaw = item.image;
-        const image_url =
-          typeof imageRaw === 'string'
-            ? imageRaw
-            : Array.isArray(imageRaw)
-            ? imageRaw[0] ?? null
-            : null;
+        let image_url: string | null = null;
+        if (typeof imageRaw === 'string') {
+          image_url = imageRaw;
+        } else if (Array.isArray(imageRaw)) {
+          image_url = imageRaw[0] ?? null;
+        } else if (imageRaw && typeof imageRaw === 'object') {
+          const contentUrl = imageRaw.contentUrl;
+          image_url = Array.isArray(contentUrl)
+            ? contentUrl[0] ?? null
+            : contentUrl ?? null;
+        }
 
         return { title: item.name ?? '', current_price: price, image_url };
       }
