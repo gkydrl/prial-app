@@ -2,6 +2,7 @@ import { TouchableOpacity, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import type { ProductResponse, ProductStoreResponse } from '@/types/api';
 
 interface ProductCardProps {
@@ -13,7 +14,11 @@ export function ProductCard({ product, store }: ProductCardProps) {
   const activeStore = store ?? product.stores[0];
 
   const price = activeStore?.current_price;
+  const originalPrice = activeStore?.original_price;
+  const discount = activeStore?.discount_percent;
+
   const priceStr = price != null ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : '-';
+  const originalStr = originalPrice != null ? originalPrice.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : null;
 
   return (
     <TouchableOpacity
@@ -22,57 +27,56 @@ export function ProductCard({ product, store }: ProductCardProps) {
       style={{
         width: 160,
         height: 200,
-        backgroundColor: '#0F172A',
-        borderRadius: 12,
+        backgroundColor: '#1E293B',
+        borderRadius: 16,
         overflow: 'hidden',
       }}
     >
-      <Image
-        source={{ uri: product.image_url ?? undefined }}
-        style={{ width: '100%', height: 140 }}
-        contentFit="cover"
-        placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-      />
+      {/* Görsel alanı */}
+      <View style={{ width: '100%', height: 140 }}>
+        <Image
+          source={{ uri: product.image_url ?? undefined }}
+          style={{ width: '100%', height: 140 }}
+          contentFit="cover"
+          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+        />
+        {/* İndirim badge — sol üst köşe */}
+        {!!discount && <DiscountBadge percent={discount} />}
+      </View>
 
+      {/* Yazı alanı */}
       <View style={{ height: 60, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
         <Text
-          style={{
-            color: '#FFFFFF',
-            fontSize: 11,
-            fontFamily: 'Inter_600SemiBold',
-            lineHeight: 15,
-          }}
+          style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 15 }}
           numberOfLines={1}
         >
           {product.title}
         </Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {!!activeStore?.discount_percent && (
-              <View
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {originalStr && (
+              <Text
                 style={{
-                  backgroundColor: '#22C55E',
-                  borderRadius: 4,
-                  paddingHorizontal: 5,
-                  paddingVertical: 2,
+                  color: '#6B7280',
+                  fontSize: 11,
+                  fontFamily: 'Inter_400Regular',
+                  textDecorationLine: 'line-through',
                 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
-                  %{activeStore.discount_percent}
-                </Text>
-              </View>
+                {originalStr}
+              </Text>
             )}
-            <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
               {priceStr}
             </Text>
           </View>
 
           <TouchableOpacity
-            onPress={() => router.push(`/product/${product.id}`)}
+            onPress={(e) => { e.stopPropagation(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="notifications-outline" size={16} color="#6C47FF" />
+            <Ionicons name="locate-outline" size={16} color="#6C47FF" />
           </TouchableOpacity>
         </View>
       </View>

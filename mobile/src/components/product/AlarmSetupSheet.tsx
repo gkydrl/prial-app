@@ -41,7 +41,7 @@ export function AlarmSetupSheet({ productId, currentPrice, onSuccess, sheetRef }
 
     setLoading(true);
     try {
-      Alert.alert('Başarılı', 'Alarm kuruldu! Fiyat hedefe düşünce bildirim alacaksınız.');
+      Alert.alert('Başarılı', 'Talep oluşturuldu! Fiyat hedefe düşünce bildirim alacaksınız.');
       if (Platform.OS === 'web') {
         setWebVisible(false);
       } else {
@@ -49,7 +49,7 @@ export function AlarmSetupSheet({ productId, currentPrice, onSuccess, sheetRef }
       }
       onSuccess?.();
     } catch (e: any) {
-      Alert.alert('Hata', e.response?.data?.detail ?? 'Alarm kurulamadı');
+      Alert.alert('Hata', e.response?.data?.detail ?? 'Talep oluşturulamadı');
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ export function AlarmSetupSheet({ productId, currentPrice, onSuccess, sheetRef }
 
   const formContent = (
     <>
-      <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>Fiyat Alarmı Kur</Text>
+      <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>Talep Et</Text>
       {currentPrice && (
         <Text style={{ color: '#9CA3AF', fontSize: 14 }}>
           Güncel fiyat:{' '}
@@ -72,7 +72,7 @@ export function AlarmSetupSheet({ productId, currentPrice, onSuccess, sheetRef }
         placeholder="örn: 999.99"
       />
       <Button onPress={handleSetAlarm} loading={loading}>
-        Alarm Kur
+        Talep Et
       </Button>
     </>
   );

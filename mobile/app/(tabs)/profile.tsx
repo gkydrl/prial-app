@@ -1,43 +1,127 @@
 import { View, Text, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/api/users';
-import { Colors } from '@/constants/colors';
-import type { UserUpdatePreferences } from '@/types/api';
 
-function PreferenceRow({
+const BG = '#0A1628';
+const ROW_BG = '#0F172A';
+const SEPARATOR = '#1E293B';
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// ─── Ayar Satırı (ok ile) ─────────────────────────────────────────────────────
+
+function SettingRow({
+  icon,
+  label,
+  onPress,
+  showSeparator = true,
+}: {
+  icon: IoniconName;
+  label: string;
+  onPress?: () => void;
+  showSeparator?: boolean;
+}) {
+  return (
+    <>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.7}
+        style={{
+          backgroundColor: ROW_BG,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          gap: 12,
+        }}
+      >
+        <Ionicons name={icon} size={20} color="#64748B" />
+        <Text style={{ flex: 1, color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+          {label}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color="#334155" />
+      </TouchableOpacity>
+      {showSeparator && (
+        <View style={{ height: 1, backgroundColor: SEPARATOR, marginLeft: 52 }} />
+      )}
+    </>
+  );
+}
+
+// ─── Toggle Satırı ────────────────────────────────────────────────────────────
+
+function ToggleRow({
+  icon,
   label,
   value,
   onToggle,
 }: {
+  icon: IoniconName;
   label: string;
   value: boolean;
   onToggle: (v: boolean) => void;
 }) {
   return (
-    <View className="flex-row items-center justify-between py-3.5 border-b border-border">
-      <Text className="text-white text-sm">{label}</Text>
+    <View
+      style={{
+        backgroundColor: ROW_BG,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        gap: 12,
+      }}
+    >
+      <Ionicons name={icon} size={20} color="#64748B" />
+      <Text style={{ flex: 1, color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_400Regular' }}>
+        {label}
+      </Text>
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: Colors.border, true: Colors.brand }}
-        thumbColor="#fff"
+        trackColor={{ false: '#334155', true: '#1D4ED8' }}
+        thumbColor="#FFFFFF"
       />
     </View>
   );
 }
 
-export default function ProfileScreen() {
+// ─── Grup Kapsayıcısı ─────────────────────────────────────────────────────────
+
+function SettingGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={{
+        color: '#64748B',
+        fontSize: 11,
+        fontFamily: 'Inter_600SemiBold',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        paddingHorizontal: 4,
+      }}>
+        {title}
+      </Text>
+      <View style={{ borderRadius: 16, overflow: 'hidden' }}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+// ─── Ana Ekran ────────────────────────────────────────────────────────────────
+
+export default function SettingsScreen() {
   const { user, logout, updateUser } = useAuth();
 
-  const handleToggle = async (field: keyof UserUpdatePreferences, value: boolean) => {
-    updateUser({ [field]: value });
+  const handleToggleNotifications = async (value: boolean) => {
+    updateUser({ push_notifications_enabled: value });
     try {
-      await usersApi.updatePreferences({ [field]: value });
+      await usersApi.updatePreferences({ push_notifications_enabled: value });
     } catch {
-      // Hata → revert
-      updateUser({ [field]: !value });
+      updateUser({ push_notifications_enabled: !value });
       Alert.alert('Hata', 'Tercih güncellenemedi');
     }
   };
@@ -59,56 +143,82 @@ export default function ProfileScreen() {
   if (!user) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView className="flex-1">
+    <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ width: 3, height: 40, borderRadius: 2, backgroundColor: '#1D4ED8' }} />
+        <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>Ayarlar</Text>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Kullanıcı bilgisi */}
-        <View className="px-4 pt-6 pb-4 items-center gap-2">
-          <View className="w-20 h-20 rounded-full bg-brand items-center justify-center">
-            <Text className="text-white text-3xl font-bold">
-              {(user.full_name ?? user.email)[0].toUpperCase()}
+        <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 24 }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold' }}>
+            {user.full_name ?? 'Kullanıcı'}
+          </Text>
+          <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 }}>
+            {user.email}
+          </Text>
+        </View>
+
+        {/* Gruplar */}
+        <View style={{ paddingHorizontal: 16, gap: 0 }}>
+
+          {/* Hesap */}
+          <SettingGroup title="Hesap">
+            <SettingRow icon="person-outline" label="Profil Bilgileri" onPress={() => {}} />
+            <SettingRow icon="lock-closed-outline" label="Şifre Değiştir" onPress={() => {}} showSeparator={false} />
+          </SettingGroup>
+
+          {/* Ayraç */}
+          <View style={{ height: 1, backgroundColor: SEPARATOR, marginVertical: 20 }} />
+
+          {/* Bildirimler */}
+          <SettingGroup title="Bildirimler">
+            <ToggleRow
+              icon="notifications-outline"
+              label="Bildirimler"
+              value={user.push_notifications_enabled}
+              onToggle={handleToggleNotifications}
+            />
+          </SettingGroup>
+
+          {/* Ayraç */}
+          <View style={{ height: 1, backgroundColor: SEPARATOR, marginVertical: 20 }} />
+
+          {/* Uygulama */}
+          <SettingGroup title="Uygulama">
+            <SettingRow icon="star-outline" label="Uygulamayı Puanla" onPress={() => {}} />
+            <SettingRow icon="share-outline" label="Arkadaşına Öner" onPress={() => {}} />
+            <SettingRow icon="document-text-outline" label="Gizlilik Politikası" onPress={() => {}} />
+            <SettingRow icon="information-circle-outline" label="Hakkında" onPress={() => {}} showSeparator={false} />
+          </SettingGroup>
+
+          {/* Çıkış Yap */}
+          <TouchableOpacity
+            onPress={handleLogout}
+            activeOpacity={0.8}
+            style={{
+              marginTop: 28,
+              backgroundColor: '#EF444415',
+              borderWidth: 1,
+              borderColor: '#EF444430',
+              borderRadius: 16,
+              paddingVertical: 16,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#EF4444', fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>
+              Çıkış Yap
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ paddingTop: 20, alignItems: 'center' }}>
+            <Text style={{ color: '#334155', fontSize: 11, fontFamily: 'Inter_400Regular' }}>
+              Prial v1.0.0
             </Text>
           </View>
-          <Text className="text-white text-xl font-bold">{user.full_name ?? 'Kullanıcı'}</Text>
-          <Text className="text-muted text-sm">{user.email}</Text>
-        </View>
 
-        {/* Bildirim tercihleri */}
-        <View className="mx-4 mt-4 bg-card rounded-2xl px-4">
-          <Text className="text-muted text-xs font-semibold pt-4 pb-2 uppercase tracking-wider">
-            Bildirim Tercihleri
-          </Text>
-          <PreferenceRow
-            label="Push Bildirimleri"
-            value={user.push_notifications_enabled}
-            onToggle={(v) => handleToggle('push_notifications_enabled', v)}
-          />
-          <PreferenceRow
-            label="E-posta Bildirimleri"
-            value={user.email_notifications_enabled}
-            onToggle={(v) => handleToggle('email_notifications_enabled', v)}
-          />
-          <PreferenceRow
-            label="Fiyat Düşüşü Bildirimi"
-            value={user.notify_on_price_drop}
-            onToggle={(v) => handleToggle('notify_on_price_drop', v)}
-          />
-          <PreferenceRow
-            label="Stoğa Girince Bildir"
-            value={user.notify_on_back_in_stock}
-            onToggle={(v) => handleToggle('notify_on_back_in_stock', v)}
-          />
-        </View>
-
-        {/* Çıkış */}
-        <TouchableOpacity
-          className="mx-4 mt-6 bg-danger/10 border border-danger/30 rounded-2xl py-4 items-center"
-          onPress={handleLogout}
-        >
-          <Text className="text-danger font-semibold">Çıkış Yap</Text>
-        </TouchableOpacity>
-
-        <View className="py-8 items-center">
-          <Text className="text-muted text-xs">Prial v1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

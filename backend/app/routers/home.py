@@ -14,16 +14,19 @@ router = APIRouter(prefix="/home", tags=["home"])
 
 @router.get("/daily-deals")
 async def daily_deals(limit: int = 20, db: AsyncSession = Depends(get_db)):
-    """Bugünün indirimleri — discount_percent'e göre sıralı."""
+    """Bugünün indirimleri — en yüksek indirimli ürünler."""
+    from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(ProductStore)
+        select(Product)
+        .join(ProductStore, ProductStore.product_id == Product.id)
         .where(ProductStore.discount_percent.isnot(None))
         .where(ProductStore.in_stock == True)
+        .options(selectinload(Product.stores))
         .order_by(desc(ProductStore.discount_percent))
+        .distinct()
         .limit(limit)
     )
-    stores = result.scalars().all()
-    return stores
+    return result.scalars().all()
 
 
 @router.get("/top-drops")

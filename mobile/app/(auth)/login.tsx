@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Alert, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -36,7 +36,11 @@ export default function LoginScreen() {
       <View className="flex-1 justify-center px-6 gap-8">
         {/* Logo */}
         <View className="items-center gap-2">
-          <Text className="text-5xl font-bold text-brand">Prial</Text>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={{ width: 180, height: 90 }}
+            resizeMode="contain"
+          />
           <Text className="text-muted text-base">Fiyat takip ve alarm uygulaması</Text>
         </View>
 

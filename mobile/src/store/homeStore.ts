@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { homeApi } from '@/api/home';
 import { CACHE_TTL_MS } from '@/constants/config';
-import type { ProductResponse, ProductStoreResponse, TopDropResponse } from '@/types/api';
+import type { ProductResponse, TopDropResponse } from '@/types/api';
 
 interface HomeState {
-  dailyDeals: ProductStoreResponse[];
+  dailyDeals: ProductResponse[];
   topDrops: TopDropResponse[];
   mostAlarmed: ProductResponse[];
   isLoading: boolean;
@@ -16,7 +16,7 @@ interface HomeState {
 }
 
 export const useHomeStore = create<HomeState>((set, get) => ({
-  dailyDeals: [],
+  dailyDeals: [] as ProductResponse[],
   topDrops: [],
   mostAlarmed: [],
   isLoading: false,

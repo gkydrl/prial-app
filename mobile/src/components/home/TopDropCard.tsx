@@ -1,9 +1,17 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { DiscountBadge } from '@/components/ui/DiscountBadge';
+
 import type { TopDropResponse } from '@/types/api';
 
-/** URL'den ürün adı türetir, her kelimeyi capitalize eder */
+function capitalize(str: string): string {
+  return str
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 function nameFromUrl(url: string): string {
   try {
     const segments = new URL(url).pathname.split('/').filter(Boolean);
@@ -25,33 +33,24 @@ function nameFromUrl(url: string): string {
   }
 }
 
-function capitalize(str: string): string {
-  return str
-    .split(' ')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
-}
-
 export function TopDropCard({ item }: { item: TopDropResponse }) {
   const { product, store, price_now, price_24h_ago, drop_percent } = item;
 
   const nowStr = price_now.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
   const agoStr = price_24h_ago.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
-  const productName = product?.title
-    ? capitalize(product.title)
-    : nameFromUrl(store.url);
+  const productName = product?.title ? capitalize(product.title) : nameFromUrl(store.url);
 
   return (
     <View
       style={{
         width: 160,
         height: 200,
-        backgroundColor: '#0F172A',
-        borderRadius: 12,
+        backgroundColor: '#1E293B',
+        borderRadius: 16,
         overflow: 'hidden',
       }}
     >
-      {/* Görsel alanı — 140px */}
+      {/* Görsel alanı */}
       <View style={{ width: '100%', height: 140 }}>
         <Image
           source={{ uri: product?.image_url ?? undefined }}
@@ -60,28 +59,10 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
           placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
         />
         {/* Drop badge — sol üst köşe */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            backgroundColor: '#22C55E',
-            borderRadius: 6,
-            paddingHorizontal: 6,
-            paddingVertical: 3,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 2,
-          }}
-        >
-          <Ionicons name="trending-down" size={10} color="#FFFFFF" />
-          <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
-            -{drop_percent.toFixed(1)}%
-          </Text>
-        </View>
+        <DiscountBadge percent={drop_percent} />
       </View>
 
-      {/* Yazı alanı — 60px */}
+      {/* Yazı alanı */}
       <View
         style={{
           height: 60,
@@ -102,14 +83,14 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
             <Text
               style={{
                 color: '#6B7280',
-                fontSize: 10,
+                fontSize: 11,
                 fontFamily: 'Inter_400Regular',
                 textDecorationLine: 'line-through',
               }}
             >
               {agoStr}
             </Text>
-            <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_700Bold' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
               {nowStr}
             </Text>
           </View>

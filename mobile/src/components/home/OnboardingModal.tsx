@@ -90,8 +90,8 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
       onDismiss();
       router.push('/(tabs)/alarms');
     } catch (e: any) {
-      const detail = e.response?.data?.detail ?? 'Alarm kurulamadı. Linki kontrol et.';
-      Alert.alert('Hata', typeof detail === 'string' ? detail : 'Alarm kurulamadı');
+      const detail = e.response?.data?.detail ?? 'Talep oluşturulamadı. Linki kontrol et.';
+      Alert.alert('Hata', typeof detail === 'string' ? detail : 'Talep oluşturulamadı');
     } finally {
       setSubmitting(false);
     }
@@ -134,7 +134,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
             {/* Header */}
             <View style={{ gap: 6 }}>
               <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
-                İlk alarmını kur
+                İlk talebini oluştur
               </Text>
               <Text style={{ color: '#9CA3AF', fontSize: 14, lineHeight: 20 }}>
                 Takip etmek istediğin ürünün linkini yapıştır
@@ -283,7 +283,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
                     fontFamily: 'Inter_700Bold',
                   }}
                 >
-                  Alarm Kur
+                  Talep Et
                 </Text>
               )}
             </TouchableOpacity>
