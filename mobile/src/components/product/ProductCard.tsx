@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { TouchableOpacity, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -11,6 +12,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, store }: ProductCardProps) {
+  const [imgError, setImgError] = useState(false);
   const activeStore = store ?? product.stores[0];
 
   const price = activeStore?.current_price;
@@ -34,12 +36,18 @@ export function ProductCard({ product, store }: ProductCardProps) {
     >
       {/* Görsel alanı */}
       <View style={{ width: '100%', height: 140 }}>
-        <Image
-          source={{ uri: product.image_url ?? undefined }}
-          style={{ width: '100%', height: 140 }}
-          contentFit="cover"
-          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-        />
+        {product.image_url && !imgError ? (
+          <Image
+            source={{ uri: product.image_url }}
+            style={{ width: '100%', height: 140 }}
+            contentFit="contain"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <View style={{ width: '100%', height: 140, backgroundColor: '#2D3F55', justifyContent: 'center', alignItems: 'center' }}>
+            <Ionicons name="cube-outline" size={40} color="#475569" />
+          </View>
+        )}
         {/* İndirim badge — sol üst köşe */}
         {!!discount && <DiscountBadge percent={discount} />}
       </View>
