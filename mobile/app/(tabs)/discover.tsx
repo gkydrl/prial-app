@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +18,18 @@ import type { ProductResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD_BG = '#1E293B';
+
+const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
+  { label: 'Tümü', slug: null, icon: 'apps-outline' },
+  { label: 'Telefon', slug: 'telefon', icon: 'phone-portrait-outline' },
+  { label: 'Bilgisayar', slug: 'bilgisayar', icon: 'laptop-outline' },
+  { label: 'Televizyon', slug: 'televizyon', icon: 'tv-outline' },
+  { label: 'Ev Aleti', slug: 'ev-aleti', icon: 'home-outline' },
+  { label: 'Akıllı Saat', slug: 'akilli-saat', icon: 'watch-outline' },
+  { label: 'Oyun', slug: 'oyun-konsolu', icon: 'game-controller-outline' },
+  { label: 'Kamera', slug: 'kamera', icon: 'camera-outline' },
+  { label: 'Kulaklık', slug: 'kulaklik', icon: 'headset-outline' },
+];
 
 function ProductGridCard({ product }: { product: ProductResponse }) {
   const [imgError, setImgError] = useState(false);
@@ -87,20 +100,24 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
 
 export default function DiscoverScreen() {
   const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProducts = useCallback(async (q: string) => {
+  const fetchProducts = useCallback(async (q: string, category: string | null) => {
     setIsLoading(true);
     try {
-      const endpoint = q.trim()
-        ? ENDPOINTS.DISCOVER_SEARCH
-        : '/products';
-      const params = q.trim()
-        ? { q: q.trim(), limit: 50 }
-        : { limit: 50 };
-      const res = await client.get<ProductResponse[]>(endpoint, { params });
-      setProducts(res.data);
+      if (q.trim()) {
+        const res = await client.get<ProductResponse[]>(ENDPOINTS.DISCOVER_SEARCH, {
+          params: { q: q.trim(), limit: 50 },
+        });
+        setProducts(res.data);
+      } else {
+        const params: Record<string, string | number> = { limit: 50 };
+        if (category) params.category = category;
+        const res = await client.get<ProductResponse[]>('/products', { params });
+        setProducts(res.data);
+      }
     } catch {
       setProducts([]);
     } finally {
@@ -110,19 +127,24 @@ export default function DiscoverScreen() {
 
   // İlk yükleme
   useEffect(() => {
-    fetchProducts('');
+    fetchProducts('', null);
   }, []);
 
-  // Arama debounce
+  // Arama + kategori debounce
   useEffect(() => {
-    const t = setTimeout(() => fetchProducts(query), 400);
+    const t = setTimeout(() => fetchProducts(query, selectedCategory), 400);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, selectedCategory]);
+
+  const handleCategoryPress = (slug: string | null) => {
+    setSelectedCategory(slug);
+    if (query) setQuery('');
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       {/* Başlık + Arama */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, gap: 10 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, gap: 10 }}>
         <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
           Keşfet
         </Text>
@@ -158,6 +180,42 @@ export default function DiscoverScreen() {
         </View>
       </View>
 
+      {/* Kategori Chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 10, gap: 8 }}
+      >
+        {CATEGORIES.map((cat) => {
+          const isActive = selectedCategory === cat.slug;
+          return (
+            <TouchableOpacity
+              key={cat.label}
+              onPress={() => handleCategoryPress(cat.slug)}
+              activeOpacity={0.75}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 20,
+                backgroundColor: isActive ? '#6C47FF' : '#1E293B',
+              }}
+            >
+              <Ionicons name={cat.icon} size={14} color={isActive ? '#FFFFFF' : '#64748B'} />
+              <Text style={{
+                color: isActive ? '#FFFFFF' : '#9CA3AF',
+                fontSize: 12,
+                fontFamily: 'Inter_500Medium',
+              }}>
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       {/* Ürün Grid */}
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -167,7 +225,7 @@ export default function DiscoverScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 }}>
           <Ionicons name="search-outline" size={40} color="#334155" />
           <Text style={{ color: '#64748B', fontSize: 14, fontFamily: 'Inter_400Regular' }}>
-            {query ? 'Ürün bulunamadı' : 'Henüz ürün yok'}
+            {query ? 'Ürün bulunamadı' : 'Bu kategoride ürün yok'}
           </Text>
         </View>
       ) : (

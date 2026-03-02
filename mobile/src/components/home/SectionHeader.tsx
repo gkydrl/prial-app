@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface SectionHeaderProps {
   title: string;
@@ -17,9 +18,14 @@ export function SectionHeader({ title, subtitle, onSeeAll }: SectionHeaderProps)
         marginBottom: 12,
       }}
     >
-      {/* Sol: dikey çizgi + başlık + alt başlık */}
+      {/* Sol: gradient dikey çizgi + başlık + alt başlık */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <View style={{ width: 3, height: 40, borderRadius: 2, backgroundColor: '#1D4ED8' }} />
+        <LinearGradient
+          colors={['#1D4ED8', '#059669']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={{ width: 3, height: 40, borderRadius: 2 }}
+        />
         <View style={{ gap: 2 }}>
           <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>
             {title}

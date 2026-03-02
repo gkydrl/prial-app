@@ -33,10 +33,10 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           paddingVertical: 10,
           paddingHorizontal: 8,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.4,
-          shadowRadius: 16,
-          elevation: 12,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 12,
+          elevation: 10,
         }}
       >
         {TABS.map((tab, index) => {

@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.product import Product, ProductStore
 from app.models.alarm import Alarm, AlarmStatus
 from app.models.price_history import PriceHistory
+from app.models.category import Category
 from app.schemas.product import ProductResponse, ProductAddRequest, PriceHistoryPoint, ProductPreviewRequest, ProductPreviewResponse
 from app.schemas.alarm import AlarmResponse
 from app.core.security import get_current_user
@@ -90,14 +91,16 @@ async def add_product_by_url(
 @router.get("", response_model=list[ProductResponse])
 async def list_products(
     limit: int = Query(default=50, le=200),
+    category: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Tüm ürünleri listeler (Keşfet ekranı için)."""
+    """Tüm ürünleri listeler (Keşfet ekranı için). category slug ile filtrelenebilir."""
+    query = select(Product).options(selectinload(Product.stores))
+    if category:
+        cat_sq = select(Category.id).where(Category.slug == category).scalar_subquery()
+        query = query.where(Product.category_id == cat_sq)
     result = await db.execute(
-        select(Product)
-        .options(selectinload(Product.stores))
-        .order_by(Product.alarm_count.desc(), Product.created_at.desc())
-        .limit(limit)
+        query.order_by(Product.alarm_count.desc(), Product.created_at.desc()).limit(limit)
     )
     return result.scalars().all()
 
