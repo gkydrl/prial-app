@@ -56,11 +56,11 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Görsel */}
-      <View style={{ width: '100%', aspectRatio: 1 }}>
+      <View style={{ width: '100%', height: 100 }}>
         {product.image_url && !imgError ? (
           <Image
             source={{ uri: product.image_url }}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: 100 }}
             contentFit="contain"
             onError={() => setImgError(true)}
           />
@@ -197,9 +197,9 @@ export default function DiscoverScreen() {
               onPress={() => handleCategoryPress(cat.slug)}
               activeOpacity={0.75}
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
+                width: 52,
+                height: 52,
+                borderRadius: 26,
                 backgroundColor: isActive ? '#6C47FF' : '#1E293B',
                 justifyContent: 'center',
                 alignItems: 'center',
