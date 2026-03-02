@@ -1,104 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import Slider from '@react-native-community/slider';
+import { Modal, View, Text, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { productsApi } from '@/api/products';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
-import { fetchProductPreview, type PreviewResult } from '@/utils/productPreview';
 
 interface Props {
   visible: boolean;
   onDismiss: () => void;
 }
 
-function formatPrice(price: number): string {
-  return price.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
 export function OnboardingModal({ visible, onDismiss }: Props) {
-  const [url, setUrl] = useState('');
-  const [previewing, setPreviewing] = useState(false);
-  const [previewFailed, setPreviewFailed] = useState(false);
-  const [preview, setPreview] = useState<PreviewResult | null>(null);
-  const [sliderValue, setSliderValue] = useState(0);
-  const [manualPrice, setManualPrice] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    setPreview(null);
-    setPreviewFailed(false);
-
-    const trimmed = url.trim();
-    if (!trimmed || trimmed.length < 10) return;
-
-    debounceRef.current = setTimeout(async () => {
-      setPreviewing(true);
-      try {
-        const result = await fetchProductPreview(trimmed);
-        setPreview(result);
-        setSliderValue(Math.round(result.current_price * 0.7));
-        setPreviewFailed(false);
-      } catch {
-        setPreview(null);
-        setPreviewFailed(true);
-      } finally {
-        setPreviewing(false);
-      }
-    }, 800);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [url]);
+  const handleExplore = async () => {
+    await completeOnboarding();
+    onDismiss();
+    router.push('/(tabs)/discover');
+  };
 
   const handleSkip = async () => {
     await completeOnboarding();
     onDismiss();
   };
-
-  const targetPrice = preview
-    ? sliderValue
-    : parseFloat(manualPrice.replace(',', '.'));
-
-  const canSubmit =
-    url.trim().length > 10 &&
-    !previewing &&
-    (preview ? sliderValue > 0 : (!isNaN(targetPrice) && targetPrice > 0));
-
-  const handleSetAlarm = async () => {
-    if (!canSubmit) return;
-
-    setSubmitting(true);
-    try {
-      await productsApi.add(url.trim(), targetPrice);
-      await completeOnboarding();
-      onDismiss();
-      router.push('/(tabs)/alarms');
-    } catch (e: any) {
-      const detail = e.response?.data?.detail ?? 'Talep oluşturulamadı. Linki kontrol et.';
-      Alert.alert('Hata', typeof detail === 'string' ? detail : 'Talep oluşturulamadı');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const minPrice = preview ? Math.round(preview.current_price * 0.3) : 0;
-  const maxPrice = preview ? Math.round(preview.current_price * 0.95) : 0;
 
   return (
     <Modal
@@ -109,191 +31,94 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
       onRequestClose={handleSkip}
     >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View
+          style={{
+            backgroundColor: '#1A1A1A',
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            padding: 24,
+            paddingBottom: 44,
+            gap: 24,
+          }}
+        >
+          {/* Handle */}
           <View
             style={{
-              backgroundColor: '#1A1A1A',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: 24,
-              paddingBottom: 44,
-              gap: 20,
+              width: 40,
+              height: 4,
+              backgroundColor: '#3A3A3A',
+              borderRadius: 2,
+              alignSelf: 'center',
+            }}
+          />
+
+          {/* İkon */}
+          <View style={{ alignItems: 'center' }}>
+            <View style={{
+              width: 72,
+              height: 72,
+              borderRadius: 36,
+              backgroundColor: '#1E293B',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <Ionicons name="pricetag-outline" size={36} color="#6C47FF" />
+            </View>
+          </View>
+
+          {/* Başlık */}
+          <View style={{ gap: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
+              Hoş geldin!
+            </Text>
+            <Text style={{ color: '#9CA3AF', fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
+              Takip etmek istediğin ürünleri keşfet ve talep oluştur.{'\n'}
+              Fiyat düşünce seni haberdar edelim.
+            </Text>
+          </View>
+
+          {/* Özellikler */}
+          <View style={{ gap: 12 }}>
+            {[
+              { icon: 'search-outline', text: 'Ürün ara ve keşfet' },
+              { icon: 'pricetag-outline', text: 'Talep oluştur, fiyat düşünce bildir' },
+              { icon: 'trending-down-outline', text: 'Fiyat geçmişini takip et' },
+            ].map((item) => (
+              <View key={item.text} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  backgroundColor: '#262626',
+                  justifyContent: 'center', alignItems: 'center',
+                }}>
+                  <Ionicons name={item.icon as any} size={18} color="#6C47FF" />
+                </View>
+                <Text style={{ color: '#D1D5DB', fontSize: 14, fontFamily: 'Inter_400Regular', flex: 1 }}>
+                  {item.text}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Keşfet Butonu */}
+          <TouchableOpacity
+            onPress={handleExplore}
+            style={{
+              backgroundColor: '#6C47FF',
+              borderRadius: 14,
+              paddingVertical: 16,
+              alignItems: 'center',
             }}
           >
-            {/* Handle */}
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: '#3A3A3A',
-                borderRadius: 2,
-                alignSelf: 'center',
-              }}
-            />
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+              Ürünleri Keşfet
+            </Text>
+          </TouchableOpacity>
 
-            {/* Header */}
-            <View style={{ gap: 6 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
-                İlk talebini oluştur
-              </Text>
-              <Text style={{ color: '#9CA3AF', fontSize: 14, lineHeight: 20 }}>
-                Takip etmek istediğin ürünün linkini yapıştır
-              </Text>
-            </View>
-
-            {/* URL Input */}
-            <View style={{ gap: 6 }}>
-              <Text style={{ color: '#9CA3AF', fontSize: 13, fontFamily: 'Inter_500Medium' }}>
-                Ürün Linki
-              </Text>
-              <View style={{ position: 'relative' }}>
-                <TextInput
-                  value={url}
-                  onChangeText={setUrl}
-                  placeholder="https://trendyol.com/..."
-                  placeholderTextColor="#4B5563"
-                  autoCapitalize="none"
-                  keyboardType="url"
-                  style={{
-                    backgroundColor: '#262626',
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingRight: previewing ? 44 : 16,
-                    paddingVertical: 14,
-                    color: '#FFFFFF',
-                    fontSize: 15,
-                    borderWidth: 1,
-                    borderColor: previewing ? '#6C47FF' : '#333333',
-                  }}
-                />
-                {previewing && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      right: 14,
-                      top: 0,
-                      bottom: 0,
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <ActivityIndicator size="small" color="#6C47FF" />
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Preview Card */}
-            {preview && !previewing && (
-              <View
-                style={{
-                  backgroundColor: '#262626',
-                  borderRadius: 14,
-                  padding: 16,
-                  gap: 4,
-                  borderWidth: 1,
-                  borderColor: '#333333',
-                }}
-              >
-                <Text
-                  style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}
-                  numberOfLines={2}
-                >
-                  {preview.title}
-                </Text>
-                <Text style={{ color: '#9CA3AF', fontSize: 13 }}>
-                  Mevcut fiyat:{' '}
-                  <Text style={{ color: '#6C47FF', fontFamily: 'Inter_700Bold' }}>
-                    {formatPrice(preview.current_price)} ₺
-                  </Text>
-                </Text>
-              </View>
-            )}
-
-            {/* Slider (preview başarılıysa) */}
-            {preview && !previewing && (
-              <View style={{ gap: 8 }}>
-                <Slider
-                  minimumValue={minPrice}
-                  maximumValue={maxPrice}
-                  step={1}
-                  value={sliderValue}
-                  onValueChange={(v) => setSliderValue(Math.round(v))}
-                  minimumTrackTintColor="#6C47FF"
-                  maximumTrackTintColor="#333333"
-                  thumbTintColor="#6C47FF"
-                  style={{ width: '100%', height: 40 }}
-                />
-                <Text style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center' }}>
-                  <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_700Bold' }}>
-                    {formatPrice(sliderValue)} ₺
-                  </Text>
-                  {' '}altına düşünce bildir
-                </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#6B7280', fontSize: 12 }}>{formatPrice(minPrice)} ₺</Text>
-                  <Text style={{ color: '#6B7280', fontSize: 12 }}>{formatPrice(maxPrice)} ₺</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Manuel fiyat (preview başarısızsa fallback) */}
-            {previewFailed && !previewing && (
-              <View style={{ gap: 6 }}>
-                <Text style={{ color: '#9CA3AF', fontSize: 13, fontFamily: 'Inter_500Medium' }}>
-                  Hedef Fiyat (₺)
-                </Text>
-                <TextInput
-                  value={manualPrice}
-                  onChangeText={setManualPrice}
-                  placeholder="örn. 1500"
-                  placeholderTextColor="#4B5563"
-                  keyboardType="decimal-pad"
-                  style={{
-                    backgroundColor: '#262626',
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    color: '#FFFFFF',
-                    fontSize: 15,
-                    borderWidth: 1,
-                    borderColor: '#333333',
-                  }}
-                />
-              </View>
-            )}
-
-            {/* Alarm Kur button */}
-            <TouchableOpacity
-              onPress={handleSetAlarm}
-              disabled={submitting || !canSubmit}
-              style={{
-                backgroundColor: canSubmit ? '#6C47FF' : '#333333',
-                borderRadius: 14,
-                paddingVertical: 16,
-                alignItems: 'center',
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text
-                  style={{
-                    color: canSubmit ? '#FFFFFF' : '#6B7280',
-                    fontSize: 16,
-                    fontFamily: 'Inter_700Bold',
-                  }}
-                >
-                  Talep Et
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Skip */}
-            <TouchableOpacity onPress={handleSkip} style={{ alignItems: 'center' }}>
-              <Text style={{ color: '#6B7280', fontSize: 14 }}>Şimdi değil, atla</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+          {/* Atla */}
+          <TouchableOpacity onPress={handleSkip} style={{ alignItems: 'center' }}>
+            <Text style={{ color: '#6B7280', fontSize: 14 }}>Şimdi değil, atla</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );

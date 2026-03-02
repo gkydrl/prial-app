@@ -1,7 +1,8 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
@@ -84,6 +85,21 @@ async def add_product_by_url(
     )
 
     return {"message": "Ürün ekleniyor, kısa süre içinde alarm kurulacak"}
+
+
+@router.get("", response_model=list[ProductResponse])
+async def list_products(
+    limit: int = Query(default=50, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tüm ürünleri listeler (Keşfet ekranı için)."""
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.stores))
+        .order_by(Product.alarm_count.desc(), Product.created_at.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
 
 
 @router.get("/{product_id}", response_model=ProductResponse)

@@ -21,14 +21,15 @@ function StatBox({ icon, value, label }: { icon: IoniconName; value: string; lab
     <View style={{
       flex: 1,
       backgroundColor: '#1E293B',
-      borderRadius: 12,
-      padding: 12,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 6,
       alignItems: 'center',
-      gap: 4,
+      gap: 2,
     }}>
-      <Ionicons name={icon} size={18} color="#64748B" />
-      <Text style={{ color: '#FFFFFF', fontSize: 24, fontFamily: 'Inter_700Bold' }}>{value}</Text>
-      <Text style={{ color: '#64748B', fontSize: 11, fontFamily: 'Inter_400Regular' }}>{label}</Text>
+      <Ionicons name={icon} size={14} color="#64748B" />
+      <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold' }}>{value}</Text>
+      <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>{label}</Text>
     </View>
   );
 }
@@ -87,7 +88,7 @@ export default function HomeScreen() {
         }
       >
         {/* İstatistikler */}
-        <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginTop: 12, marginBottom: 28 }}>
+        <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginTop: 8, marginBottom: 20 }}>
           <StatBox icon="people-outline" value="12.847" label="Kullanıcı" />
           <StatBox icon="flag-outline" value="48.392" label="Aktif Talep" />
           <StatBox icon="checkmark-circle-outline" value="3.241" label="Gerçekleşen" />
@@ -104,7 +105,7 @@ export default function HomeScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
               {dailyDeals.map((item) => (
                 <ProductCard key={item.id} product={item} />
@@ -126,7 +127,7 @@ export default function HomeScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
               {topDrops.map((item, i) => (
                 <TopDropCard key={i} item={item} />
@@ -138,7 +139,7 @@ export default function HomeScreen() {
         </View>
 
         {/* En Çok Talep Edilen */}
-        <View style={{ marginBottom: 32 }}>
+        <View style={{ marginBottom: 100 }}>
           <SectionHeader
             title="En Çok Talep Edilen"
             subtitle="Topluluğun en çok beklediği ürünler"
@@ -148,7 +149,7 @@ export default function HomeScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
               {mostAlarmed.map((item) => (
                 <ProductCard key={item.id} product={item} />

@@ -46,7 +46,7 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
         width: 160,
         height: 200,
         backgroundColor: '#1E293B',
-        borderRadius: 16,
+        borderRadius: 8,
         overflow: 'hidden',
       }}
     >
@@ -94,9 +94,7 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
               {nowStr}
             </Text>
           </View>
-          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="notifications-outline" size={15} color="#6C47FF" />
-          </TouchableOpacity>
+          <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
         </View>
       </View>
     </View>

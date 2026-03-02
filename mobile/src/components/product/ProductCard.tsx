@@ -30,7 +30,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
         width: 160,
         height: 200,
         backgroundColor: '#1E293B',
-        borderRadius: 16,
+        borderRadius: 8,
         overflow: 'hidden',
       }}
     >
@@ -80,12 +80,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
             </Text>
           </View>
 
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="locate-outline" size={16} color="#6C47FF" />
-          </TouchableOpacity>
+          <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
         </View>
       </View>
     </TouchableOpacity>
