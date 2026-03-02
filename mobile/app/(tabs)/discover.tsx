@@ -213,6 +213,7 @@ export default function DiscoverScreen() {
       </ScrollView>
 
       {/* Ürün Grid */}
+      <View style={{ flex: 1, marginTop: 16 }}>
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#6C47FF" />
@@ -234,6 +235,7 @@ export default function DiscoverScreen() {
           renderItem={({ item }) => <ProductGridCard product={item} />}
         />
       )}
+      </View>
     </SafeAreaView>
   );
 }
