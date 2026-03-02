@@ -29,23 +29,18 @@ export const useHomeStore = create<HomeState>((set, get) => ({
     if (lastFetchedAt && Date.now() - lastFetchedAt < CACHE_TTL_MS) return;
 
     set({ isLoading: true, error: null });
-    try {
-      const [deals, drops, alarmed] = await Promise.all([
-        homeApi.dailyDeals(),
-        homeApi.topDrops(),
-        homeApi.mostAlarmed(),
-      ]);
-      set({
-        dailyDeals: deals.data,
-        topDrops: drops.data,
-        mostAlarmed: alarmed.data,
-        lastFetchedAt: Date.now(),
-      });
-    } catch (e: any) {
-      set({ error: e.message ?? 'Veriler yüklenemedi' });
-    } finally {
-      set({ isLoading: false });
-    }
+    const [deals, drops, alarmed] = await Promise.allSettled([
+      homeApi.dailyDeals(),
+      homeApi.topDrops(),
+      homeApi.mostAlarmed(),
+    ]);
+    set({
+      dailyDeals: deals.status === 'fulfilled' ? deals.value.data : [],
+      topDrops: drops.status === 'fulfilled' ? drops.value.data : [],
+      mostAlarmed: alarmed.status === 'fulfilled' ? alarmed.value.data : [],
+      lastFetchedAt: Date.now(),
+      isLoading: false,
+    });
   },
 
   invalidate: () => set({ lastFetchedAt: null }),
