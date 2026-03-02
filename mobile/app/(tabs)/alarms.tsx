@@ -2,6 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, Switch, RefreshControl, Alert
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAlarms } from '@/hooks/useAlarms';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -279,7 +280,7 @@ function PopularCard({ product }: { product: ProductResponse }) {
             onPress={(e) => { e.stopPropagation(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="notifications-outline" size={20} color="#6C47FF" />
+            <Ionicons name="pricetag-outline" size={20} color="#6C47FF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -309,7 +310,12 @@ export default function AlarmsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <View style={{ width: 3, height: 40, borderRadius: 2, backgroundColor: '#1D4ED8' }} />
+        <LinearGradient
+          colors={['#1D4ED8', '#059669']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={{ width: 3, height: 40, borderRadius: 2 }}
+        />
         <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>Taleplerim</Text>
       </View>
 
@@ -334,7 +340,7 @@ export default function AlarmsScreen() {
           </View>
         ) : (
           <View style={{ alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32, gap: 12 }}>
-            <Text style={{ fontSize: 40 }}>🔔</Text>
+            <Ionicons name="pricetag-outline" size={48} color="#6C47FF" />
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' }}>
               Henüz aktif talebin yok
             </Text>

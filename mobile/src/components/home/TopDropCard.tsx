@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 
 import type { TopDropResponse } from '@/types/api';
@@ -41,7 +42,9 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
   const productName = product?.title ? capitalize(product.title) : nameFromUrl(store.url);
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => product?.id && router.push(`/product/${product.id}`)}
       style={{
         width: 160,
         height: 200,
@@ -97,6 +100,6 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
           <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }

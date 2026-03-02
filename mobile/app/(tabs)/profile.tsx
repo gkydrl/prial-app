@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Switch, TouchableOpacity, Alert } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/api/users';
 
@@ -146,7 +147,12 @@ export default function SettingsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <View style={{ width: 3, height: 40, borderRadius: 2, backgroundColor: '#1D4ED8' }} />
+        <LinearGradient
+          colors={['#1D4ED8', '#059669']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={{ width: 3, height: 40, borderRadius: 2 }}
+        />
         <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>Ayarlar</Text>
       </View>
 

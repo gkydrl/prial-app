@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +19,8 @@ import type { ProductResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD_BG = '#1E293B';
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = (SCREEN_WIDTH - 32) / 3;
 
 const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { label: 'Tümü', slug: null, icon: 'apps-outline' },
@@ -45,8 +48,8 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
       onPress={() => router.push(`/product/${product.id}`)}
       activeOpacity={0.85}
       style={{
-        flex: 1,
-        margin: 4,
+        width: CARD_WIDTH,
+        margin: 2,
         backgroundColor: CARD_BG,
         borderRadius: 8,
         overflow: 'hidden',
@@ -194,23 +197,15 @@ export default function DiscoverScreen() {
               onPress={() => handleCategoryPress(cat.slug)}
               activeOpacity={0.75}
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: 20,
+                width: 56,
+                height: 56,
+                borderRadius: 28,
                 backgroundColor: isActive ? '#6C47FF' : '#1E293B',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
-              <Ionicons name={cat.icon} size={14} color={isActive ? '#FFFFFF' : '#64748B'} />
-              <Text style={{
-                color: isActive ? '#FFFFFF' : '#9CA3AF',
-                fontSize: 12,
-                fontFamily: 'Inter_500Medium',
-              }}>
-                {cat.label}
-              </Text>
+              <Ionicons name={cat.icon} size={22} color={isActive ? '#FFFFFF' : '#64748B'} />
             </TouchableOpacity>
           );
         })}
@@ -232,7 +227,7 @@ export default function DiscoverScreen() {
         <FlatList
           data={products}
           keyExtractor={(item) => item.id}
-          numColumns={2}
+          numColumns={3}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 100 }}
           renderItem={({ item }) => <ProductGridCard product={item} />}

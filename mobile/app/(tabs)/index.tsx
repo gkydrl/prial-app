@@ -27,7 +27,7 @@ function StatBox({ icon, value, label }: { icon: IoniconName; value: string; lab
       alignItems: 'center',
       gap: 2,
     }}>
-      <Ionicons name={icon} size={14} color="#64748B" />
+      <Ionicons name={icon} size={16} color="#64748B" />
       <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold' }}>{value}</Text>
       <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>{label}</Text>
     </View>

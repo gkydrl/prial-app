@@ -310,11 +310,6 @@ export default function ProductDetailScreen() {
                 dataPointsColor={BRAND_BLUE}
                 dataPointsRadius={3}
                 curved
-                areaChart
-                startFillColor={`${BRAND_BLUE}40`}
-                endFillColor={`${BRAND_BLUE}05`}
-                startOpacity={0.6}
-                endOpacity={0.05}
                 hideRules
                 isAnimated
                 backgroundColor={CARD}
