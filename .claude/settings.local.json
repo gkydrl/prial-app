@@ -34,7 +34,18 @@
       "Bash(gem contents:*)",
       "Bash(git -C /Users/Gokay/Desktop/Prial status)",
       "Bash(curl:*)",
-      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMjRkNGU0Yy1mODJkLTRmOGYtOWU3OC0wYjBkMTBhZmY3OTQiLCJleHAiOjE3NzE4OTA2MzIsInR5cGUiOiJhY2Nlc3MifQ.4yOp2AjDtE4pquCLv7NEEZz52b0YKzuTYBMLTtaJcZw\" __NEW_LINE_4005c0d8678fd4e9__ curl -s -X POST \"https://prial-app-production.up.railway.app/api/v1/products/preview\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" -d '{\"\"\"\"url\"\"\"\":\"\"\"\"https://www.trendyol.com/arzum/ok004-okka-minio-turk-kahvesi-makinesi-bakir-p-146157\"\"\"\"}')"
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMjRkNGU0Yy1mODJkLTRmOGYtOWU3OC0wYjBkMTBhZmY3OTQiLCJleHAiOjE3NzE4OTA2MzIsInR5cGUiOiJhY2Nlc3MifQ.4yOp2AjDtE4pquCLv7NEEZz52b0YKzuTYBMLTtaJcZw\" __NEW_LINE_4005c0d8678fd4e9__ curl -s -X POST \"https://prial-app-production.up.railway.app/api/v1/products/preview\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" -d '{\"\"\"\"url\"\"\"\":\"\"\"\"https://www.trendyol.com/arzum/ok004-okka-minio-turk-kahvesi-makinesi-bakir-p-146157\"\"\"\"}')",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0NTQ2ZTQ5ZC1iOWIzLTQ0YjMtYmViNi1lN2RhNWY1YmNiOGQiLCJleHAiOjE3NzE4OTI4ODUsInR5cGUiOiJhY2Nlc3MifQ.I1S1YRY5hMDREWWbScHNAWMxj3OY-gSnTIeLO3zNUzo\")",
+      "Bash(__NEW_LINE_1baa3e851eb1f03b__ curl -s -X POST \"https://prial-app-production.up.railway.app/api/v1/products/preview\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" --data-raw '{\"\"url\"\":\"\"https://www.trendyol.com/arzum/ok004-okka-minio-turk-kahvesi-makinesi-bakir-p-146157\"\"}')",
+      "Bash(PATH=\"/Users/Gokay/.rbenv/shims:$PATH\" npx expo run:ios:*)",
+      "Bash(sh)",
+      "Bash(railway:*)",
+      "Bash(ls:*)",
+      "Bash(git -C /Users/Gokay/Desktop/Prial add mobile/src/components/home/DealCard.tsx mobile/src/components/home/TopDropCard.tsx mobile/src/components/product/ProductCard.tsx mobile/src/components/ui/CardSkeleton.tsx)",
+      "Bash(git -C:*)",
+      "Bash(git -C /Users/Gokay/Desktop/Prial push)",
+      "Bash(sips:*)",
+      "Bash(convert:*)"
     ]
   }
 }
