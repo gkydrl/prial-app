@@ -13,6 +13,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/constants/api';
 import type { ProductResponse } from '@/types/api';
@@ -149,9 +150,17 @@ export default function DiscoverScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       {/* Başlık + Arama */}
       <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, gap: 10 }}>
-        <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
-          Keşfet
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <LinearGradient
+            colors={['#1D4ED8', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={{ width: 3, height: 28, borderRadius: 2 }}
+          />
+          <Text style={{ color: '#FFFFFF', fontSize: 22, fontFamily: 'Inter_700Bold' }}>
+            Keşfet
+          </Text>
+        </View>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
