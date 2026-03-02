@@ -5,9 +5,11 @@ import { router } from 'expo-router';
 import { registerForPushNotificationsAsync } from '@/utils/notifications';
 import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/store/authStore';
+import { useNotificationStore } from '@/store/notificationStore';
 
 export function useNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const addNotification = useNotificationStore((s) => s.addNotification);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -20,16 +22,31 @@ export function useNotifications() {
       }
     });
 
-    // Bildirime tıklanınca ürün sayfasına git
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    // Gelen bildirimi store'a kaydet
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+      const { identifier, content } = notification.request;
+      addNotification({
+        id: identifier,
+        title: content.title ?? null,
+        body: content.body ?? null,
+        data: (content.data ?? {}) as Record<string, unknown>,
+        receivedAt: new Date().toISOString(),
+      });
+    });
+
+    // Bildirime tıklanınca ilgili ekrana git
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, string>;
-      if (data?.alarm_id) {
-        // alarm_id varsa ilgili ürünü aç
-        // product_id yoksa alarm listesine yönlendir
-        router.push('/(tabs)/alarms');
+      if (data?.product_id) {
+        router.push(`/product/${data.product_id}`);
+      } else {
+        router.push('/notifications');
       }
     });
 
-    return () => subscription.remove();
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
   }, [isAuthenticated]);
 }

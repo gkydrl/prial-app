@@ -44,11 +44,15 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0F0F0F' } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="splash" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="product/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="discover/category/[slug]" options={{ presentation: 'card' }} />
         <Stack.Screen name="discover/search" options={{ presentation: 'card' }} />
+        <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
+        <Stack.Screen name="alarm-search" options={{ presentation: 'modal' }} />
       </Stack>
     </GestureHandlerRootView>
   );

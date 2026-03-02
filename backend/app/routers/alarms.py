@@ -8,10 +8,68 @@ from app.database import get_db
 from app.models.user import User
 from app.models.alarm import Alarm, AlarmStatus
 from app.models.product import Product, ProductStore
-from app.schemas.alarm import AlarmResponse, AlarmUpdate
+from app.schemas.alarm import AlarmCreate, AlarmResponse, AlarmUpdate
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/alarms", tags=["alarms"])
+
+
+@router.post("/", response_model=AlarmResponse, status_code=201)
+async def create_alarm(
+    payload: AlarmCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Ürün var mı?
+    product = await db.get(Product, payload.product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    # Aynı ürün için aktif/paused alarm zaten var mı?
+    dup = await db.execute(
+        select(Alarm).where(
+            Alarm.user_id == current_user.id,
+            Alarm.product_id == payload.product_id,
+            Alarm.status.in_([AlarmStatus.ACTIVE, AlarmStatus.PAUSED]),
+        )
+    )
+    if dup.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Bu ürün için zaten aktif bir talebiniz var")
+
+    # Mağaza belirtilmemişse en ucuz mağazayı seç
+    store_id = payload.product_store_id
+    if not store_id:
+        sr = await db.execute(
+            select(ProductStore)
+            .where(ProductStore.product_id == payload.product_id, ProductStore.in_stock == True)
+            .order_by(ProductStore.current_price.asc())
+            .limit(1)
+        )
+        store = sr.scalar_one_or_none()
+        if store:
+            store_id = store.id
+
+    alarm = Alarm(
+        user_id=current_user.id,
+        product_id=payload.product_id,
+        product_store_id=store_id,
+        target_price=payload.target_price,
+        status=AlarmStatus.ACTIVE,
+    )
+    db.add(alarm)
+    product.alarm_count += 1
+    await db.flush()
+
+    # İlişkileriyle birlikte döndür
+    res = await db.execute(
+        select(Alarm)
+        .options(
+            selectinload(Alarm.product).selectinload(Product.stores),
+            selectinload(Alarm.product_store),
+        )
+        .where(Alarm.id == alarm.id)
+    )
+    return res.scalar_one()
 
 
 @router.get("/", response_model=list[AlarmResponse])

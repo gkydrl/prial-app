@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type BottomSheet from '@gorhom/bottom-sheet';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { useProduct } from '@/hooks/useProduct';
+import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
 
@@ -27,9 +28,10 @@ const WHITE = '#FFFFFF';
 
 // ─── Fiyat formatlayıcı ───────────────────────────────────────────────────────
 
-function fmt(price: number | null | undefined): string {
+// Backend Decimal → JSON string olarak gelir, Number() ile parse ediyoruz
+function fmt(price: number | string | null | undefined): string {
   if (price == null) return '-';
-  return price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
+  return Math.round(Number(price)).toLocaleString('tr-TR') + ' ₺';
 }
 
 // ─── Talep dağılım grafiği verisi ─────────────────────────────────────────────
@@ -100,7 +102,8 @@ export default function ProductDetailScreen() {
     }, null);
   }, [stores]);
 
-  const currentPrice = lowestStore?.current_price ?? null;
+  // Decimal → string olarak gelebilir, Number() ile normalize et
+  const currentPrice = lowestStore?.current_price != null ? Number(lowestStore.current_price) : null;
   const alarmCount = product?.alarm_count ?? 0;
 
   const demandBars = useMemo(() => {
@@ -156,9 +159,9 @@ export default function ProductDetailScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* ── Ürün görseli ── */}
         <Image
-          source={{ uri: product.image_url ?? undefined }}
-          style={{ width: '100%', height: 250, backgroundColor: CARD }}
-          contentFit="cover"
+          source={imageSource(product.image_url)}
+          style={{ width: '100%', height: 260, backgroundColor: CARD }}
+          contentFit="contain"
           placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
         />
 
@@ -396,7 +399,7 @@ export default function ProductDetailScreen() {
           onPress={() => alarmSheetRef.current?.expand()}
           activeOpacity={0.85}
         >
-          <Ionicons name="hand-right" size={20} color={WHITE} />
+          <Ionicons name="pricetag-outline" size={20} color={WHITE} />
           <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
             Talep Et
           </Text>
@@ -406,6 +409,7 @@ export default function ProductDetailScreen() {
       {/* Alarm/Talep kurma sheet */}
       <AlarmSetupSheet
         productId={product.id}
+        storeUrl={lowestStore?.url ?? null}
         currentPrice={currentPrice}
         sheetRef={alarmSheetRef}
       />

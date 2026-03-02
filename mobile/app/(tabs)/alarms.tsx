@@ -7,6 +7,9 @@ import { router } from 'expo-router';
 import { useAlarms } from '@/hooks/useAlarms';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import type { AlarmResponse, ProductResponse } from '@/types/api';
+import Animated from 'react-native-reanimated';
+import { useFadeIn } from '@/hooks/useFadeIn';
+import { imageSource } from '@/utils/imageSource';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -153,14 +156,17 @@ function AlarmListCard({
   const currentPrice = store?.current_price ?? null;
   const targetPrice = alarm.target_price;
 
-  const currentStr = currentPrice != null
-    ? currentPrice.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺'
+  const currentNum = currentPrice != null ? Number(currentPrice) : null;
+  const targetNum = Number(targetPrice);
+
+  const currentStr = currentNum != null
+    ? Math.round(currentNum).toLocaleString('tr-TR') + ' ₺'
     : '-';
-  const targetStr = targetPrice.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
+  const targetStr = Math.round(targetNum).toLocaleString('tr-TR') + ' ₺';
 
   // Hedefe yakınlık: 0-1 arası (1 = hedefe ulaşıldı)
-  const progress = currentPrice != null && currentPrice > 0
-    ? Math.min(targetPrice / currentPrice, 1)
+  const progress = currentNum != null && currentNum > 0
+    ? Math.min(targetNum / currentNum, 1)
     : 0;
 
   const isActive = alarm.status === 'active';
@@ -181,7 +187,7 @@ function AlarmListCard({
       {/* Ürün görseli */}
       <TouchableOpacity onPress={() => router.push(`/product/${product.id}`)}>
         <Image
-          source={{ uri: product.image_url ?? undefined }}
+          source={imageSource(product.image_url)}
           style={{ width: 70, height: 70, borderRadius: 12 }}
           contentFit="cover"
           placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
@@ -208,13 +214,13 @@ function AlarmListCard({
         </View>
 
         {/* Fiyatlar */}
-        <View style={{ flexDirection: 'row', gap: 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <View>
             <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>Güncel</Text>
             <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>{currentStr}</Text>
           </View>
-          <View>
-            <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>Hedef</Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>Talep Edilen</Text>
             <Text style={{ color: '#22C55E', fontSize: 14, fontFamily: 'Inter_700Bold' }}>{targetStr}</Text>
           </View>
         </View>
@@ -239,10 +245,13 @@ function AlarmListCard({
 
 function PopularCard({ product }: { product: ProductResponse }) {
   const store = product.stores[0];
-  const price = store?.current_price;
-  const priceStr = price != null
-    ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺'
-    : '-';
+  const price = store?.current_price != null ? Number(store.current_price) : null;
+  const originalPrice = store?.original_price != null ? Number(store.original_price) : null;
+  const discount = store?.discount_percent;
+
+  const priceStr = price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
+  const originalStr = originalPrice != null ? Math.round(originalPrice).toLocaleString('tr-TR') + ' ₺' : null;
+  const hasDiscount = originalStr && originalPrice && price && originalPrice > price;
 
   return (
     <TouchableOpacity
@@ -273,15 +282,24 @@ function PopularCard({ product }: { product: ProductResponse }) {
         </Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
-            {priceStr}
-          </Text>
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="pricetag-outline" size={20} color="#6C47FF" />
-          </TouchableOpacity>
+          <View style={{ gap: 2 }}>
+            {hasDiscount && (
+              <Text style={{ color: '#64748B', fontSize: 12, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' }}>
+                {originalStr}
+              </Text>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
+                {priceStr}
+              </Text>
+              {!!discount && (
+                <View style={{ backgroundColor: '#22C55E20', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
+                  <Text style={{ color: '#22C55E', fontSize: 10, fontFamily: 'Inter_700Bold' }}>-%{discount}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <Ionicons name="pricetag-outline" size={20} color="#6C47FF" />
         </View>
       </View>
     </TouchableOpacity>
@@ -305,9 +323,11 @@ export default function AlarmsScreen() {
   };
 
   const hasAlarms = alarms.length > 0;
+  const fadeStyle = useFadeIn();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
+      <Animated.View style={[{ flex: 1 }, fadeStyle]}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <LinearGradient
@@ -328,7 +348,7 @@ export default function AlarmsScreen() {
       >
         {/* Alarm listesi veya boş durum */}
         {hasAlarms ? (
-          <View style={{ paddingHorizontal: 16, gap: 10, marginBottom: 32 }}>
+          <View style={{ paddingHorizontal: 16, gap: 10, marginBottom: 8 }}>
             {alarms.map((alarm) => (
               <AlarmListCard
                 key={alarm.id}
@@ -347,22 +367,34 @@ export default function AlarmsScreen() {
             <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' }}>
               Ürün fiyatları düştüğünde seni haberdar edelim
             </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/discover')}
-              style={{
-                marginTop: 8,
-                backgroundColor: '#1D4ED8',
-                borderRadius: 12,
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
-                İlk Talebini Oluştur
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
+
+        {/* Yeni talep oluştur butonu */}
+        <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/alarm-search')}
+            activeOpacity={0.8}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: '#6C47FF',
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#6C47FF',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.45,
+              shadowRadius: 10,
+              elevation: 8,
+            }}
+          >
+            <Ionicons name="add" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={{ color: '#64748B', fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 6 }}>
+            Yeni talep oluştur
+          </Text>
+        </View>
 
         {/* Popüler Takipler */}
         <View style={{ marginBottom: 32 }}>
@@ -378,6 +410,7 @@ export default function AlarmsScreen() {
           </View>
         </View>
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 }

@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 
 import type { TopDropResponse } from '@/types/api';
+import { imageSource } from '@/utils/imageSource';
 
 function capitalize(str: string): string {
   return str
@@ -56,7 +57,7 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
       {/* Görsel alanı */}
       <View style={{ width: '100%', height: 140 }}>
         <Image
-          source={{ uri: product?.image_url ?? undefined }}
+          source={imageSource(product?.image_url)}
           style={{ width: '100%', height: 140 }}
           contentFit="cover"
           placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}

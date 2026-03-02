@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/api/users';
+import Animated from 'react-native-reanimated';
+import { useFadeIn } from '@/hooks/useFadeIn';
 
 const BG = '#0A1628';
 const ROW_BG = '#0F172A';
@@ -116,6 +118,7 @@ function SettingGroup({ title, children }: { title: string; children: React.Reac
 
 export default function SettingsScreen() {
   const { user, logout, updateUser } = useAuth();
+  const fadeStyle = useFadeIn();
 
   const handleToggleNotifications = async (value: boolean) => {
     updateUser({ push_notifications_enabled: value });
@@ -145,6 +148,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
+      <Animated.View style={[{ flex: 1 }, fadeStyle]}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <LinearGradient
@@ -227,6 +231,7 @@ export default function SettingsScreen() {
 
         </View>
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 }

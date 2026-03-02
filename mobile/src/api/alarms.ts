@@ -3,6 +3,9 @@ import { ENDPOINTS } from '@/constants/api';
 import type { AlarmResponse, AlarmStatus, AlarmUpdatePayload } from '@/types/api';
 
 export const alarmsApi = {
+  create: (payload: { product_id: string; target_price: number; product_store_id?: string }) =>
+    client.post<AlarmResponse>(ENDPOINTS.ALARMS, payload),
+
   list: (status?: AlarmStatus) =>
     client.get<AlarmResponse[]>(ENDPOINTS.ALARMS, {
       params: status ? { status } : undefined,

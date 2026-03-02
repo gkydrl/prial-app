@@ -107,7 +107,12 @@ async def list_products(
 
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    product = await db.get(Product, product_id)
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.stores))
+        .where(Product.id == product_id)
+    )
+    product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
     return product

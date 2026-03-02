@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, RefreshControl } from 'react-native';
+import { useNotificationStore } from '@/store/notificationStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +10,8 @@ import { ProductCard } from '@/components/product/ProductCard';
 import { OnboardingModal } from '@/components/home/OnboardingModal';
 import { useAuthStore } from '@/store/authStore';
 import { useHome } from '@/hooks/useHome';
+import Animated from 'react-native-reanimated';
+import { useFadeIn } from '@/hooks/useFadeIn';
 
 const BG = '#0A1628';
 
@@ -88,8 +91,10 @@ export default function HomeScreen() {
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
   const [modalDismissed, setModalDismissed] = useState(false);
   const { dailyDeals, topDrops, mostAlarmed, isLoading, refresh } = useHome();
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   const showOnboarding = !hasCompletedOnboarding && !modalDismissed;
+  const fadeStyle = useFadeIn();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
@@ -97,7 +102,7 @@ export default function HomeScreen() {
         visible={showOnboarding}
         onDismiss={() => setModalDismissed(true)}
       />
-
+      <Animated.View style={[{ flex: 1 }, fadeStyle]}>
       {/* Üst bar: logo ortada, bildirim sağda */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 }}>
         <View style={{ flex: 1 }} />
@@ -108,10 +113,32 @@ export default function HomeScreen() {
         />
         <View style={{ flex: 1, alignItems: 'flex-end' }}>
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/alarms')}
+            onPress={() => router.push('/notifications')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="notifications-outline" size={22} color="#9CA3AF" />
+            <View style={{ position: 'relative' }}>
+              <Ionicons name="notifications-outline" size={22} color="#9CA3AF" />
+              {unreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -3,
+                  right: -3,
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  backgroundColor: '#EF4444',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 3,
+                  borderWidth: 1.5,
+                  borderColor: '#0A1628',
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -192,6 +219,7 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 }

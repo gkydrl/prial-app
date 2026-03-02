@@ -1,23 +1,35 @@
-import { useEffect } from 'react';
-import { useHomeStore } from '@/store/homeStore';
+import { useState, useEffect, useCallback } from 'react';
+import { homeApi } from '@/api/home';
+import type { ProductResponse, TopDropResponse } from '@/types/api';
 
 export function useHome() {
-  const dailyDeals = useHomeStore((s) => s.dailyDeals);
-  const topDrops = useHomeStore((s) => s.topDrops);
-  const mostAlarmed = useHomeStore((s) => s.mostAlarmed);
-  const isLoading = useHomeStore((s) => s.isLoading);
-  const error = useHomeStore((s) => s.error);
-  const fetchAll = useHomeStore((s) => s.fetchAll);
-  const invalidate = useHomeStore((s) => s.invalidate);
+  const [dailyDeals, setDailyDeals] = useState<ProductResponse[]>([]);
+  const [topDrops, setTopDrops] = useState<TopDropResponse[]>([]);
+  const [mostAlarmed, setMostAlarmed] = useState<ProductResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    const [deals, drops, alarmed] = await Promise.allSettled([
+      homeApi.dailyDeals(),
+      homeApi.topDrops(),
+      homeApi.mostAlarmed(),
+    ]);
+    setDailyDeals(deals.status === 'fulfilled' ? deals.value.data : []);
+    setTopDrops(drops.status === 'fulfilled' ? drops.value.data : []);
+    setMostAlarmed(alarmed.status === 'fulfilled' ? alarmed.value.data : []);
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
     fetchAll();
-  }, []);
+  }, [fetchAll]);
 
-  const refresh = () => {
-    invalidate();
+  const refresh = useCallback(() => {
     fetchAll();
-  };
+  }, [fetchAll]);
 
   return { dailyDeals, topDrops, mostAlarmed, isLoading, error, refresh };
 }

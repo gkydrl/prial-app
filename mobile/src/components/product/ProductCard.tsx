@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import type { ProductResponse, ProductStoreResponse } from '@/types/api';
+import { imageSource } from '@/utils/imageSource';
 
 interface ProductCardProps {
   product: ProductResponse;
@@ -38,7 +39,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
       <View style={{ width: '100%', height: 140 }}>
         {product.image_url && !imgError ? (
           <Image
-            source={{ uri: product.image_url }}
+            source={imageSource(product.image_url)}
             style={{ width: '100%', height: 140 }}
             contentFit="contain"
             onError={() => setImgError(true)}
