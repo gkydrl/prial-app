@@ -34,11 +34,18 @@ export const useHomeStore = create<HomeState>((set, get) => ({
       homeApi.topDrops(),
       homeApi.mostAlarmed(),
     ]);
+    const dailyDeals = deals.status === 'fulfilled' ? deals.value.data : [];
+    const topDrops = drops.status === 'fulfilled' ? drops.value.data : [];
+    const mostAlarmed = alarmed.status === 'fulfilled' ? alarmed.value.data : [];
+
+    // Tüm istekler başarısız olduysa (timeout/hata) cache'leme — bir sonraki mount'ta yeniden dene
+    const hasData = dailyDeals.length > 0 || mostAlarmed.length > 0;
+
     set({
-      dailyDeals: deals.status === 'fulfilled' ? deals.value.data : [],
-      topDrops: drops.status === 'fulfilled' ? drops.value.data : [],
-      mostAlarmed: alarmed.status === 'fulfilled' ? alarmed.value.data : [],
-      lastFetchedAt: Date.now(),
+      dailyDeals,
+      topDrops,
+      mostAlarmed,
+      lastFetchedAt: hasData ? Date.now() : null,
       isLoading: false,
     });
   },

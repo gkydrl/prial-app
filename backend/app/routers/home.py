@@ -14,10 +14,9 @@ router = APIRouter(prefix="/home", tags=["home"])
 
 @router.get("/daily-deals")
 async def daily_deals(limit: int = 20, db: AsyncSession = Depends(get_db)):
-    """Bugünün indirimleri — en yüksek indirimli ürünler."""
-    from sqlalchemy.orm import selectinload
+    """Bugünün indirimleri — en yüksek indirimli ürünler; indirim yoksa en yeniler."""
 
-    # Her ürün için en yüksek indirimi bul (subquery)
+    # İndirimli ürünleri getir
     subq = (
         select(
             ProductStore.product_id,
@@ -36,7 +35,21 @@ async def daily_deals(limit: int = 20, db: AsyncSession = Depends(get_db)):
         .order_by(desc(subq.c.max_discount))
         .limit(limit)
     )
-    return result.scalars().all()
+    discounted = result.scalars().all()
+
+    if len(discounted) >= limit // 2:
+        return discounted
+
+    # Yeterli indirimli ürün yoksa en yeni ürünleri ekle
+    existing_ids = {p.id for p in discounted}
+    result2 = await db.execute(
+        select(Product)
+        .options(selectinload(Product.stores))
+        .where(Product.id.notin_(existing_ids))
+        .order_by(desc(Product.created_at))
+        .limit(limit - len(discounted))
+    )
+    return list(discounted) + list(result2.scalars().all())
 
 
 @router.get("/top-drops")
@@ -101,10 +114,11 @@ async def top_drops(limit: int = 20, db: AsyncSession = Depends(get_db)):
 
 @router.get("/most-alarmed")
 async def most_alarmed(limit: int = 20, db: AsyncSession = Depends(get_db)):
-    """En çok alarm kurulan ürünler."""
+    """En çok alarm kurulan ürünler; alarm yoksa en çok takip edilen kategorilerden ürünler."""
     result = await db.execute(
         select(Product)
-        .order_by(desc(Product.alarm_count))
+        .options(selectinload(Product.stores))
+        .order_by(desc(Product.alarm_count), desc(Product.created_at))
         .limit(limit)
     )
     return result.scalars().all()
