@@ -26,15 +26,15 @@ const fmtPrice = (price: number | null) =>
   price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
 
 const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-  { label: 'Tümü', slug: null, icon: 'apps-outline' },
-  { label: 'Telefon', slug: 'telefon', icon: 'phone-portrait-outline' },
-  { label: 'Bilgisayar', slug: 'bilgisayar', icon: 'laptop-outline' },
-  { label: 'Televizyon', slug: 'televizyon', icon: 'tv-outline' },
-  { label: 'Ev Aleti', slug: 'ev-aleti', icon: 'home-outline' },
-  { label: 'Akıllı Saat', slug: 'akilli-saat', icon: 'watch-outline' },
-  { label: 'Oyun', slug: 'oyun-konsolu', icon: 'game-controller-outline' },
-  { label: 'Kamera', slug: 'kamera', icon: 'camera-outline' },
-  { label: 'Kulaklık', slug: 'kulaklik', icon: 'headset-outline' },
+  { label: 'Tümü', slug: null, icon: 'apps' },
+  { label: 'Telefon', slug: 'telefon', icon: 'phone-portrait' },
+  { label: 'Bilgisayar', slug: 'bilgisayar', icon: 'laptop' },
+  { label: 'Televizyon', slug: 'televizyon', icon: 'tv' },
+  { label: 'Ev Aleti', slug: 'ev-aleti', icon: 'home' },
+  { label: 'Akıllı Saat', slug: 'akilli-saat', icon: 'watch' },
+  { label: 'Oyun', slug: 'oyun-konsolu', icon: 'game-controller' },
+  { label: 'Kamera', slug: 'kamera', icon: 'camera' },
+  { label: 'Kulaklık', slug: 'kulaklik', icon: 'headset' },
 ];
 
 function ProductGridCard({ product }: { product: ProductResponse }) {
@@ -188,7 +188,8 @@ export default function DiscoverScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 0, gap: 8 }}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 4, gap: 8 }}
       >
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.slug;
@@ -206,7 +207,7 @@ export default function DiscoverScreen() {
                 alignItems: 'center',
               }}
             >
-              <Ionicons name={cat.icon} size={26} color={isActive ? '#FFFFFF' : '#64748B'} />
+              <Ionicons name={cat.icon} size={26} color={isActive ? '#FFFFFF' : '#94A3B8'} />
             </TouchableOpacity>
           );
         })}
