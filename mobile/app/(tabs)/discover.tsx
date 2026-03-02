@@ -23,7 +23,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = (SCREEN_WIDTH - 32) / 3;
 
 const fmtPrice = (price: number | null) =>
-  price != null ? price.toLocaleString('tr-TR') + ' ₺' : '-';
+  price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
 
 const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { label: 'Tümü', slug: null, icon: 'apps-outline' },
@@ -188,7 +188,7 @@ export default function DiscoverScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 16, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 0, gap: 8 }}
       >
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.slug;
