@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -12,24 +12,60 @@ import { useHome } from '@/hooks/useHome';
 
 const BG = '#0A1628';
 
-// ─── İstatistik Kutusu ────────────────────────────────────────────────────────
+// ─── İstatistik Kartı ─────────────────────────────────────────────────────────
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-function StatBox({ icon, value, label }: { icon: IoniconName; value: string; label: string }) {
+const STATS: { icon: IoniconName; target: number; label: string }[] = [
+  { icon: 'people-outline', target: 12847, label: 'Kullanıcı' },
+  { icon: 'flag-outline', target: 48392, label: 'Aktif Talep' },
+  { icon: 'checkmark-circle-outline', target: 3241, label: 'Gerçekleşen' },
+];
+
+function StatsCard() {
+  const [counts, setCounts] = useState([0, 0, 0]);
+
+  useEffect(() => {
+    const DURATION = 1500;
+    const FPS = 60;
+    const STEP_MS = DURATION / FPS;
+    let frame = 0;
+    const timer = setInterval(() => {
+      frame++;
+      const t = Math.min(frame / FPS, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setCounts(STATS.map((s) => Math.round(s.target * ease)));
+      if (t >= 1) clearInterval(timer);
+    }, STEP_MS);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <View style={{
-      flex: 1,
-      backgroundColor: '#1E293B',
-      borderRadius: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 6,
-      alignItems: 'center',
-      gap: 2,
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 20,
+      backgroundColor: '#0F172A',
+      borderRadius: 16,
+      flexDirection: 'row',
+      overflow: 'hidden',
     }}>
-      <Ionicons name={icon} size={16} color="#64748B" />
-      <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold' }}>{value}</Text>
-      <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>{label}</Text>
+      {STATS.map((stat, i) => (
+        <Fragment key={stat.label}>
+          <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, gap: 3 }}>
+            <Ionicons name={stat.icon} size={16} color="#64748B" />
+            <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold' }}>
+              {counts[i].toLocaleString('tr-TR')}
+            </Text>
+            <Text style={{ color: '#64748B', fontSize: 10, fontFamily: 'Inter_400Regular' }}>
+              {stat.label}
+            </Text>
+          </View>
+          {i < STATS.length - 1 && (
+            <View style={{ width: 1, backgroundColor: '#334155', marginVertical: 10 }} />
+          )}
+        </Fragment>
+      ))}
     </View>
   );
 }
@@ -88,11 +124,7 @@ export default function HomeScreen() {
         }
       >
         {/* İstatistikler */}
-        <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginTop: 8, marginBottom: 20 }}>
-          <StatBox icon="people-outline" value="12.847" label="Kullanıcı" />
-          <StatBox icon="flag-outline" value="48.392" label="Aktif Talep" />
-          <StatBox icon="checkmark-circle-outline" value="3.241" label="Gerçekleşen" />
-        </View>
+        <StatsCard />
 
         {/* Bugünün Fırsatları */}
         <View style={{ marginBottom: 24 }}>

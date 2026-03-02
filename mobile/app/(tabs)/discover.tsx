@@ -22,6 +22,9 @@ const CARD_BG = '#1E293B';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = (SCREEN_WIDTH - 32) / 3;
 
+const fmtPrice = (price: number | null) =>
+  price != null ? price.toLocaleString('tr-TR') + ' ₺' : '-';
+
 const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { label: 'Tümü', slug: null, icon: 'apps-outline' },
   { label: 'Telefon', slug: 'telefon', icon: 'phone-portrait-outline' },
@@ -39,9 +42,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
   const store = product.stores?.[0];
   const price = store?.current_price;
   const discount = store?.discount_percent;
-  const priceStr = price != null
-    ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺'
-    : '-';
+  const priceStr = fmtPrice(price);
 
   return (
     <TouchableOpacity
@@ -187,7 +188,7 @@ export default function DiscoverScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 10, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 16, gap: 8 }}
       >
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.slug;
@@ -205,7 +206,7 @@ export default function DiscoverScreen() {
                 alignItems: 'center',
               }}
             >
-              <Ionicons name={cat.icon} size={22} color={isActive ? '#FFFFFF' : '#64748B'} />
+              <Ionicons name={cat.icon} size={26} color={isActive ? '#FFFFFF' : '#64748B'} />
             </TouchableOpacity>
           );
         })}
