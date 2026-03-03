@@ -72,16 +72,16 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Görsel */}
-      <View style={{ flex: 1, backgroundColor: CARD_BG }}>
+      <View style={{ flex: 1, backgroundColor: CARD_BG, padding: 10, justifyContent: 'center', alignItems: 'center' }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
+            style={{ width: '100%', height: '100%', borderRadius: 4 }}
+            contentFit="contain"
             onError={() => setImgError(true)}
           />
         ) : (
-          <View style={{ flex: 1, backgroundColor: '#2D3F55', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="cube-outline" size={48} color="#475569" />
           </View>
         )}
@@ -147,16 +147,16 @@ function SideCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Sabit yükseklik görsel alanı — gri kutu kartı ele geçirmesin */}
-      <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG }}>
+      <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG, padding: 6, justifyContent: 'center', alignItems: 'center' }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}
-            style={{ width: '100%', height: SIDE_IMAGE_H }}
-            contentFit="cover"
+            style={{ width: '100%', height: '100%', borderRadius: 3 }}
+            contentFit="contain"
             onError={() => setImgError(true)}
           />
         ) : (
-          <View style={{ flex: 1, backgroundColor: '#2D3F55', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 3, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="cube-outline" size={22} color="#475569" />
           </View>
         )}
@@ -199,16 +199,16 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
         overflow: 'hidden',
       }}
     >
-      <View style={{ width: '100%', height: 100, backgroundColor: CARD_BG }}>
+      <View style={{ width: '100%', height: 100, backgroundColor: CARD_BG, padding: 8, justifyContent: 'center', alignItems: 'center' }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}
-            style={{ width: '100%', height: 100 }}
-            contentFit="cover"
+            style={{ width: '100%', height: '100%', borderRadius: 4 }}
+            contentFit="contain"
             onError={() => setImgError(true)}
           />
         ) : (
-          <View style={{ flex: 1, backgroundColor: '#2D3F55', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="cube-outline" size={36} color="#475569" />
           </View>
         )}

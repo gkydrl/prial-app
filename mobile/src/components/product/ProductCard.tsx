@@ -36,16 +36,16 @@ export function ProductCard({ product, store }: ProductCardProps) {
       }}
     >
       {/* Görsel alanı */}
-      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B' }}>
+      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8, justifyContent: 'center', alignItems: 'center' }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}
-            style={{ width: '100%', height: 140 }}
-            contentFit="cover"
+            style={{ width: '100%', height: '100%', borderRadius: 4 }}
+            contentFit="contain"
             onError={() => setImgError(true)}
           />
         ) : (
-          <View style={{ width: '100%', height: 140, backgroundColor: '#2D3F55', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="cube-outline" size={40} color="#475569" />
           </View>
         )}
