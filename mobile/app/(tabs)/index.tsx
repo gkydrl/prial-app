@@ -157,7 +157,7 @@ export default function HomeScreen() {
         <View style={{ marginBottom: 24 }}>
           <SectionHeader
             title="Bugünün Fırsatları"
-            subtitle="En yüksek indirimli ürünler"
+            subtitle="Son 24 saatte en çok oransal düşen ürünler"
             onSeeAll={() => router.push('/(tabs)/discover')}
           />
           {dailyDeals.length > 0 ? (
@@ -166,8 +166,8 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
-              {dailyDeals.map((item) => (
-                <ProductCard key={item.id} product={item} />
+              {dailyDeals.map((item, i) => (
+                <TopDropCard key={i} item={item} />
               ))}
             </ScrollView>
           ) : (

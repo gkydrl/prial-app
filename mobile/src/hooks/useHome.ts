@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { homeApi } from '@/api/home';
-import type { ProductResponse, TopDropResponse } from '@/types/api';
+import type { TopDropResponse, ProductResponse } from '@/types/api';
 
 export function useHome() {
-  const [dailyDeals, setDailyDeals] = useState<ProductResponse[]>([]);
+  const [dailyDeals, setDailyDeals] = useState<TopDropResponse[]>([]);
   const [topDrops, setTopDrops] = useState<TopDropResponse[]>([]);
   const [mostAlarmed, setMostAlarmed] = useState<ProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
