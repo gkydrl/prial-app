@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 import { useAlarms } from '@/hooks/useAlarms';
 import { SectionHeader } from '@/components/home/SectionHeader';
@@ -145,11 +146,9 @@ const CARD = '#1E293B';
 function AlarmListCard({
   alarm,
   onToggle,
-  onClose,
 }: {
   alarm: AlarmResponse;
   onToggle: () => void;
-  onClose: () => void;
 }) {
   const product = alarm.product;
   const store = alarm.product_store;
@@ -202,18 +201,13 @@ function AlarmListCard({
           >
             {product.title}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Switch
-              value={isActive}
-              onValueChange={onToggle}
-              trackColor={{ false: '#334155', true: '#1D4ED8' }}
-              thumbColor="#FFFFFF"
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle-outline" size={20} color="#64748B" />
-            </TouchableOpacity>
-          </View>
+          <Switch
+            value={isActive}
+            onValueChange={onToggle}
+            trackColor={{ false: '#334155', true: '#1D4ED8' }}
+            thumbColor="#FFFFFF"
+            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+          />
         </View>
 
         {/* Fiyatlar */}
@@ -355,12 +349,31 @@ export default function AlarmsScreen() {
         {hasAlarms ? (
           <View style={{ paddingHorizontal: 16, gap: 10, marginBottom: 8 }}>
             {visibleAlarms.map((alarm) => (
-              <AlarmListCard
+              <Swipeable
                 key={alarm.id}
-                alarm={alarm}
-                onToggle={() => handleToggle(alarm)}
-                onClose={() => handleClose(alarm.id)}
-              />
+                overshootRight={false}
+                renderRightActions={() => (
+                  <TouchableOpacity
+                    onPress={() => handleClose(alarm.id)}
+                    style={{
+                      backgroundColor: '#EF4444',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      width: 72,
+                      borderRadius: 16,
+                      marginLeft: 8,
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 4 }}>Sil</Text>
+                  </TouchableOpacity>
+                )}
+              >
+                <AlarmListCard
+                  alarm={alarm}
+                  onToggle={() => handleToggle(alarm)}
+                />
+              </Swipeable>
             ))}
           </View>
         ) : (
