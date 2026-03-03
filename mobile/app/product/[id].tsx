@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type BottomSheet from '@gorhom/bottom-sheet';
-import { BarChart, LineChart } from 'react-native-gifted-charts';
+import { LineChart } from 'react-native-gifted-charts';
 import { useProduct } from '@/hooks/useProduct';
 import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -57,10 +57,14 @@ function buildDemandBars(currentPrice: number, alarmCount: number) {
     const value = Math.max(rawValue, Math.ceil(alarmCount * 0.02));
 
     const isPeak = offset === peakOffset;
-    const label =
-      rangeStart >= 1000
-        ? `${Math.round(rangeStart / 1000)}k`
-        : `${rangeStart}`;
+    const fmtK = (v: number) => {
+      if (v >= 1000) {
+        const k = v / 1000;
+        return k % 1 === 0 ? `${k}k` : `${k.toFixed(1)}k`;
+      }
+      return `${v}`;
+    };
+    const label = `${fmtK(rangeStart)}–${fmtK(rangeEnd)}`;
 
     bars.push({
       label,
@@ -113,6 +117,10 @@ export default function ProductDetailScreen() {
 
   const lineData = useMemo(() => buildLineData(history ?? []), [history]);
   const dropScore = useMemo(() => Math.floor(Math.random() * 40) + 40, [product?.id]);
+  const maxBarValue = useMemo(
+    () => Math.max(...(demandBars.map((b) => b.value)), 1),
+    [demandBars]
+  );
 
   // ─── Yükleniyor / hata durumu ──────────────────────────────────────────────
 
@@ -226,52 +234,42 @@ export default function ProductDetailScreen() {
                   Talep Fiyat Dağılımı
                 </Text>
                 <Text style={{ color: MUTED, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                  Kullanıcıların kaçta talep ettiği fiyat aralıkları
+                  Kullanıcıların hangi fiyatta talep ettiği dağılım
                 </Text>
               </View>
 
-              <View style={{ position: 'relative' }}>
-                <BarChart
-                  data={demandBars}
-                  width={chartWidth - 32}
-                  height={140}
-                  barWidth={Math.floor((chartWidth - 80) / demandBars.length)}
-                  spacing={6}
-                  noOfSections={4}
-                  yAxisTextStyle={{ color: MUTED, fontSize: 9 }}
-                  xAxisLabelTextStyle={{ color: MUTED, fontSize: 9 }}
-                  xAxisColor={MUTED}
-                  yAxisColor={'transparent'}
-                  hideRules
-                  isAnimated
-                  animationDuration={600}
-                  backgroundColor={CARD}
-                  roundedTop
-                />
-
-                {/* Kırmızı dikey çizgi — güncel fiyat */}
-                {(() => {
-                  const currentIdx = demandBars.findIndex((b) => b.isCurrentRange);
-                  if (currentIdx < 0) return null;
-                  const barWidth = Math.floor((chartWidth - 80) / demandBars.length);
-                  const spacing = 6;
-                  const leftOffset = 44 + currentIdx * (barWidth + spacing) + barWidth / 2;
+              <View style={{ gap: 8 }}>
+                {demandBars.map((bar, idx) => {
+                  const pct = Math.round((bar.value / maxBarValue) * 100);
                   return (
-                    <View
-                      pointerEvents="none"
-                      style={{
-                        position: 'absolute',
-                        left: leftOffset,
-                        top: 0,
-                        bottom: 22,
-                        width: 2,
-                        backgroundColor: '#EF4444',
-                        borderRadius: 1,
-                        opacity: 0.9,
-                      }}
-                    />
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text
+                        style={{
+                          color: bar.isCurrentRange ? '#EF4444' : MUTED,
+                          fontSize: 10,
+                          fontFamily: 'Inter_500Medium',
+                          width: 64,
+                          textAlign: 'right',
+                        }}
+                      >
+                        {bar.label}
+                      </Text>
+                      <View style={{ flex: 1, height: 8, backgroundColor: '#0F172A', borderRadius: 4, overflow: 'hidden' }}>
+                        <View
+                          style={{
+                            width: `${pct}%`,
+                            height: '100%',
+                            backgroundColor: bar.frontColor,
+                            borderRadius: 4,
+                          }}
+                        />
+                      </View>
+                      <Text style={{ color: MUTED, fontSize: 10, fontFamily: 'Inter_400Regular', width: 28, textAlign: 'right' }}>
+                        {pct}%
+                      </Text>
+                    </View>
                   );
-                })()}
+                })}
               </View>
 
               {/* Legend */}
@@ -289,7 +287,7 @@ export default function ProductDetailScreen() {
           )}
 
           {/* ── Fiyat Geçmişi ── */}
-          <View style={{ backgroundColor: CARD, borderRadius: 16, padding: 16, gap: 12 }}>
+          <View style={{ backgroundColor: CARD, borderRadius: 16, padding: 16, gap: 12, overflow: 'hidden' }}>
             <View style={{ gap: 4 }}>
               <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
                 Fiyat Geçmişi
