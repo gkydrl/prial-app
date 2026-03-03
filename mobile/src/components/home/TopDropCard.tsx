@@ -38,9 +38,13 @@ function nameFromUrl(url: string): string {
 export function TopDropCard({ item }: { item: TopDropResponse }) {
   const { product, store, price_now, price_24h_ago, drop_percent } = item;
 
+  if (price_now == null) return null;
+
   const nowStr = price_now.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
-  const agoStr = price_24h_ago.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
-  const productName = product?.title ? capitalize(product.title) : nameFromUrl(store.url);
+  const agoStr = price_24h_ago != null
+    ? price_24h_ago.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺'
+    : null;
+  const productName = product?.title ? capitalize(product.title) : nameFromUrl(store?.url ?? '');
 
   return (
     <TouchableOpacity
@@ -86,16 +90,18 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text
-              style={{
-                color: '#6B7280',
-                fontSize: 11,
-                fontFamily: 'Inter_400Regular',
-                textDecorationLine: 'line-through',
-              }}
-            >
-              {agoStr}
-            </Text>
+            {agoStr && (
+              <Text
+                style={{
+                  color: '#6B7280',
+                  fontSize: 11,
+                  fontFamily: 'Inter_400Regular',
+                  textDecorationLine: 'line-through',
+                }}
+              >
+                {agoStr}
+              </Text>
+            )}
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
               {nowStr}
             </Text>
