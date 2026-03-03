@@ -145,11 +145,11 @@ const CARD = '#1E293B';
 function AlarmListCard({
   alarm,
   onToggle,
-  onDelete,
+  onClose,
 }: {
   alarm: AlarmResponse;
   onToggle: () => void;
-  onDelete: () => void;
+  onClose: () => void;
 }) {
   const product = alarm.product;
   const store = alarm.product_store;
@@ -172,9 +172,7 @@ function AlarmListCard({
   const isActive = alarm.status === 'active';
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onLongPress={onDelete}
+    <View
       style={{
         backgroundColor: CARD,
         borderRadius: 16,
@@ -185,7 +183,7 @@ function AlarmListCard({
       }}
     >
       {/* Ürün görseli */}
-      <TouchableOpacity onPress={() => router.push(`/product/${product.id}`)}>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => router.push(`/product/${product.id}`)}>
         <Image
           source={imageSource(product.image_url)}
           style={{ width: 70, height: 70, borderRadius: 12 }}
@@ -196,7 +194,7 @@ function AlarmListCard({
 
       {/* İçerik */}
       <View style={{ flex: 1, gap: 6 }}>
-        {/* Ürün adı + toggle */}
+        {/* Ürün adı + aksiyonlar */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <Text
             style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_600SemiBold', flex: 1 }}
@@ -204,13 +202,18 @@ function AlarmListCard({
           >
             {product.title}
           </Text>
-          <Switch
-            value={isActive}
-            onValueChange={onToggle}
-            trackColor={{ false: '#334155', true: '#1D4ED8' }}
-            thumbColor="#FFFFFF"
-            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Switch
+              value={isActive}
+              onValueChange={onToggle}
+              trackColor={{ false: '#334155', true: '#1D4ED8' }}
+              thumbColor="#FFFFFF"
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+            />
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle-outline" size={20} color="#64748B" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Fiyatlar */}
@@ -237,7 +240,7 @@ function AlarmListCard({
           />
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -315,14 +318,16 @@ export default function AlarmsScreen() {
     updateAlarm(alarm.id, { status: alarm.status === 'active' ? 'paused' : 'active' });
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert('Talebi Sil', 'Bu talebi silmek istiyor musun?', [
+  const handleClose = (id: string) => {
+    Alert.alert('Talebi Kapat', 'Bu talebi kapatmak istiyor musun?', [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Sil', style: 'destructive', onPress: () => deleteAlarm(id) },
+      { text: 'Kapat', style: 'destructive', onPress: () => deleteAlarm(id) },
     ]);
   };
 
-  const hasAlarms = alarms.length > 0;
+  // Triggered ve deleted talepler listede gösterilmez — otomatik kapandı sayılır
+  const visibleAlarms = alarms.filter((a) => a.status === 'active' || a.status === 'paused');
+  const hasAlarms = visibleAlarms.length > 0;
   const fadeStyle = useFadeIn();
 
   return (
@@ -349,12 +354,12 @@ export default function AlarmsScreen() {
         {/* Alarm listesi veya boş durum */}
         {hasAlarms ? (
           <View style={{ paddingHorizontal: 16, gap: 10, marginBottom: 8 }}>
-            {alarms.map((alarm) => (
+            {visibleAlarms.map((alarm) => (
               <AlarmListCard
                 key={alarm.id}
                 alarm={alarm}
                 onToggle={() => handleToggle(alarm)}
-                onDelete={() => handleDelete(alarm.id)}
+                onClose={() => handleClose(alarm.id)}
               />
             ))}
           </View>
