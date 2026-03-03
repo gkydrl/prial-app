@@ -77,7 +77,7 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
           <Image
             source={imageSource(product.image_url)}
             style={{ width: '100%', height: '100%' }}
-            contentFit="contain"
+            contentFit="cover"
             onError={() => setImgError(true)}
           />
         ) : (
@@ -152,7 +152,7 @@ function SideCard({ product }: { product: ProductResponse }) {
           <Image
             source={imageSource(product.image_url)}
             style={{ width: '100%', height: SIDE_IMAGE_H }}
-            contentFit="contain"
+            contentFit="cover"
             onError={() => setImgError(true)}
           />
         ) : (
@@ -204,7 +204,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
           <Image
             source={imageSource(product.image_url)}
             style={{ width: '100%', height: 100 }}
-            contentFit="contain"
+            contentFit="cover"
             onError={() => setImgError(true)}
           />
         ) : (

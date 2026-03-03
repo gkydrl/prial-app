@@ -41,7 +41,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
           <Image
             source={imageSource(product.image_url)}
             style={{ width: '100%', height: 140 }}
-            contentFit="contain"
+            contentFit="cover"
             onError={() => setImgError(true)}
           />
         ) : (
