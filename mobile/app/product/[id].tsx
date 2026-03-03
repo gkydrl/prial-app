@@ -112,6 +112,7 @@ export default function ProductDetailScreen() {
   }, [currentPrice, alarmCount]);
 
   const lineData = useMemo(() => buildLineData(history ?? []), [history]);
+  const dropScore = useMemo(() => Math.floor(Math.random() * 40) + 40, [product?.id]);
 
   // ─── Yükleniyor / hata durumu ──────────────────────────────────────────────
 
@@ -324,6 +325,35 @@ export default function ProductDetailScreen() {
               </View>
             )}
           </View>
+
+          {/* ── Düşüş Tahmini ── */}
+          {(() => {
+            const scoreColor = dropScore > 60 ? BRAND_GREEN : dropScore >= 40 ? '#F59E0B' : '#EF4444';
+            return (
+              <View style={{ backgroundColor: CARD, borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                {/* Sol: büyük skor */}
+                <View style={{ alignItems: 'center', minWidth: 72 }}>
+                  <Text style={{ color: scoreColor, fontSize: 38, fontFamily: 'Inter_700Bold', lineHeight: 44 }}>
+                    %{dropScore}
+                  </Text>
+                </View>
+                {/* Dikey ayraç */}
+                <View style={{ width: 1, height: 56, backgroundColor: '#334155' }} />
+                {/* Sağ: açıklama */}
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ color: WHITE, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                    Düşüş Tahmini
+                  </Text>
+                  <Text style={{ color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16 }}>
+                    Önümüzdeki 30 günde fiyatın düşme ihtimali
+                  </Text>
+                  <Text style={{ color: scoreColor, fontSize: 10, fontFamily: 'Inter_500Medium', marginTop: 2 }}>
+                    {dropScore > 60 ? 'Düşüş bekleniyor' : dropScore >= 40 ? 'Belirsiz seyir' : 'Düşüş beklenmiyor'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
 
           {/* ── Mağazalar ── */}
           {stores.length > 0 && (

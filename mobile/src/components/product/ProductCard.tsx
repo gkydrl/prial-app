@@ -36,7 +36,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
       }}
     >
       {/* Görsel alanı */}
-      <View style={{ width: '100%', height: 140 }}>
+      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B' }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}

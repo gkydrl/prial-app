@@ -72,7 +72,7 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Görsel */}
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: CARD_BG }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}
@@ -147,7 +147,7 @@ function SideCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Sabit yükseklik görsel alanı — gri kutu kartı ele geçirmesin */}
-      <View style={{ height: SIDE_IMAGE_H }}>
+      <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}
@@ -199,7 +199,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
         overflow: 'hidden',
       }}
     >
-      <View style={{ width: '100%', height: 100 }}>
+      <View style={{ width: '100%', height: 100, backgroundColor: CARD_BG }}>
         {product.image_url && !imgError ? (
           <Image
             source={imageSource(product.image_url)}

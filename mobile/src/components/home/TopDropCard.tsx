@@ -55,7 +55,7 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
       }}
     >
       {/* Görsel alanı */}
-      <View style={{ width: '100%', height: 140 }}>
+      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B' }}>
         <Image
           source={imageSource(product?.image_url)}
           style={{ width: '100%', height: 140 }}

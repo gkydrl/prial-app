@@ -20,12 +20,20 @@ async def lifespan(app: FastAPI):
 
     # Fiyat takip zamanlayıcısı
     from app.services.price_tracker import check_all_prices
+    from app.services.alarm_checker import check_alarm_triggers
 
     scheduler.add_job(
         check_all_prices,
         trigger="interval",
         minutes=settings.scrape_interval_minutes,
         id="price_check",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        check_alarm_triggers,
+        trigger="interval",
+        minutes=30,
+        id="alarm_check",
         replace_existing=True,
     )
     scheduler.start()
