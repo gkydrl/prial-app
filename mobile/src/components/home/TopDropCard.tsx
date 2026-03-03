@@ -91,14 +91,14 @@ export function TopDropCard({ item, width = 160, badge = 'both' }: { item: TopDr
           />
           {/* Drop badge — sol üst köşe (%) */}
           {(badge === 'percent' || badge === 'both') && <DiscountBadge percent={drop_percent} />}
-          {/* ₺ düşüş rozeti — sağ üst köşe */}
+          {/* ₺ düşüş rozeti — sol üst köşe (amount only) veya sağ üst (both) */}
           {(badge === 'amount' || badge === 'both') && dropAmountStr && (
             <View
               style={{
                 position: 'absolute',
                 top: 8,
                 ...(badge === 'both' ? { right: 8 } : { left: 8 }),
-                backgroundColor: '#6C47FF',
+                backgroundColor: '#22C55E',
                 borderRadius: 20,
                 paddingHorizontal: 8,
                 paddingVertical: 4,
@@ -108,6 +108,21 @@ export function TopDropCard({ item, width = 160, badge = 'both' }: { item: TopDr
                 ↘ -{dropAmountStr}
               </Text>
             </View>
+          )}
+          {/* Talep oluştur — sağ üst yuvarlak buton (both dışında, sağ üst boşsa) */}
+          {badge !== 'both' && (
+            <TouchableOpacity
+              onPress={handleAlarmPress}
+              activeOpacity={0.85}
+              style={{
+                position: 'absolute', top: 8, right: 8,
+                width: 24, height: 24, borderRadius: 12,
+                backgroundColor: '#6C47FF',
+                justifyContent: 'center', alignItems: 'center',
+              }}
+            >
+              <Ionicons name="add" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -146,9 +161,17 @@ export function TopDropCard({ item, width = 160, badge = 'both' }: { item: TopDr
               {nowStr}
             </Text>
           </View>
-          <TouchableOpacity onPress={handleAlarmPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
-          </TouchableOpacity>
+          {badge === 'both' && (
+            <TouchableOpacity onPress={handleAlarmPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={{
+                width: 24, height: 24, borderRadius: 12,
+                backgroundColor: '#6C47FF',
+                justifyContent: 'center', alignItems: 'center',
+              }}>
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>

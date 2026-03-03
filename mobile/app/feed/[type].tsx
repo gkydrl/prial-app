@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { PrialLoader } from '@/components/ui/PrialLoader';
 import { homeApi } from '@/api/home';
 import { TopDropCard } from '@/components/home/TopDropCard';
 import { ProductCard } from '@/components/product/ProductCard';
@@ -123,9 +124,7 @@ export default function FeedScreen() {
 
       {/* İçerik */}
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={BRAND} />
-        </View>
+        <PrialLoader />
       ) : data.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <Ionicons name="analytics-outline" size={48} color="#334155" />

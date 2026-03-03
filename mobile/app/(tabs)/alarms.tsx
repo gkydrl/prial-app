@@ -157,6 +157,15 @@ function PopularCard({ product }: { product: ProductResponse }) {
           {product.title}
         </Text>
 
+        {product.alarm_count > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Ionicons name="pricetag-outline" size={11} color="#A78BFA" />
+            <Text style={{ color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+              {product.alarm_count.toLocaleString('tr-TR')} talep
+            </Text>
+          </View>
+        )}
+
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ gap: 2 }}>
             {hasDiscount && (

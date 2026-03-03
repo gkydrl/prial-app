@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { PrialLoader } from '@/components/ui/PrialLoader';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/constants/api';
 import type { ProductResponse } from '@/types/api';
@@ -77,6 +78,14 @@ function ProductRow({ product }: { product: ProductResponse }) {
             }}>
               <Text style={{ color: '#22C55E', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
                 -{discount}%
+              </Text>
+            </View>
+          )}
+          {product.alarm_count > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+              <Ionicons name="pricetag-outline" size={11} color="#A78BFA" />
+              <Text style={{ color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                {product.alarm_count.toLocaleString('tr-TR')} talep
               </Text>
             </View>
           )}
@@ -188,9 +197,7 @@ export default function AlarmSearchScreen() {
 
       {/* Sonuçlar */}
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#6C47FF" />
-        </View>
+        <PrialLoader />
       ) : !hasSearched ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingBottom: 60 }}>
           <Ionicons name="search-outline" size={48} color="#1E293B" />

@@ -69,8 +69,22 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
               <Ionicons name="cube-outline" size={40} color="#94A3B8" />
             </View>
           )}
-          {/* İndirim badge — sol üst köşe */}
+          {/* İndirim badge — sol üst */}
           {!!discount && <DiscountBadge percent={discount} />}
+
+          {/* Talep oluştur — sağ üst yuvarlak buton */}
+          <TouchableOpacity
+            onPress={handleAlarmPress}
+            activeOpacity={0.85}
+            style={{
+              position: 'absolute', top: 6, right: 6,
+              width: 24, height: 24, borderRadius: 12,
+              backgroundColor: '#6C47FF',
+              justifyContent: 'center', alignItems: 'center',
+            }}
+          >
+            <Ionicons name="add" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -86,14 +100,7 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {originalStr && (
-              <Text
-                style={{
-                  color: '#6B7280',
-                  fontSize: 11,
-                  fontFamily: 'Inter_400Regular',
-                  textDecorationLine: 'line-through',
-                }}
-              >
+              <Text style={{ color: '#6B7280', fontSize: 11, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' }}>
                 {originalStr}
               </Text>
             )}
@@ -102,9 +109,15 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
             </Text>
           </View>
 
-          <TouchableOpacity onPress={handleAlarmPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
-          </TouchableOpacity>
+          {/* Talep sayısı — sağ alt */}
+          {product.alarm_count > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#6C47FF20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
+              <Ionicons name="pricetag-outline" size={11} color="#A78BFA" />
+              <Text style={{ color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
+                {product.alarm_count.toLocaleString('tr-TR')} Talep
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>

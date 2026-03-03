@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import { TopDropCard } from '@/components/home/TopDropCard';
 import { ProductCard } from '@/components/product/ProductCard';
+import { DailyBanner } from '@/components/home/DailyBanner';
 import { OnboardingModal } from '@/components/home/OnboardingModal';
 import { useAuthStore } from '@/store/authStore';
 import { useHome } from '@/hooks/useHome';
@@ -150,6 +151,9 @@ export default function HomeScreen() {
           <RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#6C47FF" />
         }
       >
+        {/* Günlük Banner */}
+        {topDrops.length > 0 && <DailyBanner items={topDrops} />}
+
         {/* İstatistikler */}
         <StatsCard />
 

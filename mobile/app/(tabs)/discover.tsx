@@ -13,12 +13,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PrialLoader } from '@/components/ui/PrialLoader';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/constants/api';
 import type { ProductResponse } from '@/types/api';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
 import { imageSource } from '@/utils/imageSource';
+import { useAuthStore } from '@/store/authStore';
+import { openAlarmSheet } from '@/store/alarmSheetStore';
+import { showAlert } from '@/store/alertStore';
 
 const BG = '#0A1628';
 const CARD_BG = '#1E293B';
@@ -33,7 +37,7 @@ const FEATURED_INTERVAL = 6;
 // Büyük kart + 2 yan kartın toplam yüksekliği
 const FEATURED_ROW_HEIGHT = 270;
 // Yan küçük kartlarda görsel için sabit yükseklik
-const SIDE_IMAGE_H = 88;
+const SIDE_IMAGE_H = 76;
 
 const fmtPrice = (price: number | null) =>
   price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
@@ -54,10 +58,26 @@ const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentPro
 
 function FeaturedCard({ product }: { product: ProductResponse }) {
   const [imgError, setImgError] = useState(false);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const store = product.stores?.[0];
   const price = store?.current_price;
   const discount = store?.discount_percent;
   const priceStr = fmtPrice(price);
+
+  const handleAlarmPress = () => {
+    if (!isAuthenticated) {
+      showAlert('Giriş Gerekli', 'Talep oluşturmak için giriş yapmalısınız.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    openAlarmSheet({
+      productId: product.id,
+      storeUrl: store?.url ?? null,
+      currentPrice: price != null ? Number(price) : null,
+    });
+  };
 
   return (
     <TouchableOpacity
@@ -87,7 +107,7 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
             </View>
           )}
 
-          {/* "ÖNE ÇIKAN" badge */}
+          {/* "ÖNE ÇIKAN" badge — sol üst */}
           <View style={{
             position: 'absolute', top: 8, left: 8,
             backgroundColor: '#6C47FF', borderRadius: 5,
@@ -97,6 +117,20 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
               ÖNE ÇIKAN
             </Text>
           </View>
+
+          {/* Talep oluştur — sağ üst yuvarlak buton */}
+          <TouchableOpacity
+            onPress={handleAlarmPress}
+            activeOpacity={0.85}
+            style={{
+              position: 'absolute', top: 8, right: 8,
+              width: 26, height: 26, borderRadius: 13,
+              backgroundColor: '#6C47FF',
+              justifyContent: 'center', alignItems: 'center',
+            }}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
 
           {!!discount && (
             <View style={{
@@ -120,9 +154,19 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
         >
           {product.title}
         </Text>
-        <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-          {priceStr}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+            {priceStr}
+          </Text>
+          {product.alarm_count > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#6C47FF20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
+              <Ionicons name="pricetag-outline" size={12} color="#A78BFA" />
+              <Text style={{ color: '#A78BFA', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
+                {product.alarm_count.toLocaleString('tr-TR')} Talep
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -132,9 +176,25 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
 
 function SideCard({ product }: { product: ProductResponse }) {
   const [imgError, setImgError] = useState(false);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const store = product.stores?.[0];
   const price = store?.current_price;
   const priceStr = fmtPrice(price);
+
+  const handleAlarmPress = () => {
+    if (!isAuthenticated) {
+      showAlert('Giriş Gerekli', 'Talep oluşturmak için giriş yapmalısınız.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    openAlarmSheet({
+      productId: product.id,
+      storeUrl: store?.url ?? null,
+      currentPrice: price != null ? Number(price) : null,
+    });
+  };
 
   return (
     <TouchableOpacity
@@ -148,7 +208,7 @@ function SideCard({ product }: { product: ProductResponse }) {
         minHeight: 0,
       }}
     >
-      {/* Sabit yükseklik görsel alanı — gri kutu kartı ele geçirmesin */}
+      {/* Sabit yükseklik görsel alanı */}
       <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG, padding: 6 }}>
         <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, overflow: 'hidden' }}>
           {product.image_url && !imgError ? (
@@ -163,20 +223,43 @@ function SideCard({ product }: { product: ProductResponse }) {
               <Ionicons name="cube-outline" size={22} color="#94A3B8" />
             </View>
           )}
+          {/* Talep oluştur — sağ üst yuvarlak buton */}
+          <TouchableOpacity
+            onPress={handleAlarmPress}
+            activeOpacity={0.85}
+            style={{
+              position: 'absolute', top: 5, right: 5,
+              width: 20, height: 20, borderRadius: 10,
+              backgroundColor: '#6C47FF',
+              justifyContent: 'center', alignItems: 'center',
+            }}
+          >
+            <Ionicons name="add" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Yazı — geri kalan alanı doldur */}
-      <View style={{ flex: 1, padding: 6, justifyContent: 'center' }}>
+      {/* Yazı */}
+      <View style={{ flex: 1, paddingHorizontal: 6, paddingVertical: 4, justifyContent: 'space-between' }}>
         <Text
           style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_500Medium', lineHeight: 13 }}
           numberOfLines={2}
         >
           {product.title}
         </Text>
-        <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold', marginTop: 3 }}>
-          {priceStr}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
+            {priceStr}
+          </Text>
+          {product.alarm_count > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#6C47FF20', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 }}>
+              <Ionicons name="pricetag-outline" size={10} color="#A78BFA" />
+              <Text style={{ color: '#A78BFA', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                {product.alarm_count.toLocaleString('tr-TR')} Talep
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -186,10 +269,26 @@ function SideCard({ product }: { product: ProductResponse }) {
 
 function ProductGridCard({ product }: { product: ProductResponse }) {
   const [imgError, setImgError] = useState(false);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const store = product.stores?.[0];
   const price = store?.current_price;
   const discount = store?.discount_percent;
   const priceStr = fmtPrice(price);
+
+  const handleAlarmPress = () => {
+    if (!isAuthenticated) {
+      showAlert('Giriş Gerekli', 'Talep oluşturmak için giriş yapmalısınız.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    openAlarmSheet({
+      productId: product.id,
+      storeUrl: store?.url ?? null,
+      currentPrice: price != null ? Number(price) : null,
+    });
+  };
 
   return (
     <TouchableOpacity
@@ -228,6 +327,19 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
               </Text>
             </View>
           )}
+          {/* Talep oluştur — sağ üst yuvarlak buton */}
+          <TouchableOpacity
+            onPress={handleAlarmPress}
+            activeOpacity={0.85}
+            style={{
+              position: 'absolute', top: 6, right: 6,
+              width: 22, height: 22, borderRadius: 11,
+              backgroundColor: '#6C47FF',
+              justifyContent: 'center', alignItems: 'center',
+            }}
+          >
+            <Ionicons name="add" size={15} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -242,7 +354,14 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
           <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>
             {priceStr}
           </Text>
-          <Ionicons name="pricetag-outline" size={13} color="#6C47FF" />
+          {product.alarm_count > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#6C47FF20', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 }}>
+              <Ionicons name="pricetag-outline" size={10} color="#A78BFA" />
+              <Text style={{ color: '#A78BFA', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                {product.alarm_count.toLocaleString('tr-TR')} Talep
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -396,9 +515,7 @@ export default function DiscoverScreen() {
       {/* Ürün Grid */}
       <View style={{ flex: 1, marginTop: 16 }}>
         {isLoading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#6C47FF" />
-          </View>
+          <PrialLoader />
         ) : products.length === 0 ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 }}>
             <Ionicons name="search-outline" size={40} color="#334155" />
