@@ -37,7 +37,7 @@ export function ProductCard({ product, store }: ProductCardProps) {
     >
       {/* Görsel alanı */}
       <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8 }}>
-        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 10, overflow: 'hidden' }}>
           {product.image_url && !imgError ? (
             <Image
               source={imageSource(product.image_url)}

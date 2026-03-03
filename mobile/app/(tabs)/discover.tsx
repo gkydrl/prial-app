@@ -73,7 +73,7 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
     >
       {/* Görsel */}
       <View style={{ flex: 1, backgroundColor: CARD_BG, padding: 10 }}>
-        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 10, overflow: 'hidden' }}>
           {product.image_url && !imgError ? (
             <Image
               source={imageSource(product.image_url)}
@@ -150,7 +150,7 @@ function SideCard({ product }: { product: ProductResponse }) {
     >
       {/* Sabit yükseklik görsel alanı — gri kutu kartı ele geçirmesin */}
       <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG, padding: 6 }}>
-        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, overflow: 'hidden' }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, overflow: 'hidden' }}>
           {product.image_url && !imgError ? (
             <Image
               source={imageSource(product.image_url)}
@@ -204,7 +204,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
       }}
     >
       <View style={{ width: '100%', height: 100, backgroundColor: CARD_BG, padding: 8 }}>
-        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, overflow: 'hidden' }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, overflow: 'hidden' }}>
           {product.image_url && !imgError ? (
             <Image
               source={imageSource(product.image_url)}
