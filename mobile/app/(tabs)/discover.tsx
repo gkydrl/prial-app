@@ -72,42 +72,44 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Görsel */}
-      <View style={{ flex: 1, backgroundColor: CARD_BG, padding: 10, justifyContent: 'center', alignItems: 'center' }}>
-        {product.image_url && !imgError ? (
-          <Image
-            source={imageSource(product.image_url)}
-            style={{ width: '100%', height: '100%', borderRadius: 4 }}
-            contentFit="contain"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="cube-outline" size={48} color="#475569" />
-          </View>
-        )}
+      <View style={{ flex: 1, backgroundColor: CARD_BG, padding: 10 }}>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' }}>
+          {product.image_url && !imgError ? (
+            <Image
+              source={imageSource(product.image_url)}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="cube-outline" size={48} color="#94A3B8" />
+            </View>
+          )}
 
-        {/* "ÖNE ÇIKAN" badge */}
-        <View style={{
-          position: 'absolute', top: 8, left: 8,
-          backgroundColor: '#6C47FF', borderRadius: 5,
-          paddingHorizontal: 7, paddingVertical: 3,
-        }}>
-          <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 }}>
-            ÖNE ÇIKAN
-          </Text>
-        </View>
-
-        {!!discount && (
+          {/* "ÖNE ÇIKAN" badge */}
           <View style={{
-            position: 'absolute', top: 8, right: 8,
-            backgroundColor: '#22C55E', borderRadius: 5,
+            position: 'absolute', top: 8, left: 8,
+            backgroundColor: '#6C47FF', borderRadius: 5,
             paddingHorizontal: 7, paddingVertical: 3,
           }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
-              -{discount}%
+            <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 }}>
+              ÖNE ÇIKAN
             </Text>
           </View>
-        )}
+
+          {!!discount && (
+            <View style={{
+              position: 'absolute', top: 8, right: 8,
+              backgroundColor: '#22C55E', borderRadius: 5,
+              paddingHorizontal: 7, paddingVertical: 3,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                -{discount}%
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Bilgi */}
@@ -147,19 +149,21 @@ function SideCard({ product }: { product: ProductResponse }) {
       }}
     >
       {/* Sabit yükseklik görsel alanı — gri kutu kartı ele geçirmesin */}
-      <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG, padding: 6, justifyContent: 'center', alignItems: 'center' }}>
-        {product.image_url && !imgError ? (
-          <Image
-            source={imageSource(product.image_url)}
-            style={{ width: '100%', height: '100%', borderRadius: 3 }}
-            contentFit="contain"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 3, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="cube-outline" size={22} color="#475569" />
-          </View>
-        )}
+      <View style={{ height: SIDE_IMAGE_H, backgroundColor: CARD_BG, padding: 6 }}>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, overflow: 'hidden' }}>
+          {product.image_url && !imgError ? (
+            <Image
+              source={imageSource(product.image_url)}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="cube-outline" size={22} color="#94A3B8" />
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Yazı — geri kalan alanı doldur */}
@@ -199,30 +203,32 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
         overflow: 'hidden',
       }}
     >
-      <View style={{ width: '100%', height: 100, backgroundColor: CARD_BG, padding: 8, justifyContent: 'center', alignItems: 'center' }}>
-        {product.image_url && !imgError ? (
-          <Image
-            source={imageSource(product.image_url)}
-            style={{ width: '100%', height: '100%', borderRadius: 4 }}
-            contentFit="contain"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="cube-outline" size={36} color="#475569" />
-          </View>
-        )}
-        {!!discount && (
-          <View style={{
-            position: 'absolute', top: 6, left: 6,
-            backgroundColor: '#22C55E', borderRadius: 4,
-            paddingHorizontal: 5, paddingVertical: 2,
-          }}>
-            <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
-              -{discount}%
-            </Text>
-          </View>
-        )}
+      <View style={{ width: '100%', height: 100, backgroundColor: CARD_BG, padding: 8 }}>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, overflow: 'hidden' }}>
+          {product.image_url && !imgError ? (
+            <Image
+              source={imageSource(product.image_url)}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="cube-outline" size={36} color="#94A3B8" />
+            </View>
+          )}
+          {!!discount && (
+            <View style={{
+              position: 'absolute', top: 6, left: 6,
+              backgroundColor: '#22C55E', borderRadius: 4,
+              paddingHorizontal: 5, paddingVertical: 2,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                -{discount}%
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={{ padding: 8, gap: 4 }}>

@@ -55,15 +55,17 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
       }}
     >
       {/* Görsel alanı */}
-      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8, justifyContent: 'center', alignItems: 'center' }}>
-        <Image
-          source={imageSource(product?.image_url)}
-          style={{ width: '100%', height: '100%', borderRadius: 4 }}
-          contentFit="contain"
-          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-        />
-        {/* Drop badge — sol üst köşe */}
-        <DiscountBadge percent={drop_percent} />
+      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8 }}>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' }}>
+          <Image
+            source={imageSource(product?.image_url)}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="contain"
+            placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+          />
+          {/* Drop badge — sol üst köşe */}
+          <DiscountBadge percent={drop_percent} />
+        </View>
       </View>
 
       {/* Yazı alanı */}

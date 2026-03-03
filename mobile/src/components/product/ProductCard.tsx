@@ -36,21 +36,23 @@ export function ProductCard({ product, store }: ProductCardProps) {
       }}
     >
       {/* Görsel alanı */}
-      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8, justifyContent: 'center', alignItems: 'center' }}>
-        {product.image_url && !imgError ? (
-          <Image
-            source={imageSource(product.image_url)}
-            style={{ width: '100%', height: '100%', borderRadius: 4 }}
-            contentFit="contain"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={{ flex: 1, width: '100%', backgroundColor: '#2D3F55', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="cube-outline" size={40} color="#475569" />
-          </View>
-        )}
-        {/* İndirim badge — sol üst köşe */}
-        {!!discount && <DiscountBadge percent={discount} />}
+      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8 }}>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' }}>
+          {product.image_url && !imgError ? (
+            <Image
+              source={imageSource(product.image_url)}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="cube-outline" size={40} color="#94A3B8" />
+            </View>
+          )}
+          {/* İndirim badge — sol üst köşe */}
+          {!!discount && <DiscountBadge percent={discount} />}
+        </View>
       </View>
 
       {/* Yazı alanı */}
