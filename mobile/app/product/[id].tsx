@@ -167,12 +167,16 @@ export default function ProductDetailScreen() {
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* ── Ürün görseli ── */}
-        <Image
-          source={imageSource(product.image_url)}
-          style={{ width: '100%', height: 260, backgroundColor: CARD }}
-          contentFit="contain"
-          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-        />
+        <View style={{ width: '100%', height: 280, backgroundColor: BG, padding: 16 }}>
+          <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden' }}>
+            <Image
+              source={imageSource(product.image_url)}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+              placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+            />
+          </View>
+        </View>
 
         <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 20, paddingBottom: 120 }}>
 
