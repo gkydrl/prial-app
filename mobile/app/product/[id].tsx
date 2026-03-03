@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   Alert,
-  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -13,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type BottomSheet from '@gorhom/bottom-sheet';
-import { LineChart } from 'react-native-gifted-charts';
 import { useProduct } from '@/hooks/useProduct';
 import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -22,7 +20,6 @@ import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
 const BG = '#0A1628';
 const CARD = '#1E293B';
 const BRAND_GREEN = '#22C55E';
-const BRAND_BLUE = '#1D4ED8';
 const MUTED = '#64748B';
 const WHITE = '#FFFFFF';
 
@@ -77,26 +74,12 @@ function buildDemandBars(currentPrice: number, alarmCount: number) {
   return bars;
 }
 
-// ─── Fiyat geçmişi verisi ─────────────────────────────────────────────────────
-
-function buildLineData(history: { price: number; recorded_at: string }[]) {
-  if (!history || history.length === 0) return [];
-  const sorted = [...history].sort(
-    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-  );
-  // Son 30 nokta
-  return sorted.slice(-30).map((h) => ({ value: h.price }));
-}
-
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { product, history, isLoading, error } = useProduct(id);
   const alarmSheetRef = useRef<BottomSheet>(null);
-  const { width } = useWindowDimensions();
-  const chartWidth = width - 48; // padding
-
   const stores = product?.stores ?? [];
   const lowestStore = useMemo(() => {
     return stores.reduce<typeof stores[0] | null>((min, s) => {
@@ -115,7 +98,6 @@ export default function ProductDetailScreen() {
     return buildDemandBars(currentPrice, Math.max(alarmCount, 50));
   }, [currentPrice, alarmCount]);
 
-  const lineData = useMemo(() => buildLineData(history ?? []), [history]);
   const dropScore = useMemo(() => Math.floor(Math.random() * 40) + 40, [product?.id]);
   const maxBarValue = useMemo(
     () => Math.max(...(demandBars.map((b) => b.value)), 1),
@@ -289,44 +271,6 @@ export default function ProductDetailScreen() {
               </View>
             </View>
           )}
-
-          {/* ── Fiyat Geçmişi ── */}
-          <View style={{ backgroundColor: CARD, borderRadius: 16, padding: 16, gap: 12, overflow: 'hidden' }}>
-            <View style={{ gap: 4 }}>
-              <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-                Fiyat Geçmişi
-              </Text>
-              <Text style={{ color: MUTED, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                Son 30 kayıt
-              </Text>
-            </View>
-
-            {lineData.length > 1 ? (
-              <LineChart
-                data={lineData}
-                width={chartWidth - 32}
-                height={140}
-                color={BRAND_BLUE}
-                thickness={2}
-                noOfSections={4}
-                yAxisTextStyle={{ color: MUTED, fontSize: 9 }}
-                xAxisColor={MUTED}
-                yAxisColor={'transparent'}
-                hideDataPoints={lineData.length > 10}
-                dataPointsColor={BRAND_BLUE}
-                dataPointsRadius={3}
-                curved
-                hideRules
-                isAnimated
-                backgroundColor={CARD}
-              />
-            ) : (
-              <View style={{ height: 100, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Ionicons name="analytics-outline" size={32} color={MUTED} />
-                <Text style={{ color: MUTED, fontSize: 13 }}>Henüz yeterli fiyat geçmişi yok</Text>
-              </View>
-            )}
-          </View>
 
           {/* ── Düşüş Tahmini ── */}
           {(() => {
