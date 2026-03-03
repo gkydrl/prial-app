@@ -110,7 +110,7 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
           {/* "ÖNE ÇIKAN" badge — sol üst */}
           <View style={{
             position: 'absolute', top: 8, left: 8,
-            backgroundColor: '#6C47FF', borderRadius: 5,
+            backgroundColor: '#1D4ED8', borderRadius: 5,
             paddingHorizontal: 7, paddingVertical: 3,
           }}>
             <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 }}>
@@ -125,7 +125,7 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
             style={{
               position: 'absolute', top: 8, right: 8,
               width: 26, height: 26, borderRadius: 13,
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               justifyContent: 'center', alignItems: 'center',
             }}
           >
@@ -159,9 +159,9 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
             {priceStr}
           </Text>
           {product.alarm_count > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#6C47FF20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
-              <Ionicons name="pricetag-outline" size={12} color="#A78BFA" />
-              <Text style={{ color: '#A78BFA', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1D4ED820', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
+              <Ionicons name="pricetag-outline" size={12} color="#93C5FD" />
+              <Text style={{ color: '#93C5FD', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
                 {product.alarm_count.toLocaleString('tr-TR')} Talep
               </Text>
             </View>
@@ -230,7 +230,7 @@ function SideCard({ product }: { product: ProductResponse }) {
             style={{
               position: 'absolute', top: 5, right: 5,
               width: 20, height: 20, borderRadius: 10,
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               justifyContent: 'center', alignItems: 'center',
             }}
           >
@@ -252,9 +252,9 @@ function SideCard({ product }: { product: ProductResponse }) {
             {priceStr}
           </Text>
           {product.alarm_count > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#6C47FF20', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 }}>
-              <Ionicons name="pricetag-outline" size={10} color="#A78BFA" />
-              <Text style={{ color: '#A78BFA', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#1D4ED820', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 }}>
+              <Ionicons name="pricetag-outline" size={10} color="#93C5FD" />
+              <Text style={{ color: '#93C5FD', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
                 {product.alarm_count.toLocaleString('tr-TR')} Talep
               </Text>
             </View>
@@ -334,7 +334,7 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
             style={{
               position: 'absolute', top: 6, right: 6,
               width: 22, height: 22, borderRadius: 11,
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               justifyContent: 'center', alignItems: 'center',
             }}
           >
@@ -355,9 +355,9 @@ function ProductGridCard({ product }: { product: ProductResponse }) {
             {priceStr}
           </Text>
           {product.alarm_count > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#6C47FF20', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 }}>
-              <Ionicons name="pricetag-outline" size={10} color="#A78BFA" />
-              <Text style={{ color: '#A78BFA', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#1D4ED820', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 2 }}>
+              <Ionicons name="pricetag-outline" size={10} color="#93C5FD" />
+              <Text style={{ color: '#93C5FD', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
                 {product.alarm_count.toLocaleString('tr-TR')} Talep
               </Text>
             </View>
@@ -442,7 +442,7 @@ export default function DiscoverScreen() {
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <LinearGradient
-            colors={['#1D4ED8', '#059669']}
+            colors={['#0D2060', '#1D4ED8']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ width: 3, height: 40, borderRadius: 2 }}
@@ -501,7 +501,7 @@ export default function DiscoverScreen() {
                 width: 52,
                 height: 52,
                 borderRadius: 26,
-                backgroundColor: isActive ? '#6C47FF' : '#1E293B',
+                backgroundColor: isActive ? '#1D4ED8' : '#1E293B',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}

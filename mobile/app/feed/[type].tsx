@@ -19,7 +19,7 @@ import type { TopDropResponse, ProductResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD = '#1E293B';
-const BRAND = '#6C47FF';
+const BRAND = '#1D4ED8';
 
 const PERIODS = [
   { label: 'Son 1 Gün', value: '1d' },

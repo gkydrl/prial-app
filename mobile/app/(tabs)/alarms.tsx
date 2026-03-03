@@ -83,7 +83,7 @@ function AlarmListCard({
           <Switch
             value={isActive}
             onValueChange={onToggle}
-            trackColor={{ false: '#334155', true: '#6C47FF' }}
+            trackColor={{ false: '#334155', true: '#1D4ED8' }}
             thumbColor="#FFFFFF"
             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
           />
@@ -159,8 +159,8 @@ function PopularCard({ product }: { product: ProductResponse }) {
 
         {product.alarm_count > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Ionicons name="pricetag-outline" size={11} color="#A78BFA" />
-            <Text style={{ color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+            <Ionicons name="pricetag-outline" size={11} color="#93C5FD" />
+            <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
               {product.alarm_count.toLocaleString('tr-TR')} talep
             </Text>
           </View>
@@ -184,7 +184,7 @@ function PopularCard({ product }: { product: ProductResponse }) {
               )}
             </View>
           </View>
-          <Ionicons name="pricetag-outline" size={20} color="#6C47FF" />
+          <Ionicons name="pricetag-outline" size={20} color="#1D4ED8" />
         </View>
       </View>
     </TouchableOpacity>
@@ -197,7 +197,7 @@ function GuestWall() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 16 }}>
-        <Ionicons name="pricetag-outline" size={52} color="#6C47FF" />
+        <Ionicons name="pricetag-outline" size={52} color="#1D4ED8" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
           Taleplerinizi görüntüleyin
         </Text>
@@ -207,7 +207,7 @@ function GuestWall() {
         <TouchableOpacity
           onPress={() => router.push('/(auth)/login')}
           style={{
-            backgroundColor: '#6C47FF',
+            backgroundColor: '#1D4ED8',
             borderRadius: 14,
             paddingVertical: 14,
             paddingHorizontal: 40,
@@ -218,7 +218,7 @@ function GuestWall() {
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
           <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' }}>
-            Hesabın yok mu? <Text style={{ color: '#6C47FF', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
+            Hesabın yok mu? <Text style={{ color: '#1D4ED8', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
           </Text>
         </TouchableOpacity>
       </View>
@@ -264,7 +264,7 @@ export default function AlarmsScreen() {
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <LinearGradient
-          colors={['#1D4ED8', '#059669']}
+          colors={['#0D2060', '#1D4ED8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={{ width: 3, height: 40, borderRadius: 2 }}
@@ -320,7 +320,7 @@ export default function AlarmsScreen() {
                   borderColor: '#334155',
                 }}
               >
-                <Text style={{ color: '#6C47FF', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+                <Text style={{ color: '#1D4ED8', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
                   Hepsini Gör ({visibleAlarms.length})
                 </Text>
               </TouchableOpacity>
@@ -328,7 +328,7 @@ export default function AlarmsScreen() {
           </View>
         ) : (
           <View style={{ alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32, gap: 12 }}>
-            <Ionicons name="pricetag-outline" size={48} color="#6C47FF" />
+            <Ionicons name="pricetag-outline" size={48} color="#1D4ED8" />
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' }}>
               Henüz aktif talebin yok
             </Text>
@@ -347,10 +347,10 @@ export default function AlarmsScreen() {
               width: 56,
               height: 56,
               borderRadius: 28,
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               justifyContent: 'center',
               alignItems: 'center',
-              shadowColor: '#6C47FF',
+              shadowColor: '#1D4ED8',
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.45,
               shadowRadius: 10,

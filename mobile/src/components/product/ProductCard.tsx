@@ -79,7 +79,7 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
             style={{
               position: 'absolute', top: 6, right: 6,
               width: 24, height: 24, borderRadius: 12,
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               justifyContent: 'center', alignItems: 'center',
             }}
           >
@@ -111,9 +111,9 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
 
           {/* Talep sayısı — sağ alt */}
           {product.alarm_count > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#6C47FF20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
-              <Ionicons name="pricetag-outline" size={11} color="#A78BFA" />
-              <Text style={{ color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1D4ED820', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
+              <Ionicons name="pricetag-outline" size={11} color="#93C5FD" />
+              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
                 {product.alarm_count.toLocaleString('tr-TR')} Talep
               </Text>
             </View>

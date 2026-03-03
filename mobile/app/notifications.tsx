@@ -46,11 +46,11 @@ function NotificationItem({ item }: { item: StoredNotification }) {
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: '#6C47FF20',
+          backgroundColor: '#1D4ED820',
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Ionicons name="pricetag-outline" size={20} color="#6C47FF" />
+          <Ionicons name="pricetag-outline" size={20} color="#1D4ED8" />
         </View>
         {!item.read && (
           <View style={{
@@ -105,7 +105,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
 
         <LinearGradient
-          colors={['#1D4ED8', '#059669']}
+          colors={['#0D2060', '#1D4ED8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={{ width: 3, height: 40, borderRadius: 2, marginLeft: 8 }}

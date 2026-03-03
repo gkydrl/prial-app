@@ -111,7 +111,7 @@ export default function LoginScreen() {
           >
             <Text style={{ color: '#6B7280', fontSize: 14 }}>
               Hesabın yok mu?{' '}
-              <Text style={{ color: '#6C47FF', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
+              <Text style={{ color: '#1D4ED8', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
             </Text>
           </TouchableOpacity>
         </View>

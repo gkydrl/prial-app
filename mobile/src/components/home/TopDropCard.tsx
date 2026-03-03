@@ -117,7 +117,7 @@ export function TopDropCard({ item, width = 160, badge = 'both' }: { item: TopDr
               style={{
                 position: 'absolute', top: 8, right: 8,
                 width: 24, height: 24, borderRadius: 12,
-                backgroundColor: '#6C47FF',
+                backgroundColor: '#1D4ED8',
                 justifyContent: 'center', alignItems: 'center',
               }}
             >
@@ -165,7 +165,7 @@ export function TopDropCard({ item, width = 160, badge = 'both' }: { item: TopDr
             <TouchableOpacity onPress={handleAlarmPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <View style={{
                 width: 24, height: 24, borderRadius: 12,
-                backgroundColor: '#6C47FF',
+                backgroundColor: '#1D4ED8',
                 justifyContent: 'center', alignItems: 'center',
               }}>
                 <Ionicons name="add" size={16} color="#FFFFFF" />

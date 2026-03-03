@@ -21,7 +21,7 @@ function LinkRow({ icon, label, url }: { icon: React.ComponentProps<typeof Ionic
         paddingVertical: 14,
       }}
     >
-      <Ionicons name={icon} size={20} color="#6C47FF" />
+      <Ionicons name={icon} size={20} color="#1D4ED8" />
       <Text style={{ flex: 1, color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_400Regular' }}>{label}</Text>
       <Ionicons name="open-outline" size={16} color="#334155" />
     </TouchableOpacity>

@@ -47,7 +47,7 @@ function StatsCard() {
   return (
     <View style={{
       marginHorizontal: 16,
-      marginTop: 16,
+      marginTop: 8,
       marginBottom: 20,
       backgroundColor: '#0F172A',
       borderRadius: 16,
@@ -148,7 +148,7 @@ export default function HomeScreen() {
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#6C47FF" />
+          <RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#1D4ED8" />
         }
       >
         {/* Günlük Banner */}

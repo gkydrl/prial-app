@@ -62,7 +62,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
               justifyContent: 'center',
               alignItems: 'center',
             }}>
-              <Ionicons name="pricetag-outline" size={36} color="#6C47FF" />
+              <Ionicons name="pricetag-outline" size={36} color="#1D4ED8" />
             </View>
           </View>
 
@@ -90,7 +90,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
                   backgroundColor: '#262626',
                   justifyContent: 'center', alignItems: 'center',
                 }}>
-                  <Ionicons name={item.icon as any} size={18} color="#6C47FF" />
+                  <Ionicons name={item.icon as any} size={18} color="#1D4ED8" />
                 </View>
                 <Text style={{ color: '#D1D5DB', fontSize: 14, fontFamily: 'Inter_400Regular', flex: 1 }}>
                   {item.text}
@@ -103,7 +103,7 @@ export function OnboardingModal({ visible, onDismiss }: Props) {
           <TouchableOpacity
             onPress={handleExplore}
             style={{
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               borderRadius: 14,
               paddingVertical: 16,
               alignItems: 'center',

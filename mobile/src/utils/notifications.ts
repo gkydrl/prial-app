@@ -31,7 +31,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       name: 'Prial Alarmları',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#6C47FF',
+      lightColor: '#1D4ED8',
     });
   }
 

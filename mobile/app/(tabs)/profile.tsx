@@ -87,7 +87,7 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#334155', true: '#6C47FF' }}
+        trackColor={{ false: '#334155', true: '#1D4ED8' }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -127,7 +127,7 @@ export default function SettingsScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 16 }}>
-          <Ionicons name="person-circle-outline" size={52} color="#6C47FF" />
+          <Ionicons name="person-circle-outline" size={52} color="#1D4ED8" />
           <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
             Profilinizi görüntüleyin
           </Text>
@@ -137,7 +137,7 @@ export default function SettingsScreen() {
           <TouchableOpacity
             onPress={() => router.push('/(auth)/login')}
             style={{
-              backgroundColor: '#6C47FF',
+              backgroundColor: '#1D4ED8',
               borderRadius: 14,
               paddingVertical: 14,
               paddingHorizontal: 40,
@@ -148,7 +148,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
             <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' }}>
-              Hesabın yok mu? <Text style={{ color: '#6C47FF', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
+              Hesabın yok mu? <Text style={{ color: '#1D4ED8', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -188,7 +188,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <LinearGradient
-          colors={['#1D4ED8', '#059669']}
+          colors={['#0D2060', '#1D4ED8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={{ width: 3, height: 40, borderRadius: 2 }}

@@ -15,8 +15,8 @@ const SCREEN_W = Dimensions.get('window').width;
 const CARD_W = SCREEN_W - 32;
 
 const LABELS = [
-  { title: '🔥 Günün En İyi Fırsatı', sub: 'Bugün en çok düşen ürün' },
-  { title: '⚡ Kaçırma! Büyük Düşüş', sub: 'Fiyat rekor kırdı' },
+  '🔥 Günün En İyi Fırsatı',
+  '⚡ Kaçırma! Büyük Düşüş',
 ];
 
 function fmt(n: number) {
@@ -27,6 +27,7 @@ function BannerCard({ item, index }: { item: TopDropResponse; index: number }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { product, store, price_now, price_24h_ago, drop_amount, drop_percent } = item;
   const label = LABELS[index] ?? LABELS[0];
+
 
   const handleAlarm = () => {
     if (!isAuthenticated) {
@@ -55,26 +56,16 @@ function BannerCard({ item, index }: { item: TopDropResponse; index: number }) {
         colors={['#0D2060', '#1A47C4']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={{ borderRadius: 18, padding: 16, gap: 12 }}
+        style={{ borderRadius: 18, padding: 12, gap: 8, overflow: 'hidden' }}
       >
         {/* Üst etiket */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View>
-            <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
-              {label.title}
-            </Text>
-            <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 }}>
-              {label.sub}
-            </Text>
-          </View>
+          <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>
+            {label}
+          </Text>
           {!!drop_percent && (
-            <View style={{
-              backgroundColor: '#22C55E',
-              borderRadius: 20,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-            }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
+            <View style={{ backgroundColor: '#22C55E', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
                 %{Math.round(drop_percent)} ↘
               </Text>
             </View>
@@ -82,12 +73,12 @@ function BannerCard({ item, index }: { item: TopDropResponse; index: number }) {
         </View>
 
         {/* İçerik */}
-        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Ürün görseli */}
           <View style={{
-            width: 90, height: 90,
+            width: 76, height: 76,
             backgroundColor: '#FFFFFF',
-            borderRadius: 14,
+            borderRadius: 12,
             overflow: 'hidden',
             flexShrink: 0,
           }}>
@@ -99,7 +90,7 @@ function BannerCard({ item, index }: { item: TopDropResponse; index: number }) {
           </View>
 
           {/* Metin */}
-          <View style={{ flex: 1, gap: 6 }}>
+          <View style={{ flex: 1, gap: 4 }}>
             <Text
               style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_600SemiBold', lineHeight: 18 }}
               numberOfLines={2}
@@ -107,46 +98,36 @@ function BannerCard({ item, index }: { item: TopDropResponse; index: number }) {
               {product?.title ?? 'Ürün'}
             </Text>
 
-            <View style={{ gap: 2 }}>
+            <View style={{ gap: 1 }}>
               {price_24h_ago != null && (
                 <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' }}>
                   {fmt(price_24h_ago)}
                 </Text>
               )}
-              <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold' }}>
                 {fmt(price_now)}
               </Text>
-              {drop_amount != null && (
-                <Text style={{ color: '#4ADE80', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                  ↘ {fmt(drop_amount)} daha ucuz
-                </Text>
-              )}
             </View>
-
-            {/* CTA butonu */}
-            <TouchableOpacity
-              onPress={handleAlarm}
-              activeOpacity={0.85}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-                backgroundColor: '#FFFFFF1A',
-                borderRadius: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                alignSelf: 'flex-start',
-                borderWidth: 1,
-                borderColor: '#FFFFFF30',
-              }}
-            >
-              <Ionicons name="pricetag-outline" size={12} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                Talep Et
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
+        {/* Talep Et — sağ alt köşe */}
+        <TouchableOpacity
+          onPress={handleAlarm}
+          activeOpacity={0.85}
+          style={{
+            position: 'absolute', bottom: 12, right: 12,
+            flexDirection: 'row', alignItems: 'center', gap: 5,
+            backgroundColor: '#FFFFFF1A',
+            borderRadius: 10,
+            paddingHorizontal: 10, paddingVertical: 6,
+            borderWidth: 1, borderColor: '#FFFFFF30',
+          }}
+        >
+          <Ionicons name="pricetag-outline" size={12} color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+            Talep Et
+          </Text>
+        </TouchableOpacity>
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -165,7 +146,7 @@ export function DailyBanner({ items }: { items: TopDropResponse[] }) {
   };
 
   return (
-    <View style={{ marginTop: 8, marginBottom: 24 }}>
+    <View style={{ marginTop: 16, marginBottom: 8 }}>
       <ScrollView
         horizontal
         pagingEnabled

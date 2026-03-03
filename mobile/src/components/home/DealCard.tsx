@@ -87,7 +87,7 @@ export function DealCard({ store }: { store: ProductStoreResponse }) {
           </View>
 
           <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="notifications-outline" size={16} color="#6C47FF" />
+            <Ionicons name="notifications-outline" size={16} color="#1D4ED8" />
           </TouchableOpacity>
         </View>
       </View>

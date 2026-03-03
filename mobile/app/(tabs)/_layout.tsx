@@ -7,7 +7,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 const ACTIVE = '#FFFFFF';
 const INACTIVE = '#475569';
 const BG = '#0F172A';
-const INDICATOR = '#6C47FF';
+const INDICATOR = '#1D4ED8';
 
 const TABS = [
   { name: 'index', title: 'Ana Sayfa', icon: 'home-outline' as const, iconActive: 'home' as const },

@@ -21,7 +21,7 @@ import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
 const BG = '#0A1628';
 const CARD = '#1E293B';
 const BRAND_GREEN = '#22C55E';
-const BRAND = '#6C47FF';
+const BRAND = '#1D4ED8';
 const MUTED = '#64748B';
 const WHITE = '#FFFFFF';
 

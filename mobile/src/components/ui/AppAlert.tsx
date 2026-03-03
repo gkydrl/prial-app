@@ -72,7 +72,7 @@ export function AppAlert() {
                       ? '#EF4444'
                       : isCancel
                       ? '#0F172A'
-                      : '#6C47FF',
+                      : '#1D4ED8',
                   }}
                 >
                   <Text

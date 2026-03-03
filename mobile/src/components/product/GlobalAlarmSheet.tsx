@@ -16,7 +16,7 @@ import { useAlarmSheetStore, openAlarmSheet } from '@/store/alarmSheetStore';
 
 const SHEET_BG = '#1E293B';
 const BORDER = '#334155';
-const BRAND = '#6C47FF';
+const BRAND = '#1D4ED8';
 const GREEN = '#22C55E';
 const MUTED = '#64748B';
 

@@ -21,7 +21,7 @@ export function SectionHeader({ title, subtitle, onSeeAll }: SectionHeaderProps)
       {/* Sol: gradient dikey çizgi + başlık + alt başlık */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <LinearGradient
-          colors={['#1D4ED8', '#059669']}
+          colors={['#0D2060', '#1D4ED8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={{ width: 3, height: 40, borderRadius: 2 }}
@@ -41,7 +41,7 @@ export function SectionHeader({ title, subtitle, onSeeAll }: SectionHeaderProps)
       {/* Sağ: Tümünü Gör */}
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll} style={{ paddingTop: 2 }}>
-          <Text style={{ color: '#6C47FF', fontSize: 14, fontFamily: 'Inter_500Medium' }}>
+          <Text style={{ color: '#1D4ED8', fontSize: 14, fontFamily: 'Inter_500Medium' }}>
             Tümünü Gör →
           </Text>
         </TouchableOpacity>

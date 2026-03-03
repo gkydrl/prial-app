@@ -83,8 +83,8 @@ function ProductRow({ product }: { product: ProductResponse }) {
           )}
           {product.alarm_count > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
-              <Ionicons name="pricetag-outline" size={11} color="#A78BFA" />
-              <Text style={{ color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+              <Ionicons name="pricetag-outline" size={11} color="#93C5FD" />
+              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
                 {product.alarm_count.toLocaleString('tr-TR')} talep
               </Text>
             </View>
