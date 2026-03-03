@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '@/api/products';
 import { alarmsApi } from '@/api/alarms';
 import { showAlert } from '@/store/alertStore';
-import { useAlarmSheetStore } from '@/store/alarmSheetStore';
+import { useAlarmSheetStore, openAlarmSheet } from '@/store/alarmSheetStore';
 
 const SHEET_BG = '#1E293B';
 const BORDER = '#334155';
@@ -32,16 +32,26 @@ function sliderStep(p: number): number {
 }
 
 export function GlobalAlarmSheet() {
-  const { visible, productId, storeUrl, currentPrice, close } = useAlarmSheetStore();
+  const {
+    visible,
+    productId,
+    storeUrl,
+    currentPrice,
+    existingAlarmId,
+    existingTargetPrice,
+    close,
+  } = useAlarmSheetStore();
+
+  const isUpdateMode = !!existingAlarmId;
 
   const hasPrice = currentPrice != null && currentPrice > 0;
   const step = useMemo(() => (hasPrice ? sliderStep(currentPrice) : 100), [currentPrice]);
   const minPrice = useMemo(() => (hasPrice ? Math.round(currentPrice * 0.5) : 0), [currentPrice]);
   const maxPrice = useMemo(() => (hasPrice ? Math.round(currentPrice * 0.99) : 10000), [currentPrice]);
-  const defaultTarget = useMemo(
-    () => (hasPrice ? Math.round((currentPrice * 0.9) / step) * step : maxPrice),
-    [currentPrice, step]
-  );
+  const defaultTarget = useMemo(() => {
+    if (isUpdateMode && existingTargetPrice) return existingTargetPrice;
+    return hasPrice ? Math.round((currentPrice * 0.9) / step) * step : maxPrice;
+  }, [currentPrice, step, isUpdateMode, existingTargetPrice]);
 
   const [sliderValue, setSliderValue] = useState(defaultTarget);
   const [loading, setLoading] = useState(false);
@@ -52,47 +62,45 @@ export function GlobalAlarmSheet() {
 
   const discountPercent = hasPrice ? Math.round((1 - sliderValue / currentPrice) * 100) : 0;
 
-  const handleSetAlarm = async () => {
+  const handleSubmit = async () => {
     if (!sliderValue || sliderValue <= 0) {
       showAlert('Hata', 'Geçerli bir hedef fiyat seçin');
       return;
     }
-    if (!storeUrl) {
-      showAlert('Hata', 'Ürün mağaza bilgisi bulunamadı');
-      return;
-    }
     setLoading(true);
     try {
-      await productsApi.add(storeUrl, sliderValue);
-      close();
-      showAlert('Talep Oluşturuldu 🎉', 'Fiyat hedefe ulaşınca sizi bilgilendireceğiz.');
+      if (isUpdateMode) {
+        // Güncelleme modu
+        await alarmsApi.update(existingAlarmId!, { target_price: sliderValue, status: 'active' });
+        close();
+        showAlert('Talep Güncellendi 🎉', 'Hedef fiyatınız güncellendi.');
+      } else {
+        // Yeni talep
+        if (!storeUrl) {
+          showAlert('Hata', 'Ürün mağaza bilgisi bulunamadı');
+          return;
+        }
+        await productsApi.add(storeUrl, sliderValue);
+        close();
+        showAlert('Talep Oluşturuldu 🎉', 'Fiyat hedefe ulaşınca sizi bilgilendireceğiz.');
+      }
     } catch (e: any) {
       const detail = e.response?.data?.detail;
       if (detail?.code === 'ALARM_EXISTS') {
-        const existing = Math.round(detail.target_price).toLocaleString('tr-TR') + ' ₺';
-        const newPrice = Math.round(sliderValue).toLocaleString('tr-TR') + ' ₺';
+        // Mevcut talebi güncelleme modunda sheet'i yeniden aç
         close();
-        showAlert(
-          'Zaten Bir Talebiniz Var',
-          `Bu ürün için ${existing} hedef fiyatlı bir talebiniz mevcut. ${newPrice} olarak güncellemek ister misiniz?`,
-          [
-            { text: 'Vazgeç', style: 'cancel' },
-            {
-              text: 'Güncelle',
-              onPress: async () => {
-                try {
-                  await alarmsApi.update(detail.alarm_id, { target_price: sliderValue, status: 'active' });
-                  showAlert('Talep Güncellendi 🎉', 'Hedef fiyatınız güncellendi.');
-                } catch {
-                  showAlert('Hata', 'Talep güncellenemedi.');
-                }
-              },
-            },
-          ]
-        );
+        setTimeout(() => {
+          openAlarmSheet({
+            productId,
+            storeUrl,
+            currentPrice,
+            existingAlarmId: detail.alarm_id,
+            existingTargetPrice: detail.target_price,
+          });
+        }, 300);
         return;
       }
-      showAlert('Hata', detail ?? 'Talep oluşturulamadı');
+      showAlert('Hata', typeof detail === 'string' ? detail : 'İşlem tamamlanamadı');
     } finally {
       setLoading(false);
     }
@@ -128,9 +136,17 @@ export function GlobalAlarmSheet() {
           />
 
           <View style={{ gap: 20 }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>
-              Talep Et
-            </Text>
+            {/* Başlık */}
+            <View style={{ gap: 4 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>
+                {isUpdateMode ? 'Talebi Güncelle' : 'Talep Et'}
+              </Text>
+              {isUpdateMode && existingTargetPrice && (
+                <Text style={{ color: MUTED, fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+                  Mevcut hedefiniz: {fmt(existingTargetPrice)}
+                </Text>
+              )}
+            </View>
 
             {/* Seçilen fiyat */}
             <View style={{ alignItems: 'center', gap: 4 }}>
@@ -189,7 +205,7 @@ export function GlobalAlarmSheet() {
 
             {/* Buton */}
             <TouchableOpacity
-              onPress={handleSetAlarm}
+              onPress={handleSubmit}
               disabled={loading}
               activeOpacity={0.85}
               style={{
@@ -207,9 +223,13 @@ export function GlobalAlarmSheet() {
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="pricetag-outline" size={18} color="#fff" />
+                  <Ionicons
+                    name={isUpdateMode ? 'checkmark-circle-outline' : 'pricetag-outline'}
+                    size={18}
+                    color="#fff"
+                  />
                   <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-                    Talep Oluştur
+                    {isUpdateMode ? 'Talebi Güncelle' : 'Talep Oluştur'}
                   </Text>
                 </>
               )}

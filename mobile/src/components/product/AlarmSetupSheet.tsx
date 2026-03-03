@@ -5,6 +5,7 @@ import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '@/api/products';
 import { alarmsApi } from '@/api/alarms';
+import { openAlarmSheet } from '@/store/alarmSheetStore';
 
 // @gorhom/bottom-sheet native-only — web'de require etme
 const BottomSheetLib = Platform.OS !== 'web' ? require('@gorhom/bottom-sheet') : null;
@@ -89,31 +90,21 @@ export function AlarmSetupSheet({ productId, storeUrl, currentPrice, onSuccess, 
     } catch (e: any) {
       const detail = e.response?.data?.detail;
       if (detail?.code === 'ALARM_EXISTS') {
-        const existing = Math.round(detail.target_price).toLocaleString('tr-TR') + ' ₺';
-        const newPrice = Math.round(sliderValue).toLocaleString('tr-TR') + ' ₺';
         if (Platform.OS === 'web') setWebVisible(false);
         else sheetRef.current?.close();
-        showAlert(
-          'Zaten Bir Talebiniz Var',
-          `Bu ürün için ${existing} hedef fiyatlı bir talebiniz mevcut. ${newPrice} olarak güncellemek ister misiniz?`,
-          [
-            { text: 'Vazgeç', style: 'cancel' },
-            {
-              text: 'Güncelle',
-              onPress: async () => {
-                try {
-                  await alarmsApi.update(detail.alarm_id, { target_price: sliderValue, status: 'active' });
-                  showAlert('Talep Güncellendi 🎉', 'Hedef fiyatınız güncellendi.');
-                } catch {
-                  showAlert('Hata', 'Talep güncellenemedi.');
-                }
-              },
-            },
-          ]
-        );
+        // Sheet'i güncelleme modunda aç
+        setTimeout(() => {
+          openAlarmSheet({
+            productId: productId,
+            storeUrl,
+            currentPrice,
+            existingAlarmId: detail.alarm_id,
+            existingTargetPrice: detail.target_price,
+          });
+        }, 300);
         return;
       }
-      showAlert('Hata', detail ?? 'Talep oluşturulamadı');
+      showAlert('Hata', typeof detail === 'string' ? detail : 'Talep oluşturulamadı');
     } finally {
       setLoading(false);
     }
