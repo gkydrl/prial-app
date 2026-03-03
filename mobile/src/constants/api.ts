@@ -9,6 +9,7 @@ export const ENDPOINTS = {
 
   // Users
   USER_ME: '/users/me',
+  USER_CHANGE_PASSWORD: '/users/me/password',
   USER_FIREBASE_TOKEN: '/users/me/firebase-token',
 
   // Products

@@ -4,6 +4,9 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
+import { useAuthStore } from '@/store/authStore';
+import { openAlarmSheet } from '@/store/alarmSheetStore';
+import { showAlert } from '@/store/alertStore';
 import type { ProductResponse, ProductStoreResponse } from '@/types/api';
 import { imageSource } from '@/utils/imageSource';
 
@@ -12,8 +15,9 @@ interface ProductCardProps {
   store?: ProductStoreResponse;
 }
 
-export function ProductCard({ product, store }: ProductCardProps) {
+export function ProductCard({ product, store, width = 160 }: ProductCardProps & { width?: number }) {
   const [imgError, setImgError] = useState(false);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const activeStore = store ?? product.stores[0];
 
   const price = activeStore?.current_price;
@@ -23,12 +27,27 @@ export function ProductCard({ product, store }: ProductCardProps) {
   const priceStr = price != null ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : '-';
   const originalStr = originalPrice != null ? originalPrice.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : null;
 
+  const handleAlarmPress = () => {
+    if (!isAuthenticated) {
+      showAlert('Giriş Gerekli', 'Talep oluşturmak için giriş yapmalısınız.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    openAlarmSheet({
+      productId: product.id,
+      storeUrl: activeStore?.url ?? null,
+      currentPrice: price != null ? Number(price) : null,
+    });
+  };
+
   return (
     <TouchableOpacity
       onPress={() => router.push(`/product/${product.id}`)}
       activeOpacity={0.85}
       style={{
-        width: 160,
+        width,
         height: 200,
         backgroundColor: '#1E293B',
         borderRadius: 8,
@@ -83,7 +102,9 @@ export function ProductCard({ product, store }: ProductCardProps) {
             </Text>
           </View>
 
-          <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
+          <TouchableOpacity onPress={handleAlarmPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>

@@ -41,7 +41,7 @@ export function SectionHeader({ title, subtitle, onSeeAll }: SectionHeaderProps)
       {/* Sağ: Tümünü Gör */}
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll} style={{ paddingTop: 2 }}>
-          <Text style={{ color: '#1D4ED8', fontSize: 14, fontFamily: 'Inter_500Medium' }}>
+          <Text style={{ color: '#6C47FF', fontSize: 14, fontFamily: 'Inter_500Medium' }}>
             Tümünü Gör →
           </Text>
         </TouchableOpacity>

@@ -1,12 +1,13 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import {
   ScrollView,
   View,
   Text,
   TouchableOpacity,
-  Alert,
   Platform,
 } from 'react-native';
+import { showAlert } from '@/store/alertStore';
+import { useAuthStore } from '@/store/authStore';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -20,6 +21,7 @@ import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
 const BG = '#0A1628';
 const CARD = '#1E293B';
 const BRAND_GREEN = '#22C55E';
+const BRAND = '#6C47FF';
 const MUTED = '#64748B';
 const WHITE = '#FFFFFF';
 
@@ -77,8 +79,9 @@ function buildDemandBars(currentPrice: number, alarmCount: number) {
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function ProductDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, openAlarm } = useLocalSearchParams<{ id: string; openAlarm?: string }>();
   const { product, history, isLoading, error } = useProduct(id);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const alarmSheetRef = useRef<BottomSheet>(null);
   const stores = product?.stores ?? [];
   const lowestStore = useMemo(() => {
@@ -103,6 +106,14 @@ export default function ProductDetailScreen() {
     () => Math.max(...(demandBars.map((b) => b.value)), 1),
     [demandBars]
   );
+
+  // Login sonrası geri dönüldüğünde alarm sheet'ini otomatik aç
+  useEffect(() => {
+    if (openAlarm === '1' && isAuthenticated && product && !isLoading) {
+      const timer = setTimeout(() => alarmSheetRef.current?.expand(), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [openAlarm, isAuthenticated, product, isLoading]);
 
   // ─── Yükleniyor / hata durumu ──────────────────────────────────────────────
 
@@ -364,7 +375,7 @@ export default function ProductDetailScreen() {
       }}>
         <TouchableOpacity
           style={{
-            backgroundColor: BRAND_GREEN,
+            backgroundColor: BRAND,
             borderRadius: 16,
             paddingVertical: 16,
             alignItems: 'center',
@@ -372,7 +383,27 @@ export default function ProductDetailScreen() {
             justifyContent: 'center',
             gap: 8,
           }}
-          onPress={() => alarmSheetRef.current?.expand()}
+          onPress={() => {
+            if (!isAuthenticated) {
+              showAlert(
+                'Giriş Gerekli',
+                'Talep oluşturmak için giriş yapmalısınız.',
+                [
+                  { text: 'Vazgeç', style: 'cancel' },
+                  {
+                    text: 'Giriş Yap',
+                    onPress: () =>
+                      router.push({
+                        pathname: '/(auth)/login',
+                        params: { returnProductId: id, openAlarm: '1' },
+                      }),
+                  },
+                ]
+              );
+              return;
+            }
+            alarmSheetRef.current?.expand();
+          }}
           activeOpacity={0.85}
         >
           <Ionicons name="pricetag-outline" size={20} color={WHITE} />

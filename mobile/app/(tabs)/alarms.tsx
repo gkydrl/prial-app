@@ -1,4 +1,7 @@
-import { View, Text, ScrollView, TouchableOpacity, Switch, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, RefreshControl } from 'react-native';
+import { showAlert } from '@/store/alertStore';
+import { useState, useEffect } from 'react';
+import { homeApi } from '@/api/home';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,137 +9,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 import { useAlarms } from '@/hooks/useAlarms';
+import { useAuthStore } from '@/store/authStore';
 import { SectionHeader } from '@/components/home/SectionHeader';
 import type { AlarmResponse, ProductResponse } from '@/types/api';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
 import { imageSource } from '@/utils/imageSource';
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_POPULAR: ProductResponse[] = [
-  {
-    id: 'mock-1',
-    title: 'Apple AirPods Pro (2. Nesil)',
-    brand: 'Apple',
-    description: null,
-    image_url: 'https://picsum.photos/seed/airpods/300/300',
-    lowest_price_ever: 3999,
-    alarm_count: 1240,
-    stores: [{ id: 's1', store: 'trendyol', url: '#', current_price: 4799, original_price: 5999, currency: 'TRY', discount_percent: 20, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-2',
-    title: 'Samsung Galaxy S24 128 GB',
-    brand: 'Samsung',
-    description: null,
-    image_url: 'https://picsum.photos/seed/galaxy/300/300',
-    lowest_price_ever: 22000,
-    alarm_count: 980,
-    stores: [{ id: 's2', store: 'hepsiburada', url: '#', current_price: 24999, original_price: 27999, currency: 'TRY', discount_percent: 11, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-3',
-    title: 'Sony WH-1000XM5 Kulaklık',
-    brand: 'Sony',
-    description: null,
-    image_url: 'https://picsum.photos/seed/sony/300/300',
-    lowest_price_ever: 5500,
-    alarm_count: 876,
-    stores: [{ id: 's3', store: 'amazon', url: '#', current_price: 6499, original_price: 7999, currency: 'TRY', discount_percent: 19, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-4',
-    title: 'Dyson V15 Detect Süpürge',
-    brand: 'Dyson',
-    description: null,
-    image_url: 'https://picsum.photos/seed/dyson/300/300',
-    lowest_price_ever: 12000,
-    alarm_count: 654,
-    stores: [{ id: 's4', store: 'mediamarkt', url: '#', current_price: 14999, original_price: 17999, currency: 'TRY', discount_percent: 17, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-5',
-    title: 'Logitech MX Master 3S Mouse',
-    brand: 'Logitech',
-    description: null,
-    image_url: 'https://picsum.photos/seed/logitech/300/300',
-    lowest_price_ever: 1800,
-    alarm_count: 512,
-    stores: [{ id: 's5', store: 'teknosa', url: '#', current_price: 2199, original_price: 2799, currency: 'TRY', discount_percent: 21, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-6',
-    title: 'iPad Air M2 256 GB Wi-Fi',
-    brand: 'Apple',
-    description: null,
-    image_url: 'https://picsum.photos/seed/ipad/300/300',
-    lowest_price_ever: 18000,
-    alarm_count: 490,
-    stores: [{ id: 's6', store: 'vatan', url: '#', current_price: 21999, original_price: null, currency: 'TRY', discount_percent: null, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-7',
-    title: 'Nike Air Max 270 Erkek Spor Ayakkabı',
-    brand: 'Nike',
-    description: null,
-    image_url: 'https://picsum.photos/seed/nike/300/300',
-    lowest_price_ever: 2200,
-    alarm_count: 430,
-    stores: [{ id: 's7', store: 'trendyol', url: '#', current_price: 2799, original_price: 3499, currency: 'TRY', discount_percent: 20, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-8',
-    title: 'Philips Airfryer XL HD9270',
-    brand: 'Philips',
-    description: null,
-    image_url: 'https://picsum.photos/seed/philips/300/300',
-    lowest_price_ever: 3100,
-    alarm_count: 388,
-    stores: [{ id: 's8', store: 'hepsiburada', url: '#', current_price: 3799, original_price: 4599, currency: 'TRY', discount_percent: 17, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-9',
-    title: 'GoPro HERO12 Black Aksiyon Kamerası',
-    brand: 'GoPro',
-    description: null,
-    image_url: 'https://picsum.photos/seed/gopro/300/300',
-    lowest_price_ever: 8500,
-    alarm_count: 345,
-    stores: [{ id: 's9', store: 'amazon', url: '#', current_price: 9999, original_price: 12999, currency: 'TRY', discount_percent: 23, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-10',
-    title: 'Xiaomi Robot Süpürge S10+',
-    brand: 'Xiaomi',
-    description: null,
-    image_url: 'https://picsum.photos/seed/xiaomi/300/300',
-    lowest_price_ever: 7200,
-    alarm_count: 312,
-    stores: [{ id: 's10', store: 'n11', url: '#', current_price: 8499, original_price: 10999, currency: 'TRY', discount_percent: 23, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-  {
-    id: 'mock-11',
-    title: 'Kindle Paperwhite 16 GB (11. Nesil)',
-    brand: 'Amazon',
-    description: null,
-    image_url: 'https://picsum.photos/seed/kindle/300/300',
-    lowest_price_ever: 2400,
-    alarm_count: 278,
-    stores: [{ id: 's11', store: 'amazon', url: '#', current_price: 2999, original_price: 3499, currency: 'TRY', discount_percent: 14, in_stock: true, last_checked_at: null }],
-    created_at: '',
-  },
-];
 
 const BG = '#0A1628';
 const CARD = '#1E293B';
@@ -204,7 +83,7 @@ function AlarmListCard({
           <Switch
             value={isActive}
             onValueChange={onToggle}
-            trackColor={{ false: '#334155', true: '#1D4ED8' }}
+            trackColor={{ false: '#334155', true: '#6C47FF' }}
             thumbColor="#FFFFFF"
             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
           />
@@ -305,15 +184,59 @@ function PopularCard({ product }: { product: ProductResponse }) {
 
 // ─── Ana Ekran ────────────────────────────────────────────────────────────────
 
+function GuestWall() {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 16 }}>
+        <Ionicons name="pricetag-outline" size={52} color="#6C47FF" />
+        <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
+          Taleplerinizi görüntüleyin
+        </Text>
+        <Text style={{ color: '#64748B', fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 }}>
+          Talep oluşturmak ve takip etmek için giriş yapmalısınız.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.push('/(auth)/login')}
+          style={{
+            backgroundColor: '#6C47FF',
+            borderRadius: 14,
+            paddingVertical: 14,
+            paddingHorizontal: 40,
+            marginTop: 8,
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' }}>Giriş Yap</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+          <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+            Hesabın yok mu? <Text style={{ color: '#6C47FF', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const INITIAL_LIMIT = 4;
+
 export default function AlarmsScreen() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { alarms, isLoading, updateAlarm, deleteAlarm, refresh } = useAlarms();
+  const [showAll, setShowAll] = useState(false);
+  const [popularProducts, setPopularProducts] = useState<ProductResponse[]>([]);
+
+  useEffect(() => {
+    homeApi.mostAlarmed(10).then((res) => setPopularProducts(res.data)).catch(() => {});
+  }, []);
+
+  if (!isAuthenticated) return <GuestWall />;
 
   const handleToggle = (alarm: AlarmResponse) => {
     updateAlarm(alarm.id, { status: alarm.status === 'active' ? 'paused' : 'active' });
   };
 
   const handleClose = (id: string) => {
-    Alert.alert('Talebi Kapat', 'Bu talebi kapatmak istiyor musun?', [
+    showAlert('Talebi Kapat', 'Bu talebi kapatmak istiyor musun?', [
       { text: 'Vazgeç', style: 'cancel' },
       { text: 'Kapat', style: 'destructive', onPress: () => deleteAlarm(id) },
     ]);
@@ -321,6 +244,8 @@ export default function AlarmsScreen() {
 
   // Triggered ve deleted talepler listede gösterilmez — otomatik kapandı sayılır
   const visibleAlarms = alarms.filter((a) => a.status === 'active' || a.status === 'paused');
+  const displayedAlarms = showAll ? visibleAlarms : visibleAlarms.slice(0, INITIAL_LIMIT);
+  const hasMore = visibleAlarms.length > INITIAL_LIMIT;
   const hasAlarms = visibleAlarms.length > 0;
   const fadeStyle = useFadeIn();
 
@@ -348,7 +273,7 @@ export default function AlarmsScreen() {
         {/* Alarm listesi veya boş durum */}
         {hasAlarms ? (
           <View style={{ paddingHorizontal: 16, gap: 10, marginBottom: 8 }}>
-            {visibleAlarms.map((alarm) => (
+            {displayedAlarms.map((alarm) => (
               <Swipeable
                 key={alarm.id}
                 overshootRight={false}
@@ -375,6 +300,22 @@ export default function AlarmsScreen() {
                 />
               </Swipeable>
             ))}
+            {hasMore && !showAll && (
+              <TouchableOpacity
+                onPress={() => setShowAll(true)}
+                style={{
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#334155',
+                }}
+              >
+                <Text style={{ color: '#6C47FF', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+                  Hepsini Gör ({visibleAlarms.length})
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={{ alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32, gap: 12 }}>
@@ -414,19 +355,21 @@ export default function AlarmsScreen() {
           </Text>
         </View>
 
-        {/* Popüler Takipler */}
-        <View style={{ marginBottom: 32 }}>
-          <SectionHeader
-            title="Popüler Talepler"
-            subtitle="En çok talep edilen ürünler"
-            onSeeAll={() => router.push('/(tabs)/discover')}
-          />
-          <View style={{ paddingHorizontal: 16, gap: 10 }}>
-            {MOCK_POPULAR.map((item) => (
-              <PopularCard key={item.id} product={item} />
-            ))}
+        {/* Popüler Talep Edilen Ürünler */}
+        {popularProducts.length > 0 && (
+          <View style={{ marginBottom: 32 }}>
+            <SectionHeader
+              title="Popüler Talepler"
+              subtitle="En çok talep edilen ürünler"
+              onSeeAll={() => router.push('/feed/most-alarmed')}
+            />
+            <View style={{ paddingHorizontal: 16, gap: 10 }}>
+              {popularProducts.map((item) => (
+                <PopularCard key={item.id} product={item} />
+              ))}
+            </View>
           </View>
-        </View>
+        )}
       </ScrollView>
       </Animated.View>
     </SafeAreaView>

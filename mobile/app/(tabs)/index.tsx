@@ -157,8 +157,8 @@ export default function HomeScreen() {
         <View style={{ marginBottom: 24 }}>
           <SectionHeader
             title="Bugünün Fırsatları"
-            subtitle="Son 24 saatte en çok oransal düşen ürünler"
-            onSeeAll={() => router.push('/(tabs)/discover')}
+            subtitle="En çok oransal düşüş yaşayan ürünler"
+            onSeeAll={() => router.push('/feed/daily-deals')}
           />
           {dailyDeals.length > 0 ? (
             <ScrollView
@@ -167,7 +167,7 @@ export default function HomeScreen() {
               contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
               {dailyDeals.map((item, i) => (
-                <TopDropCard key={i} item={item} />
+                <TopDropCard key={i} item={item} badge="percent" />
               ))}
             </ScrollView>
           ) : (
@@ -179,8 +179,8 @@ export default function HomeScreen() {
         <View style={{ marginBottom: 24 }}>
           <SectionHeader
             title="En Çok Düşenler"
-            subtitle="Son 24 saatte fiyatı en çok gerileyen ürünler"
-            onSeeAll={() => router.push('/(tabs)/discover')}
+            subtitle="En çok fiyat düşüşü yaşanan ürünler"
+            onSeeAll={() => router.push('/feed/top-drops')}
           />
           {topDrops.length > 0 ? (
             <ScrollView
@@ -189,11 +189,11 @@ export default function HomeScreen() {
               contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
               {topDrops.map((item, i) => (
-                <TopDropCard key={i} item={item} />
+                <TopDropCard key={i} item={item} badge="amount" />
               ))}
             </ScrollView>
           ) : (
-            !isLoading && <EmptySection message="Son 24 saatte fiyat düşüşü kaydedilmedi" />
+            !isLoading && <EmptySection message="Fiyat düşüşü kaydedilmedi" />
           )}
         </View>
 
@@ -202,7 +202,7 @@ export default function HomeScreen() {
           <SectionHeader
             title="En Çok Talep Edilen"
             subtitle="Topluluğun en çok beklediği ürünler"
-            onSeeAll={() => router.push('/(tabs)/discover')}
+            onSeeAll={() => router.push('/feed/most-alarmed')}
           />
           {mostAlarmed.length > 0 ? (
             <ScrollView

@@ -3,6 +3,9 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
+import { useAuthStore } from '@/store/authStore';
+import { openAlarmSheet } from '@/store/alarmSheetStore';
+import { showAlert } from '@/store/alertStore';
 
 import type { TopDropResponse } from '@/types/api';
 import { imageSource } from '@/utils/imageSource';
@@ -35,12 +38,31 @@ function nameFromUrl(url: string): string {
   }
 }
 
-export function TopDropCard({ item }: { item: TopDropResponse }) {
-  const { product, store, price_now, price_24h_ago, drop_percent } = item;
+export function TopDropCard({ item, width = 160, badge = 'both' }: { item: TopDropResponse; width?: number; badge?: 'percent' | 'amount' | 'both' }) {
+  const { product, store, price_now, price_24h_ago, drop_percent, drop_amount } = item;
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  const handleAlarmPress = () => {
+    if (!isAuthenticated) {
+      showAlert('Giriş Gerekli', 'Talep oluşturmak için giriş yapmalısınız.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    openAlarmSheet({
+      productId: product?.id ?? '',
+      storeUrl: store?.url ?? null,
+      currentPrice: price_now,
+    });
+  };
 
   if (price_now == null) return null;
 
   const nowStr = price_now.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺';
+  const dropAmountStr = drop_amount != null
+    ? drop_amount.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺'
+    : null;
   const agoStr = price_24h_ago != null
     ? price_24h_ago.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺'
     : null;
@@ -51,7 +73,7 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
       activeOpacity={0.85}
       onPress={() => product?.id && router.push(`/product/${product.id}`)}
       style={{
-        width: 160,
+        width,
         height: 200,
         backgroundColor: '#1E293B',
         borderRadius: 8,
@@ -67,8 +89,26 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
             contentFit="contain"
             placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
           />
-          {/* Drop badge — sol üst köşe */}
-          <DiscountBadge percent={drop_percent} />
+          {/* Drop badge — sol üst köşe (%) */}
+          {(badge === 'percent' || badge === 'both') && <DiscountBadge percent={drop_percent} />}
+          {/* ₺ düşüş rozeti — sağ üst köşe */}
+          {(badge === 'amount' || badge === 'both') && dropAmountStr && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 8,
+                ...(badge === 'both' ? { right: 8 } : { left: 8 }),
+                backgroundColor: '#6C47FF',
+                borderRadius: 20,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
+                ↘ -{dropAmountStr}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -106,7 +146,9 @@ export function TopDropCard({ item }: { item: TopDropResponse }) {
               {nowStr}
             </Text>
           </View>
-          <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
+          <TouchableOpacity onPress={handleAlarmPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="pricetag-outline" size={14} color="#6C47FF" />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>

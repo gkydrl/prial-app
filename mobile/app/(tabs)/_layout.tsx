@@ -1,12 +1,13 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Redirect, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '@/store/authStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const ACTIVE = '#FFFFFF';
-const INACTIVE = '#64748B';
+const INACTIVE = '#475569';
 const BG = '#0F172A';
+const INDICATOR = '#6C47FF';
 
 const TABS = [
   { name: 'index', title: 'Ana Sayfa', icon: 'home-outline' as const, iconActive: 'home' as const },
@@ -16,63 +17,59 @@ const TABS = [
 ];
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View
       style={{
-        position: 'absolute',
-        bottom: 20,
-        left: 20,
-        right: 20,
+        backgroundColor: BG,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#1E293B',
+        paddingTop: 8,
+        paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+        paddingHorizontal: 8,
+        flexDirection: 'row',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 12,
       }}
     >
-      <View
-        style={{
-          flexDirection: 'row',
-          backgroundColor: BG,
-          borderRadius: 24,
-          paddingVertical: 10,
-          paddingHorizontal: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 10,
-          elevation: 10,
-        }}
-      >
-        {TABS.map((tab, index) => {
-          const isFocused = state.index === index;
-          const color = isFocused ? ACTIVE : INACTIVE;
+      {TABS.map((tab, index) => {
+        const isFocused = state.index === index;
 
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              onPress={() => navigation.navigate(tab.name)}
-              activeOpacity={0.7}
-              style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 4 }}
+        return (
+          <TouchableOpacity
+            key={tab.name}
+            onPress={() => navigation.navigate(tab.name)}
+            activeOpacity={0.7}
+            style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 }}
+          >
+            <Ionicons
+              name={isFocused ? tab.iconActive : tab.icon}
+              size={22}
+              color={isFocused ? INDICATOR : INACTIVE}
+            />
+            <Text
+              style={{
+                color: isFocused ? ACTIVE : INACTIVE,
+                fontSize: 10,
+                fontFamily: isFocused ? 'Inter_600SemiBold' : 'Inter_400Regular',
+              }}
             >
-              <Ionicons
-                name={isFocused ? tab.iconActive : tab.icon}
-                size={22}
-                color={color}
-              />
-              <Text style={{ color, fontSize: 10, fontFamily: 'Inter_500Medium' }}>
-                {tab.title}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              {tab.title}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
 export default function TabsLayout() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-
-  if (!isAuthenticated) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}

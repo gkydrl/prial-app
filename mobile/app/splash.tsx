@@ -20,7 +20,7 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={animatedStyle}>
+      <Animated.View style={[animatedStyle, styles.glow]}>
         <Image
           source={require('../assets/images/logo.png')}
           style={{ width: 200, height: 80 }}
@@ -37,5 +37,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A1628',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  glow: {
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
   },
 });

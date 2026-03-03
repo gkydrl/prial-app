@@ -8,6 +8,9 @@ export const usersApi = {
   updatePreferences: (payload: UserUpdatePreferences) =>
     client.patch<UserResponse>(ENDPOINTS.USER_ME, payload),
 
+  changePassword: (current_password: string, new_password: string) =>
+    client.patch(ENDPOINTS.USER_CHANGE_PASSWORD, { current_password, new_password }),
+
   updateFirebaseToken: (firebase_token: string) =>
     client.post<UserResponse>(ENDPOINTS.USER_FIREBASE_TOKEN, { firebase_token }),
 };

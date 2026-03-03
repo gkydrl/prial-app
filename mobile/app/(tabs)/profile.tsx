@@ -1,9 +1,11 @@
-import { View, Text, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, Switch, TouchableOpacity, Share, Linking } from 'react-native';
+import { showAlert } from '@/store/alertStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/authStore';
 import { usersApi } from '@/api/users';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
@@ -85,7 +87,7 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#334155', true: '#1D4ED8' }}
+        trackColor={{ false: '#334155', true: '#6C47FF' }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -118,7 +120,41 @@ function SettingGroup({ title, children }: { title: string; children: React.Reac
 
 export default function SettingsScreen() {
   const { user, logout, updateUser } = useAuth();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const fadeStyle = useFadeIn();
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 16 }}>
+          <Ionicons name="person-circle-outline" size={52} color="#6C47FF" />
+          <Text style={{ color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_700Bold', textAlign: 'center' }}>
+            Profilinizi görüntüleyin
+          </Text>
+          <Text style={{ color: '#64748B', fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 }}>
+            Ayarlarınıza ve bildirimlerinize erişmek için giriş yapmalısınız.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/login')}
+            style={{
+              backgroundColor: '#6C47FF',
+              borderRadius: 14,
+              paddingVertical: 14,
+              paddingHorizontal: 40,
+              marginTop: 8,
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold' }}>Giriş Yap</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+            <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+              Hesabın yok mu? <Text style={{ color: '#6C47FF', fontFamily: 'Inter_600SemiBold' }}>Kayıt ol</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const handleToggleNotifications = async (value: boolean) => {
     updateUser({ push_notifications_enabled: value });
@@ -126,12 +162,12 @@ export default function SettingsScreen() {
       await usersApi.updatePreferences({ push_notifications_enabled: value });
     } catch {
       updateUser({ push_notifications_enabled: !value });
-      Alert.alert('Hata', 'Tercih güncellenemedi');
+      showAlert('Hata', 'Tercih güncellenemedi');
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Çıkış Yap', 'Hesabınızdan çıkmak istediğinize emin misiniz?', [
+    showAlert('Çıkış Yap', 'Hesabınızdan çıkmak istediğinize emin misiniz?', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Çıkış Yap',
@@ -176,8 +212,8 @@ export default function SettingsScreen() {
 
           {/* Hesap */}
           <SettingGroup title="Hesap">
-            <SettingRow icon="person-outline" label="Profil Bilgileri" onPress={() => {}} />
-            <SettingRow icon="lock-closed-outline" label="Şifre Değiştir" onPress={() => {}} showSeparator={false} />
+            <SettingRow icon="person-outline" label="Profil Bilgileri" onPress={() => router.push('/profile/edit')} />
+            <SettingRow icon="lock-closed-outline" label="Şifre Değiştir" onPress={() => router.push('/profile/change-password')} showSeparator={false} />
           </SettingGroup>
 
           {/* Ayraç */}
@@ -198,10 +234,32 @@ export default function SettingsScreen() {
 
           {/* Uygulama */}
           <SettingGroup title="Uygulama">
-            <SettingRow icon="star-outline" label="Uygulamayı Puanla" onPress={() => {}} />
-            <SettingRow icon="share-outline" label="Arkadaşına Öner" onPress={() => {}} />
-            <SettingRow icon="document-text-outline" label="Gizlilik Politikası" onPress={() => {}} />
-            <SettingRow icon="information-circle-outline" label="Hakkında" onPress={() => {}} showSeparator={false} />
+            <SettingRow
+              icon="star-outline"
+              label="Uygulamayı Puanla"
+              onPress={() => Linking.openURL('https://prial.app')}
+            />
+            <SettingRow
+              icon="share-outline"
+              label="Arkadaşına Öner"
+              onPress={() =>
+                Share.share({
+                  message: 'Prial ile ürün fiyatlarını takip et, fiyat düşünce anında haber al! 🎯\nhttps://prial.app',
+                  title: 'Prial — Fiyat Talep Platformu',
+                })
+              }
+            />
+            <SettingRow
+              icon="document-text-outline"
+              label="Gizlilik Politikası"
+              onPress={() => router.push('/profile/privacy')}
+            />
+            <SettingRow
+              icon="information-circle-outline"
+              label="Hakkında"
+              onPress={() => router.push('/profile/about')}
+              showSeparator={false}
+            />
           </SettingGroup>
 
           {/* Çıkış Yap */}

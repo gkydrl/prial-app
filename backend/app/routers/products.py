@@ -60,6 +60,25 @@ async def add_product_by_url(
     product_store = result.scalar_one_or_none()
 
     if product_store:
+        # Kullanıcının bu ürüne zaten aktif/paused talebi var mı?
+        existing_result = await db.execute(
+            select(Alarm).where(
+                Alarm.user_id == current_user.id,
+                Alarm.product_id == product_store.product_id,
+                Alarm.status.in_([AlarmStatus.ACTIVE, AlarmStatus.PAUSED]),
+            )
+        )
+        existing_alarm = existing_result.scalar_one_or_none()
+        if existing_alarm:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "ALARM_EXISTS",
+                    "alarm_id": str(existing_alarm.id),
+                    "target_price": float(existing_alarm.target_price),
+                },
+            )
+
         # Ürün zaten var, direkt alarm kur
         alarm = Alarm(
             user_id=current_user.id,

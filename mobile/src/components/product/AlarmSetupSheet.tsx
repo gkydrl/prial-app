@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, Alert, Platform, Modal, Pressable, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Platform, Modal, Pressable, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { showAlert } from '@/store/alertStore';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '@/api/products';
+import { alarmsApi } from '@/api/alarms';
 
 // @gorhom/bottom-sheet native-only — web'de require etme
 const BottomSheetLib = Platform.OS !== 'web' ? require('@gorhom/bottom-sheet') : null;
@@ -10,6 +12,7 @@ const BottomSheetLib = Platform.OS !== 'web' ? require('@gorhom/bottom-sheet') :
 const SHEET_BG = '#1E293B';
 const BORDER = '#334155';
 const GREEN = '#22C55E';
+const BRAND = '#6C47FF';
 const MUTED = '#64748B';
 
 interface AlarmSetupSheetProps {
@@ -65,18 +68,18 @@ export function AlarmSetupSheet({ productId, storeUrl, currentPrice, onSuccess, 
 
   const handleSetAlarm = async () => {
     if (!sliderValue || sliderValue <= 0) {
-      Alert.alert('Hata', 'Geçerli bir hedef fiyat seçin');
+      showAlert('Hata', 'Geçerli bir hedef fiyat seçin');
       return;
     }
     if (!storeUrl) {
-      Alert.alert('Hata', 'Ürün mağaza bilgisi bulunamadı');
+      showAlert('Hata', 'Ürün mağaza bilgisi bulunamadı');
       return;
     }
     setLoading(true);
     try {
       // POST /products/add — ürün zaten varsa direkt alarm oluşturur
       await productsApi.add(storeUrl, sliderValue);
-      Alert.alert('Talep Oluşturuldu', 'Fiyat hedefe düşünce bildirim alacaksınız.');
+      showAlert('Talep Oluşturuldu 🎉', 'Fiyat hedefe ulaşınca sizi bilgilendireceğiz.');
       if (Platform.OS === 'web') {
         setWebVisible(false);
       } else {
@@ -84,7 +87,33 @@ export function AlarmSetupSheet({ productId, storeUrl, currentPrice, onSuccess, 
       }
       onSuccess?.();
     } catch (e: any) {
-      Alert.alert('Hata', e.response?.data?.detail ?? 'Talep oluşturulamadı');
+      const detail = e.response?.data?.detail;
+      if (detail?.code === 'ALARM_EXISTS') {
+        const existing = Math.round(detail.target_price).toLocaleString('tr-TR') + ' ₺';
+        const newPrice = Math.round(sliderValue).toLocaleString('tr-TR') + ' ₺';
+        if (Platform.OS === 'web') setWebVisible(false);
+        else sheetRef.current?.close();
+        showAlert(
+          'Zaten Bir Talebiniz Var',
+          `Bu ürün için ${existing} hedef fiyatlı bir talebiniz mevcut. ${newPrice} olarak güncellemek ister misiniz?`,
+          [
+            { text: 'Vazgeç', style: 'cancel' },
+            {
+              text: 'Güncelle',
+              onPress: async () => {
+                try {
+                  await alarmsApi.update(detail.alarm_id, { target_price: sliderValue, status: 'active' });
+                  showAlert('Talep Güncellendi 🎉', 'Hedef fiyatınız güncellendi.');
+                } catch {
+                  showAlert('Hata', 'Talep güncellenemedi.');
+                }
+              },
+            },
+          ]
+        );
+        return;
+      }
+      showAlert('Hata', detail ?? 'Talep oluşturulamadı');
     } finally {
       setLoading(false);
     }
@@ -134,9 +163,9 @@ export function AlarmSetupSheet({ productId, storeUrl, currentPrice, onSuccess, 
             value={sliderValue}
             onValueChange={(v) => setSliderValue(Math.round(v / step) * step)}
             step={step}
-            minimumTrackTintColor={GREEN}
+            minimumTrackTintColor={BRAND}
             maximumTrackTintColor={BORDER}
-            thumbTintColor={GREEN}
+            thumbTintColor={BRAND}
             style={{ height: 40 }}
           />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -156,7 +185,7 @@ export function AlarmSetupSheet({ productId, storeUrl, currentPrice, onSuccess, 
         disabled={loading}
         activeOpacity={0.85}
         style={{
-          backgroundColor: GREEN,
+          backgroundColor: BRAND,
           borderRadius: 14,
           paddingVertical: 16,
           alignItems: 'center',

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse, UserUpdatePreferences, UserUpdateFirebaseToken
-from app.core.security import get_current_user
+from app.schemas.user import UserResponse, UserUpdatePreferences, UserUpdateFirebaseToken, UserChangePassword
+from app.core.security import get_current_user, verify_password, hash_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -25,6 +25,19 @@ async def update_preferences(
         setattr(current_user, field, value)
     db.add(current_user)
     return current_user
+
+
+@router.patch("/me/password")
+async def change_password(
+    payload: UserChangePassword,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
+    current_user.password_hash = hash_password(payload.new_password)
+    db.add(current_user)
+    return {"message": "Şifre güncellendi"}
 
 
 @router.post("/me/firebase-token", response_model=UserResponse)

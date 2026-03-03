@@ -7,6 +7,8 @@ import { useFonts } from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '@/store/authStore';
 import { useNotifications } from '@/hooks/useNotifications';
+import { AppAlert } from '@/components/ui/AppAlert';
+import { GlobalAlarmSheet } from '@/components/product/GlobalAlarmSheet';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,16 +45,22 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0F0F0F' } }}>
+      <AppAlert />
+      <GlobalAlarmSheet />
+      <Stack screenOptions={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: '#0A1628' } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="splash" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="product/[id]" options={{ presentation: 'card' }} />
-        <Stack.Screen name="discover/category/[slug]" options={{ presentation: 'card' }} />
-        <Stack.Screen name="discover/search" options={{ presentation: 'card' }} />
-        <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
+        <Stack.Screen name="product/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="discover/category/[slug]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="discover/search" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications" options={{ presentation: 'card', animation: 'slide_from_right' }} />
         <Stack.Screen name="alarm-search" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="profile/edit" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="profile/change-password" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="profile/about" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="profile/privacy" options={{ presentation: 'card', animation: 'slide_from_right' }} />
       </Stack>
     </GestureHandlerRootView>
   );
