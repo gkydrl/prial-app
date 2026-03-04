@@ -27,6 +27,7 @@ class Product(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
+    short_title: Mapped[str | None] = mapped_column(String(60), nullable=True)
     brand: Mapped[str | None] = mapped_column(String(100), index=True)
     description: Mapped[str | None] = mapped_column(String(2000))
     image_url: Mapped[str | None] = mapped_column(String(500))

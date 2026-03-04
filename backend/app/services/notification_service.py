@@ -31,11 +31,12 @@ async def send_alarm_notifications(
             if not product:
                 continue
 
-            title = f"Fiyat Düştü! {product.title[:40]}..."
+            display_name = product.short_title or product.title[:38]
+            title = f"🎯 {display_name}"
             body = (
-                f"Hedef fiyatınız {alarm.target_price} TL'ye ulaşıldı. "
-                f"Şu anki fiyat: {new_price} TL"
-            )
+                f"Hedef fiyat {int(alarm.target_price):,} ₺'ye ulaşıldı! "
+                f"Şu an: {int(new_price):,} ₺"
+            ).replace(",", ".")
 
             # Push Notification
             if user.push_notifications_enabled and user.firebase_token:

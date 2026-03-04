@@ -54,10 +54,14 @@ async def scrape_and_save_product(
     async with AsyncSessionLocal() as db:
         try:
             from app.services.variant_extractor import extract_attributes, find_or_create_variant
+            from app.services.short_title_generator import generate_short_title
+
+            short_title = await generate_short_title(scraped.brand, scraped.title)
 
             # Ürün oluştur
             product = Product(
                 title=scraped.title,
+                short_title=short_title,
                 brand=scraped.brand,
                 description=scraped.description,
                 image_url=scraped.image_url,
