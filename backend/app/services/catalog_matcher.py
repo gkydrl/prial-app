@@ -40,16 +40,32 @@ def _attributes_compatible(variant_attrs: dict, scraped_attrs: dict) -> tuple[bo
     matches = 0
 
     for key, val in variant_attrs.items():
-        if key in scraped_attrs:
-            if scraped_attrs[key].lower() != str(val).lower():
-                mismatches += 1  # 128GB vs 256GB → kesin uyumsuz
+        if key not in scraped_attrs:
+            # Scraped data'da bu attr yok → belirsiz, LLM karar versin
+            continue
+
+        v_str = str(val).lower().strip()
+        s_str = scraped_attrs[key].lower().strip()
+
+        if v_str == s_str:
+            matches += 1
+        elif key == "storage":
+            # Storage için kesin eşleşme gerekir: 128GB ≠ 256GB
+            mismatches += 1
+        else:
+            # Diğer attr'ler (color vs.) için substring kontrolü:
+            # "Titan Siyah" ile "Siyah" → uyumlu (belirsiz)
+            # "Mavi" ile "Kırmızı" → uyumsuz
+            if v_str in s_str or s_str in v_str:
+                # Kısmi eşleşme → belirsiz
+                pass
             else:
-                matches += 1
+                mismatches += 1
 
     if mismatches > 0:
         return False, True  # Kesin red
 
-    confident = matches >= len(variant_attrs)  # Tüm attr'ler eşleştiyse emin
+    confident = matches >= len(variant_attrs)  # Tüm attr'ler tam eşleştiyse emin
     return True, confident
 
 
