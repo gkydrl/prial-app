@@ -227,7 +227,7 @@ async def debug_crawl_full_test(
     searcher = GoogleSearcher()
 
     try:
-        results = await searcher.search(query, limit=3)
+        results = await searcher.search(query, limit=5)
     except Exception as e:
         return {"step": "search", "error": str(e)}
 
