@@ -20,7 +20,8 @@ export function Button({ variant = 'primary', loading, disabled, children, class
 
   return (
     <TouchableOpacity
-      className={`rounded-xl px-5 py-3.5 items-center justify-center flex-row gap-2 ${container} ${disabled || loading ? 'opacity-50' : ''} ${className ?? ''}`}
+      className={`px-5 py-3.5 items-center justify-center flex-row gap-2 ${container} ${disabled || loading ? 'opacity-50' : ''} ${className ?? ''}`}
+      style={{ borderRadius: 14 }}
       disabled={disabled || loading}
       {...props}
     >

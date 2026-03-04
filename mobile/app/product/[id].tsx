@@ -423,7 +423,7 @@ export default function ProductDetailScreen() {
         <TouchableOpacity
           style={{
             backgroundColor: BRAND,
-            borderRadius: 16,
+            borderRadius: 14,
             paddingVertical: 16,
             alignItems: 'center',
             flexDirection: 'row',
