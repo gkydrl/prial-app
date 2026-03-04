@@ -70,8 +70,14 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const store = product.stores?.[0];
   const price = store?.current_price;
-  const discount = store?.discount_percent;
   const priceStr = fmtPrice(price);
+  const drop = (() => {
+    if (store?.discount_percent && store.discount_percent > 0) return store.discount_percent;
+    const cur = Number(store?.current_price);
+    const orig = Number(store?.original_price);
+    if (orig > cur && cur > 0 && orig > 0) return Math.round((orig - cur) / orig * 100);
+    return null;
+  })();
 
   const handleAlarmPress = () => {
     if (!isAuthenticated) {
@@ -116,18 +122,30 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
             </View>
           )}
 
-          {/* "ÖNE ÇIKAN" badge — sol üst */}
-          <View style={{
-            position: 'absolute', top: 8, left: 8,
-            backgroundColor: '#1D4ED8', borderRadius: 5,
-            paddingHorizontal: 7, paddingVertical: 3,
-          }}>
-            <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 }}>
-              ÖNE ÇIKAN
-            </Text>
-          </View>
+          {/* Sol üst: düşüş varsa yeşil badge, yoksa "ÖNE ÇIKAN" */}
+          {drop ? (
+            <View style={{
+              position: 'absolute', top: 8, left: 8,
+              backgroundColor: '#22C55E', borderRadius: 5,
+              paddingHorizontal: 7, paddingVertical: 3,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+                ↓%{drop}
+              </Text>
+            </View>
+          ) : (
+            <View style={{
+              position: 'absolute', top: 8, left: 8,
+              backgroundColor: '#1D4ED8', borderRadius: 5,
+              paddingHorizontal: 7, paddingVertical: 3,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 }}>
+                ÖNE ÇIKAN
+              </Text>
+            </View>
+          )}
 
-          {/* Talep oluştur — sağ üst yuvarlak buton */}
+          {/* Sağ üst: talep oluştur butonu */}
           <TouchableOpacity
             onPress={handleAlarmPress}
             activeOpacity={0.85}
@@ -140,18 +158,6 @@ function FeaturedCard({ product }: { product: ProductResponse }) {
           >
             <Ionicons name="add" size={18} color="#FFFFFF" />
           </TouchableOpacity>
-
-          {!!discount && (
-            <View style={{
-              position: 'absolute', top: 8, right: 8,
-              backgroundColor: '#22C55E', borderRadius: 5,
-              paddingHorizontal: 7, paddingVertical: 3,
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
-                -{discount}%
-              </Text>
-            </View>
-          )}
         </View>
       </View>
 
@@ -189,6 +195,13 @@ function SideCard({ product }: { product: ProductResponse }) {
   const store = product.stores?.[0];
   const price = store?.current_price;
   const priceStr = fmtPrice(price);
+  const drop = (() => {
+    if (store?.discount_percent && store.discount_percent > 0) return store.discount_percent;
+    const cur = Number(store?.current_price);
+    const orig = Number(store?.original_price);
+    if (orig > cur && cur > 0 && orig > 0) return Math.round((orig - cur) / orig * 100);
+    return null;
+  })();
 
   const handleAlarmPress = () => {
     if (!isAuthenticated) {
@@ -232,7 +245,20 @@ function SideCard({ product }: { product: ProductResponse }) {
               <Ionicons name="cube-outline" size={22} color="#94A3B8" />
             </View>
           )}
-          {/* Talep oluştur — sağ üst yuvarlak buton */}
+          {/* Sol üst: düşüş badge */}
+          {!!drop && (
+            <View style={{
+              position: 'absolute', top: 5, left: 5,
+              backgroundColor: '#22C55E', borderRadius: 4,
+              paddingHorizontal: 4, paddingVertical: 2,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 8, fontFamily: 'Inter_700Bold' }}>
+                ↓%{drop}
+              </Text>
+            </View>
+          )}
+
+          {/* Sağ üst: talep oluştur butonu */}
           <TouchableOpacity
             onPress={handleAlarmPress}
             activeOpacity={0.85}
