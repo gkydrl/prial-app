@@ -211,29 +211,42 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
     return stats
 
 
-async def crawl_all_variants() -> None:
+async def crawl_all_variants(new_only: bool = False) -> None:
     """
     Tüm aktif variant'lar için katalog taraması.
     Scheduler veya admin endpoint tarafından çağrılır.
+
+    new_only=True → Yalnızca hiç mağazası olmayan variant'ları işler (ilk dolum için).
     """
-    print("[crawler] Katalog taraması başladı...")
+    print(f"[crawler] Katalog taraması başladı (new_only={new_only})...")
     start = datetime.now(timezone.utc)
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(ProductVariant)
-            .options(selectinload(ProductVariant.product))
+            .options(selectinload(ProductVariant.product), selectinload(ProductVariant.stores))
             .join(Product)
         )
-        variants: list[ProductVariant] = result.scalars().all()
+        all_variants: list[ProductVariant] = result.scalars().all()
 
-    if not variants:
+    if not all_variants:
         print("[crawler] Katalogda variant yok.")
         return
 
-    print(f"[crawler] {len(variants)} variant taranacak...")
+    if new_only:
+        variants = [v for v in all_variants if not v.stores]
+        print(f"[crawler] {len(variants)}/{len(all_variants)} variant mağazasız → taranacak...")
+    else:
+        variants = all_variants
+        print(f"[crawler] {len(variants)} variant taranacak...")
 
-    semaphore = asyncio.Semaphore(settings.crawler_search_concurrency)
+    if not variants:
+        print("[crawler] Taranacak yeni variant yok.")
+        return
+
+    # new_only modunda concurrency biraz daha yüksek tutabiliriz
+    concurrency = min(settings.crawler_search_concurrency * 2, 8) if new_only else settings.crawler_search_concurrency
+    semaphore = asyncio.Semaphore(concurrency)
     total_found = 0
     total_new = 0
 
