@@ -425,7 +425,7 @@ export default function DiscoverScreen() {
         setProducts(res.data);
       } else {
         const res = await client.get<ProductResponse[]>('/discover/products', {
-          params: { page_size: 50 },
+          params: { page_size: 50, sort_by: 'alarm_count' },
         });
         setProducts(res.data);
       }
