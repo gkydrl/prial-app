@@ -44,3 +44,4 @@ apscheduler==3.10.4
 # Utilities
 Pillow==10.4.0
 python-slugify==8.0.4
+resend==2.7.0

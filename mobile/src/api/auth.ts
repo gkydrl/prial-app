@@ -13,4 +13,10 @@ export const authApi = {
     client.post<TokenResponse>(`${ENDPOINTS.REFRESH}?refresh_token=${encodeURIComponent(refresh_token)}`),
 
   me: () => client.get<UserResponse>(ENDPOINTS.ME),
+
+  forgotPassword: (email: string) =>
+    client.post(ENDPOINTS.FORGOT_PASSWORD, { email }),
+
+  resetPassword: (token: string, new_password: string) =>
+    client.post(ENDPOINTS.RESET_PASSWORD, { token, new_password }),
 };

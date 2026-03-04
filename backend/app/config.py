@@ -24,13 +24,13 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 60
     jwt_refresh_token_expire_days: int = 30
 
-    # Email
-    smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    email_from: str = "noreply@prial.app"
-    email_from_name: str = "Prial"
+    # Email (Resend)
+    resend_api_key: str = ""
+    from_email: str = "noreply@prial.com"
+    from_email_name: str = "Prial"
+
+    # Password reset
+    password_reset_token_expire_minutes: int = 60
 
     # Firebase
     firebase_credentials_path: str = "firebase-credentials.json"

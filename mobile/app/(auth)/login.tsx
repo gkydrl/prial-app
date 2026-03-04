@@ -95,6 +95,14 @@ export default function LoginScreen() {
             <Button onPress={handleLogin} loading={loading}>
               Giriş Yap
             </Button>
+            <TouchableOpacity
+              style={{ alignItems: 'flex-end' }}
+              onPress={() => router.push('/(auth)/forgot-password')}
+            >
+              <Text style={{ color: '#1D4ED8', fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+                Şifremi Unuttum
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Register link */}

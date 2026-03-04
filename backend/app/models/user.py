@@ -4,6 +4,7 @@ from sqlalchemy import String, Boolean, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
+from typing import Optional
 
 
 class User(Base):
@@ -25,6 +26,10 @@ class User(Base):
     email_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     notify_on_price_drop: Mapped[bool] = mapped_column(Boolean, default=True)
     notify_on_back_in_stock: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Password reset
+    reset_token_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    reset_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
