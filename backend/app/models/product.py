@@ -77,6 +77,11 @@ class ProductStore(Base):
     in_stock: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # still being scraped
 
+    # Priority queue fields
+    check_priority: Mapped[int] = mapped_column(Integer, default=3, index=True)
+    # 1=HIGH (active alarms), 2=MEDIUM (has alarm history), 3=LOW (no alarms)
+    next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

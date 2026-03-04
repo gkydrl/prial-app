@@ -10,6 +10,8 @@ from app.models.alarm import Alarm, AlarmStatus
 from app.models.product import Product, ProductStore
 from app.schemas.alarm import AlarmCreate, AlarmResponse, AlarmUpdate
 from app.core.security import get_current_user
+from app.services.price_tracker import refresh_store_priority, next_check_delta
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/alarms", tags=["alarms"])
 
@@ -60,6 +62,14 @@ async def create_alarm(
     product.alarm_count += 1
     await db.flush()
 
+    # Aktif alarm var → store'u HIGH önceliğe al, hemen kontrol edilsin
+    if store_id:
+        target_store = await db.get(ProductStore, store_id)
+        if target_store:
+            target_store.check_priority = 1
+            target_store.next_check_at = datetime.now(timezone.utc)
+            db.add(target_store)
+
     # İlişkileriyle birlikte döndür
     res = await db.execute(
         select(Alarm)
@@ -106,7 +116,16 @@ async def update_alarm(
     if payload.target_price is not None:
         alarm.target_price = payload.target_price
     if payload.status is not None:
+        old_status = alarm.status
         alarm.status = payload.status
+        # Aktif → pause/delete geçişinde önceliği düşür
+        if old_status == AlarmStatus.ACTIVE and payload.status != AlarmStatus.ACTIVE:
+            if alarm.product_store_id:
+                store = await db.get(ProductStore, alarm.product_store_id)
+                if store:
+                    store.check_priority = 2
+                    store.next_check_at = datetime.now(timezone.utc) + next_check_delta(2)
+                    db.add(store)
 
     db.add(alarm)
     return alarm
@@ -125,6 +144,14 @@ async def delete_alarm(
     product = await db.get(Product, alarm.product_id)
     if product and product.alarm_count > 0:
         product.alarm_count -= 1
+
+    # Store önceliğini MEDIUM'a düşür (geçmişte alarm aldı)
+    if alarm.product_store_id:
+        store = await db.get(ProductStore, alarm.product_store_id)
+        if store:
+            store.check_priority = 2
+            store.next_check_at = datetime.now(timezone.utc) + next_check_delta(2)
+            db.add(store)
 
     db.add(alarm)
 
