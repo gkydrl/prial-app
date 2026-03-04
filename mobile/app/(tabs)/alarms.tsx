@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useAlarms } from '@/hooks/useAlarms';
 import { useAuthStore } from '@/store/authStore';
 import { SectionHeader } from '@/components/home/SectionHeader';
+import { PrialLoader } from '@/components/ui/PrialLoader';
 import { openAlarmSheet } from '@/store/alarmSheetStore';
 import type { AlarmResponse, ProductResponse } from '@/types/api';
 import Animated from 'react-native-reanimated';
@@ -263,6 +264,14 @@ export default function AlarmsScreen() {
   }, []);
 
   if (!isAuthenticated) return <GuestWall />;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
+        <PrialLoader />
+      </SafeAreaView>
+    );
+  }
 
   const handleToggle = (alarm: AlarmResponse) => {
     updateAlarm(alarm.id, { status: alarm.status === 'active' ? 'paused' : 'active' });
