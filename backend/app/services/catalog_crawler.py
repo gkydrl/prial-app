@@ -47,9 +47,15 @@ def _build_search_query(product: Product, variant: ProductVariant) -> str:
     Ör: "Apple iPhone 16 Pro 256GB trendyol hepsiburada"
     """
     parts: list[str] = []
-    if product.brand:
-        parts.append(product.brand)
-    parts.append(product.title)
+    brand = (product.brand or "").strip()
+    title = product.title.strip()
+
+    # Ürün başlığı zaten marka adıyla başlıyorsa tekrar ekleme
+    # Örn: "Bugaboo Bugaboo Fox 5" → "Bugaboo Fox 5"
+    if brand and not title.lower().startswith(brand.lower()):
+        parts.append(brand)
+    parts.append(title)
+
     if variant.title:
         parts.append(variant.title)
     # Mağaza adları ekle → Google kategori yerine ürün sayfalarını önceliklendirir
