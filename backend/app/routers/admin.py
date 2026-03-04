@@ -135,6 +135,37 @@ async def list_products(
     ]
 
 
+@router.get("/debug/config")
+async def debug_config(_: None = Depends(require_admin)):
+    """Railway'deki config değerlerini kontrol eder (key'ler maskelenir)."""
+    key = settings.scraper_api_key
+    anthropic = settings.anthropic_api_key
+    return {
+        "scraper_api_key": f"{key[:6]}...{key[-4:]}" if len(key) > 10 else f"({len(key)} karakter — ÇOK KISA)",
+        "anthropic_api_key_set": bool(anthropic),
+        "admin_api_key": f"{settings.admin_api_key[:4]}...",
+        "crawler_search_concurrency": settings.crawler_search_concurrency,
+        "crawler_results_per_store": settings.crawler_results_per_store,
+    }
+
+
+@router.get("/debug/scraper-test")
+async def debug_scraper_test(_: None = Depends(require_admin)):
+    """Tek bir ScraperAPI araması yaparak bağlantıyı test eder."""
+    import httpx
+    key = settings.scraper_api_key
+    if not key:
+        return {"error": "SCRAPER_API_KEY boş"}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                f"https://api.scraperapi.com/search?q=iphone+16+trendyol&country_code=tr&num=2&api_key={key}"
+            )
+            return {"status": resp.status_code, "result_count": len(resp.json().get("organic_results", []))}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.post("/crawl/trigger")
 async def trigger_crawl(
     background_tasks: BackgroundTasks,
