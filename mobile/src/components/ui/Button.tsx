@@ -15,13 +15,13 @@ const variantClasses: Record<Variant, { container: string; text: string }> = {
   danger: { container: 'bg-danger', text: 'text-white font-semibold' },
 };
 
-export function Button({ variant = 'primary', loading, disabled, children, className, ...props }: ButtonProps) {
+export function Button({ variant = 'primary', loading, disabled, children, className, style, ...props }: ButtonProps) {
   const { container, text } = variantClasses[variant];
 
   return (
     <TouchableOpacity
       className={`px-5 py-3.5 items-center justify-center flex-row gap-2 ${container} ${disabled || loading ? 'opacity-50' : ''} ${className ?? ''}`}
-      style={{ borderRadius: 14 }}
+      style={[{ borderRadius: 14 }, style]}
       disabled={disabled || loading}
       {...props}
     >

@@ -104,11 +104,12 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Dep
         user.reset_token_hash = token_hash
         user.reset_token_expires = expires
         db.add(user)
-        await db.flush()
+        await db.commit()
 
         from app.services.email_service import send_password_reset_email
         try:
             await send_password_reset_email(user.email, raw_token)
+            print(f"[auth] Şifre sıfırlama e-postası gönderildi: {user.email}")
         except Exception as e:
             print(f"[auth] Şifre sıfırlama e-postası gönderilemedi ({user.email}): {e}")
 
