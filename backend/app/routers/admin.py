@@ -159,7 +159,7 @@ async def debug_scraper_test(_: None = Depends(require_admin)):
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.get(
-                f"https://api.scraperapi.com/search?q=iphone+16+trendyol&country_code=tr&num=2&api_key={key}"
+                f"https://api.scraperapi.com/structured/google/search?query=iphone+16+trendyol&country_code=tr&num=2&api_key={key}"
             )
             raw = resp.text[:500]
             try:

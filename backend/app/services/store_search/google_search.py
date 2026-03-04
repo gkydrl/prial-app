@@ -68,14 +68,13 @@ class GoogleSearcher(BaseSearcher):
         ScraperAPI /search endpoint'i JSON sonuç döner.
         """
         params = {
-            "q": query,
+            "query": query,
             "country_code": "tr",
             "hl": "tr",
             "num": min(limit * 2, 20),  # Filtreleme sonrası limit'e ulaşmak için fazla çek
         }
-        target = "https://api.scraperapi.com/search?" + urlencode(params)
+        target = "https://api.scraperapi.com/structured/google/search?" + urlencode(params)
 
-        # ScraperAPI /search endpoint'i API key'i query string'de ister
         from app.config import settings
         url_with_key = target + f"&api_key={settings.scraper_api_key}"
 
