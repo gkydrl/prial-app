@@ -3,7 +3,7 @@ Admin endpoints — ürün kataloğu yönetimi.
 X-Admin-Key header ile korunur.
 """
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -137,10 +137,14 @@ async def list_products(
 
 @router.post("/crawl/trigger")
 async def trigger_crawl(
+    background_tasks: BackgroundTasks,
     _: None = Depends(require_admin),
 ):
     """Katalog crawler'ını manuel tetikler (test/debug için)."""
-    import asyncio
     from app.services.catalog_crawler import crawl_all_variants
-    asyncio.create_task(crawl_all_variants())
+
+    async def _run():
+        await crawl_all_variants()
+
+    background_tasks.add_task(_run)
     return {"message": "Crawler başlatıldı (arka planda çalışıyor)"}
