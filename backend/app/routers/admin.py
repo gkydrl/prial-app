@@ -157,11 +157,16 @@ async def debug_scraper_test(_: None = Depends(require_admin)):
     if not key:
         return {"error": "SCRAPER_API_KEY boş"}
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.get(
                 f"https://api.scraperapi.com/search?q=iphone+16+trendyol&country_code=tr&num=2&api_key={key}"
             )
-            return {"status": resp.status_code, "result_count": len(resp.json().get("organic_results", []))}
+            raw = resp.text[:500]
+            try:
+                data = resp.json()
+                return {"status": resp.status_code, "result_count": len(data.get("organic_results", [])), "raw_preview": raw[:200]}
+            except Exception:
+                return {"status": resp.status_code, "raw_preview": raw}
     except Exception as e:
         return {"error": str(e)}
 
