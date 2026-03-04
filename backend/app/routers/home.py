@@ -26,23 +26,57 @@ def _since(period: str) -> datetime:
     return datetime.now(timezone.utc) - timedelta(hours=hours)
 
 
-def _price_history_rows(db_result):
-    """Shared serializer for price-history-based endpoints.
+def _price_before_subquery(since: datetime):
+    """
+    Her product_store için 'since' öncesindeki en son fiyatı döner.
+    Bu referans fiyat, dönem başlamadan önceki son kayıttır.
+    Day-over-day karşılaştırma için kullanılır (max/min yanılgısı yok).
+    """
+    rn_inner = (
+        select(
+            PriceHistory.product_store_id,
+            PriceHistory.price,
+            func.row_number().over(
+                partition_by=PriceHistory.product_store_id,
+                order_by=desc(PriceHistory.recorded_at),
+            ).label("rn"),
+        )
+        .where(PriceHistory.recorded_at < since)
+        .where(PriceHistory.price > 0)
+        .subquery()
+    )
+    return (
+        select(
+            rn_inner.c.product_store_id,
+            rn_inner.c.price.label("price_before"),
+        )
+        .where(rn_inner.c.rn == 1)
+        .subquery()
+    )
 
-    row[0] = ProductStore (with .current_price = gerçek anlık fiyat)
-    row[1] = min_price (dönemdeki en düşük)
-    row[2] = max_price (dönemdeki en yüksek)
+
+def _price_history_rows(db_result):
+    """
+    row[0] = ProductStore
+    row[1] = price_before (dönem başlamadan önceki son fiyat — referans)
+
+    Karşılaştırma: price_before → store.current_price (gerçek anlık DB değeri)
     """
     rows = []
     for row in db_result:
         store: ProductStore = row[0]
-        min_price = float(row[1])
-        max_price = float(row[2])
-        # Gerçek anlık fiyat — tarihsel min değil
-        current = float(store.current_price) if store.current_price else min_price
-        # Fiyat geri çıkmışsa (şu an tarihsel maksimuma yakınsa) listeye alma
-        if max_price > 0 and current >= max_price * 0.95:
+        price_before = float(row[1])
+        current = float(store.current_price) if store.current_price else 0
+
+        if price_before <= 0 or current <= 0 or current >= price_before:
             continue
+
+        drop_pct = (price_before - current) / price_before * 100
+
+        # Sanity check: %90+ düşüş → muhtemelen hatalı scrape (ör. 2 TL sandalye)
+        if drop_pct > 90:
+            continue
+
         rows.append({
             "product": {
                 "id": str(store.product.id),
@@ -60,32 +94,18 @@ def _price_history_rows(db_result):
                 "store": store.store.value,
                 "url": store.url,
                 "current_price": current,
-                "original_price": max_price,
+                "original_price": price_before,
                 "currency": store.currency,
                 "discount_percent": store.discount_percent,
                 "in_stock": store.in_stock,
                 "last_checked_at": store.last_checked_at.isoformat() if store.last_checked_at else None,
             },
-            "price_24h_ago": max_price,
+            "price_24h_ago": price_before,
             "price_now": current,
-            "drop_amount": max_price - current,
-            "drop_percent": round((max_price - current) / max_price * 100, 1),
+            "drop_amount": price_before - current,
+            "drop_percent": round(drop_pct, 1),
         })
     return rows
-
-
-def _price_history_subquery(since: datetime):
-    return (
-        select(
-            PriceHistory.product_store_id,
-            func.min(PriceHistory.price).label("min_price"),
-            func.max(PriceHistory.price).label("max_price"),
-        )
-        .where(PriceHistory.recorded_at >= since)
-        .where(PriceHistory.price > 0)  # 0 fiyatlı bozuk kayıtları dışla
-        .group_by(PriceHistory.product_store_id)
-        .subquery()
-    )
 
 
 def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
@@ -96,7 +116,11 @@ def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
             continue
         cur = float(s.current_price)
         orig = float(s.original_price)
-        if orig <= cur:
+        if orig <= cur or cur <= 0:
+            continue
+        drop_pct = (orig - cur) / orig * 100
+        # Sanity: %90+ düşüş → hatalı veri
+        if drop_pct > 90:
             continue
         rows.append({
             "product": {
@@ -124,26 +148,9 @@ def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
             "price_24h_ago": orig,
             "price_now": cur,
             "drop_amount": orig - cur,
-            "drop_percent": round((orig - cur) / orig * 100, 1),
+            "drop_percent": round(drop_pct, 1),
         })
     return rows
-
-
-async def _history_rows_for_period(db, since: datetime, limit: int, order_by) -> list[dict]:
-    subquery = _price_history_subquery(since)
-    result = await db.execute(
-        select(ProductStore, subquery.c.min_price, subquery.c.max_price)
-        .join(subquery, ProductStore.id == subquery.c.product_store_id)
-        .options(selectinload(ProductStore.product))
-        .where(
-            subquery.c.max_price > subquery.c.min_price,
-            ProductStore.in_stock == True,
-            ProductStore.is_active == True,
-        )
-        .order_by(order_by)
-        .limit(limit)
-    )
-    return _price_history_rows(result.all())
 
 
 @router.get("/daily-deals")
@@ -153,22 +160,22 @@ async def daily_deals(
     db: AsyncSession = Depends(get_db),
 ):
     """Fiyat düşen ürünler. 1d → 7d → indirimli ürünler kademeli fallback."""
-    order_by = desc((func.cast(subquery_placeholder := None, type_=None)))
-
-    # 1d → 7d → discount fallback
     for fallback_period in [period, "7d"]:
         since = _since(fallback_period)
-        subq = _price_history_subquery(since)
+        before_subq = _price_before_subquery(since)
         result = await db.execute(
-            select(ProductStore, subq.c.min_price, subq.c.max_price)
-            .join(subq, ProductStore.id == subq.c.product_store_id)
+            select(ProductStore, before_subq.c.price_before)
+            .join(before_subq, ProductStore.id == before_subq.c.product_store_id)
             .options(selectinload(ProductStore.product))
             .where(
-                subq.c.max_price > subq.c.min_price,
+                before_subq.c.price_before > ProductStore.current_price,
                 ProductStore.in_stock == True,
                 ProductStore.is_active == True,
+                ProductStore.current_price > 0,
             )
-            .order_by(desc((subq.c.max_price - subq.c.min_price) / subq.c.max_price))
+            .order_by(desc(
+                (before_subq.c.price_before - ProductStore.current_price) / before_subq.c.price_before
+            ))
             .limit(limit)
         )
         rows = _price_history_rows(result.all())
@@ -202,17 +209,18 @@ async def top_drops(
     """En çok ₺ düşen ürünler. 1d → 7d → indirimli ürünler kademeli fallback."""
     for fallback_period in [period, "7d"]:
         since = _since(fallback_period)
-        subq = _price_history_subquery(since)
+        before_subq = _price_before_subquery(since)
         result = await db.execute(
-            select(ProductStore, subq.c.min_price, subq.c.max_price)
-            .join(subq, ProductStore.id == subq.c.product_store_id)
+            select(ProductStore, before_subq.c.price_before)
+            .join(before_subq, ProductStore.id == before_subq.c.product_store_id)
             .options(selectinload(ProductStore.product))
             .where(
-                subq.c.max_price > subq.c.min_price,
+                before_subq.c.price_before > ProductStore.current_price,
                 ProductStore.in_stock == True,
                 ProductStore.is_active == True,
+                ProductStore.current_price > 0,
             )
-            .order_by(desc(subq.c.max_price - subq.c.min_price))
+            .order_by(desc(before_subq.c.price_before - ProductStore.current_price))
             .limit(limit)
         )
         rows = _price_history_rows(result.all())
