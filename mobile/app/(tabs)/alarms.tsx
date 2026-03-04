@@ -257,6 +257,8 @@ export default function AlarmsScreen() {
   const [showAll, setShowAll] = useState(false);
   const [popularProducts, setPopularProducts] = useState<ProductResponse[]>([]);
 
+  const fadeStyle = useFadeIn();
+
   useEffect(() => {
     homeApi.mostAlarmed(20)
       .then((res) => setPopularProducts(res.data.filter((p: ProductResponse) => p.image_url)))
@@ -289,7 +291,6 @@ export default function AlarmsScreen() {
   const displayedAlarms = showAll ? visibleAlarms : visibleAlarms.slice(0, INITIAL_LIMIT);
   const hasMore = visibleAlarms.length > INITIAL_LIMIT;
   const hasAlarms = visibleAlarms.length > 0;
-  const fadeStyle = useFadeIn();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
