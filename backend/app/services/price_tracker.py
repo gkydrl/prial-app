@@ -114,6 +114,13 @@ async def check_product_price(product_store_id) -> None:
             return
 
         new_price = scraped.current_price
+        # 0 veya None fiyat → scrape başarısız, kaydetme
+        if not new_price or new_price <= 0:
+            store.next_check_at = now + next_check_delta(store.check_priority)
+            store.last_checked_at = now
+            await db.commit()
+            return
+
         old_price = store.current_price
         price_changed = old_price != new_price
 

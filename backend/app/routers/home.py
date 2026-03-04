@@ -69,6 +69,7 @@ def _price_history_subquery(since: datetime):
             func.max(PriceHistory.price).label("max_price"),
         )
         .where(PriceHistory.recorded_at >= since)
+        .where(PriceHistory.price > 0)  # 0 fiyatlı bozuk kayıtları dışla
         .group_by(PriceHistory.product_store_id)
         .subquery()
     )
