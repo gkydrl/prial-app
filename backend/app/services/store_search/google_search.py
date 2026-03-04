@@ -15,25 +15,36 @@ from decimal import Decimal
 
 # Ürün sayfası olduğunu güçlü biçimde gösteren URL pattern'leri
 _PRODUCT_URL_PATTERNS = [
-    re.compile(r"-p-\d+"),          # Trendyol: /urun-adi-p-123456
-    re.compile(r"-pm-[A-Z0-9]+"),   # Hepsiburada: /urun-pm-XXXXX
-    re.compile(r"/dp/[A-Z0-9]{10}"),# Amazon: /dp/B08XXXXX
-    re.compile(r"/product/\d+"),    # Genel pattern
-    re.compile(r"/urun[-/]"),       # Türkçe "ürün" içeren path
-    re.compile(r"/p/\d+"),          # MediaMarkt, Teknosa
-    re.compile(r"-\d{6,}"),         # 6+ haneli sayı içeren URL (çoğu e-ticaret)
+    re.compile(r"-p-\d+"),           # Trendyol: /urun-adi-p-123456
+    re.compile(r"-pm-[A-Z0-9]+"),    # Hepsiburada: /urun-pm-XXXXX
+    re.compile(r"/dp/[A-Z0-9]{10}"), # Amazon: /dp/B08XXXXX
+    re.compile(r"/product/\d+"),     # Genel pattern
+    re.compile(r"/urun[-/]"),        # Türkçe "ürün" içeren path
+    re.compile(r"/p/\d+"),           # MediaMarkt, Teknosa ürün sayfası
 ]
 
-# Kesinlikle ürün sayfası OLMAYAN URL'ler (kategori, blog, vb.)
+# Kesinlikle ürün sayfası OLMAYAN domain'ler (fiyat karşılaştırma, sosyal medya, vb.)
 _SKIP_DOMAINS = {
     "google.com", "google.com.tr",
     "youtube.com", "instagram.com", "facebook.com", "twitter.com",
     "wikipedia.org", "reddit.com",
+    "akakce.com",       # Fiyat karşılaştırma
+    "cimri.com",        # Fiyat karşılaştırma
+    "incehesap.com",    # Fiyat karşılaştırma
+    "fiyatlar.com",     # Fiyat karşılaştırma
+    "sahibinden.com",   # İkinci el
+    "letgo.com",        # İkinci el
+    "apple.com",        # Marka sitesi (ürün sayfası ama mağaza değil)
+    "samsung.com",
 }
 
 _SKIP_PATH_KEYWORDS = [
     "/kategori/", "/category/", "/blog/", "/haber/", "/yorum/",
     "/search", "/ara?", "/liste/", "/collection/",
+    # Trendyol kategori URL pattern'leri ("-x-c" veya "-c-" olmadan "-p-" içermeyen)
+    "-x-c",   # Trendyol kategori: /brand-x-c12345-v678
+    # Teknosa/MediaMarkt kategori
+    "/c-1",   # Teknosa: /iphone-c-100001
 ]
 
 

@@ -43,7 +43,8 @@ _STORE_MAP = {
 def _build_search_query(product: Product, variant: ProductVariant) -> str:
     """
     Variant için optimize edilmiş Google arama sorgusu.
-    Ör: "Apple iPhone 16 Pro 256GB Titan Siyah fiyat"
+    Trendyol/Hepsiburada ürün sayfalarını hedefler.
+    Ör: "Apple iPhone 16 Pro 256GB trendyol hepsiburada"
     """
     parts: list[str] = []
     if product.brand:
@@ -51,7 +52,8 @@ def _build_search_query(product: Product, variant: ProductVariant) -> str:
     parts.append(product.title)
     if variant.title:
         parts.append(variant.title)
-    parts.append("fiyat")
+    # Mağaza adları ekle → Google kategori yerine ürün sayfalarını önceliklendirir
+    parts.append("trendyol hepsiburada")
     return " ".join(parts)
 
 
