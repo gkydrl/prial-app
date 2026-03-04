@@ -129,16 +129,8 @@ def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
     return rows
 
 
-@router.get("/daily-deals")
-async def daily_deals(
-    limit: int = 20,
-    period: str = Query(default="30d"),
-    db: AsyncSession = Depends(get_db),
-):
-    """Son dönemde en çok oransal düşen ürünler. Yeterli history yoksa indirimli ürünler gösterilir."""
-    since = _since(period)
+async def _history_rows_for_period(db, since: datetime, limit: int, order_by) -> list[dict]:
     subquery = _price_history_subquery(since)
-
     result = await db.execute(
         select(ProductStore, subquery.c.min_price, subquery.c.max_price)
         .join(subquery, ProductStore.id == subquery.c.product_store_id)
@@ -148,71 +140,98 @@ async def daily_deals(
             ProductStore.in_stock == True,
             ProductStore.is_active == True,
         )
-        .order_by(desc((subquery.c.max_price - subquery.c.min_price) / subquery.c.max_price))
+        .order_by(order_by)
         .limit(limit)
     )
-    rows = _price_history_rows(result.all())
+    return _price_history_rows(result.all())
 
-    if len(rows) < 5:
-        fb_result = await db.execute(
-            select(ProductStore)
+
+@router.get("/daily-deals")
+async def daily_deals(
+    limit: int = 20,
+    period: str = Query(default="1d"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fiyat düşen ürünler. 1d → 7d → indirimli ürünler kademeli fallback."""
+    order_by = desc((func.cast(subquery_placeholder := None, type_=None)))
+
+    # 1d → 7d → discount fallback
+    for fallback_period in [period, "7d"]:
+        since = _since(fallback_period)
+        subq = _price_history_subquery(since)
+        result = await db.execute(
+            select(ProductStore, subq.c.min_price, subq.c.max_price)
+            .join(subq, ProductStore.id == subq.c.product_store_id)
             .options(selectinload(ProductStore.product))
             .where(
-                ProductStore.is_active == True,
+                subq.c.max_price > subq.c.min_price,
                 ProductStore.in_stock == True,
-                ProductStore.original_price > ProductStore.current_price,
-                ProductStore.current_price > 0,
+                ProductStore.is_active == True,
             )
-            .order_by(desc(
-                (ProductStore.original_price - ProductStore.current_price) / ProductStore.original_price
-            ))
+            .order_by(desc((subq.c.max_price - subq.c.min_price) / subq.c.max_price))
             .limit(limit)
         )
-        rows = _discount_fallback_rows(fb_result.scalars().all())
+        rows = _price_history_rows(result.all())
+        if len(rows) >= 3:
+            return rows
 
-    return rows
+    # Son çare: scraper'ın tespit ettiği anlık indirimler
+    fb_result = await db.execute(
+        select(ProductStore)
+        .options(selectinload(ProductStore.product))
+        .where(
+            ProductStore.is_active == True,
+            ProductStore.in_stock == True,
+            ProductStore.original_price > ProductStore.current_price,
+            ProductStore.current_price > 0,
+        )
+        .order_by(desc(
+            (ProductStore.original_price - ProductStore.current_price) / ProductStore.original_price
+        ))
+        .limit(limit)
+    )
+    return _discount_fallback_rows(fb_result.scalars().all())
 
 
 @router.get("/top-drops")
 async def top_drops(
     limit: int = 20,
-    period: str = Query(default="30d"),
+    period: str = Query(default="1d"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Son dönemde en çok ₺ düşen ürünler. Yeterli history yoksa indirimli ürünler gösterilir."""
-    since = _since(period)
-    subquery = _price_history_subquery(since)
-
-    result = await db.execute(
-        select(ProductStore, subquery.c.min_price, subquery.c.max_price)
-        .join(subquery, ProductStore.id == subquery.c.product_store_id)
-        .options(selectinload(ProductStore.product))
-        .where(
-            subquery.c.max_price > subquery.c.min_price,
-            ProductStore.in_stock == True,
-            ProductStore.is_active == True,
-        )
-        .order_by(desc(subquery.c.max_price - subquery.c.min_price))
-        .limit(limit)
-    )
-    rows = _price_history_rows(result.all())
-
-    if len(rows) < 5:
-        fb_result = await db.execute(
-            select(ProductStore)
+    """En çok ₺ düşen ürünler. 1d → 7d → indirimli ürünler kademeli fallback."""
+    for fallback_period in [period, "7d"]:
+        since = _since(fallback_period)
+        subq = _price_history_subquery(since)
+        result = await db.execute(
+            select(ProductStore, subq.c.min_price, subq.c.max_price)
+            .join(subq, ProductStore.id == subq.c.product_store_id)
             .options(selectinload(ProductStore.product))
             .where(
-                ProductStore.is_active == True,
+                subq.c.max_price > subq.c.min_price,
                 ProductStore.in_stock == True,
-                ProductStore.original_price > ProductStore.current_price,
-                ProductStore.current_price > 0,
+                ProductStore.is_active == True,
             )
-            .order_by(desc(ProductStore.original_price - ProductStore.current_price))
+            .order_by(desc(subq.c.max_price - subq.c.min_price))
             .limit(limit)
         )
-        rows = _discount_fallback_rows(fb_result.scalars().all())
+        rows = _price_history_rows(result.all())
+        if len(rows) >= 3:
+            return rows
 
-    return rows
+    fb_result = await db.execute(
+        select(ProductStore)
+        .options(selectinload(ProductStore.product))
+        .where(
+            ProductStore.is_active == True,
+            ProductStore.in_stock == True,
+            ProductStore.original_price > ProductStore.current_price,
+            ProductStore.current_price > 0,
+        )
+        .order_by(desc(ProductStore.original_price - ProductStore.current_price))
+        .limit(limit)
+    )
+    return _discount_fallback_rows(fb_result.scalars().all())
 
 
 @router.get("/most-alarmed")
