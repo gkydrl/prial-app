@@ -171,6 +171,39 @@ async def debug_scraper_test(_: None = Depends(require_admin)):
         return {"error": str(e)}
 
 
+@router.get("/debug/crawl-search-test")
+async def debug_crawl_search_test(
+    title: str = "iPhone 16 Pro",
+    brand: str = "Apple",
+    _: None = Depends(require_admin),
+):
+    """Belirtilen ürün için arama yapar ve filtrelenen URL'leri döner."""
+    from app.services.store_search.google_search import GoogleSearcher, _is_product_url
+    from app.services.catalog_crawler import _build_search_query
+    from app.models.product import Product, ProductVariant
+
+    # Mock product for query building
+    class _P:
+        pass
+    p, v = _P(), _P()
+    p.brand = brand
+    p.title = title
+    v.title = None
+
+    query = _build_search_query(p, v)
+    searcher = GoogleSearcher()
+    try:
+        results = await searcher.search(query, limit=5)
+    except Exception as e:
+        return {"query": query, "error": str(e)}
+
+    return {
+        "query": query,
+        "result_count": len(results),
+        "results": [{"title": r.title[:60], "url": r.url[:100], "store": r.store} for r in results],
+    }
+
+
 @router.post("/crawl/trigger")
 async def trigger_crawl(
     background_tasks: BackgroundTasks,
