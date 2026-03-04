@@ -204,6 +204,74 @@ async def debug_crawl_search_test(
     }
 
 
+@router.get("/debug/crawl-full-test")
+async def debug_crawl_full_test(
+    title: str = "iPhone 16 Pro",
+    brand: str = "Apple",
+    _: None = Depends(require_admin),
+):
+    """Arama → scrape → catalog match sürecini adım adım test eder."""
+    from app.services.store_search.google_search import GoogleSearcher
+    from app.services.catalog_crawler import _build_search_query
+    from app.services.scraper.dispatcher import scrape_url
+    from app.services.catalog_matcher import is_match
+
+    class _P:
+        pass
+    p, v = _P(), _P()
+    p.brand = brand
+    p.title = title
+    v.title = None
+
+    query = _build_search_query(p, v)
+    searcher = GoogleSearcher()
+
+    try:
+        results = await searcher.search(query, limit=3)
+    except Exception as e:
+        return {"step": "search", "error": str(e)}
+
+    if not results:
+        return {"step": "search", "query": query, "result": "0 sonuç"}
+
+    first = results[0]
+    try:
+        scraped = await scrape_url(first.url)
+    except Exception as e:
+        return {"step": "scrape", "url": first.url, "error": str(e)}
+
+    if not scraped or not scraped.current_price or scraped.current_price <= 0:
+        return {
+            "step": "scrape",
+            "url": first.url,
+            "result": "fiyat yok veya scrape başarısız",
+            "scraped_title": scraped.title if scraped else None,
+            "scraped_price": str(scraped.current_price) if scraped else None,
+        }
+
+    try:
+        matched = await is_match(
+            product_brand=brand,
+            product_title=title,
+            variant_title=None,
+            variant_attrs={},
+            scraped_title=scraped.title,
+            scraped_brand=scraped.brand,
+        )
+    except Exception as e:
+        return {"step": "match", "error": str(e)}
+
+    return {
+        "step": "all_ok",
+        "query": query,
+        "url": first.url,
+        "scraped_title": scraped.title,
+        "scraped_price": str(scraped.current_price),
+        "scraped_image": scraped.image_url,
+        "catalog_match": matched,
+    }
+
+
 @router.post("/crawl/trigger")
 async def trigger_crawl(
     background_tasks: BackgroundTasks,
