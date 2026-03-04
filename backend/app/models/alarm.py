@@ -27,6 +27,10 @@ class Alarm(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Optionally target a specific variant; if null, any variant counts
+    variant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # Optionally target a specific store; if null, any store counts
     product_store_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("product_stores.id", ondelete="SET NULL"), nullable=True
@@ -49,6 +53,7 @@ class Alarm(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="alarms")
     product: Mapped["Product"] = relationship("Product", back_populates="alarms")
+    variant: Mapped["ProductVariant | None"] = relationship("ProductVariant", back_populates="alarms")
     product_store: Mapped["ProductStore | None"] = relationship(
         "ProductStore", back_populates="alarms"
     )

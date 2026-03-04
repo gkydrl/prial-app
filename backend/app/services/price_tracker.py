@@ -35,13 +35,24 @@ def next_check_delta(priority: int) -> timedelta:
 
 async def refresh_store_priority(db: AsyncSession, store: ProductStore) -> None:
     """Bir store'un aktif alarm durumuna göre önceliğini ve next_check_at'ini günceller."""
-    result = await db.execute(
+    # Direkt store'a bağlı alarm var mı?
+    store_alarm_result = await db.execute(
         select(Alarm).where(
             Alarm.product_store_id == store.id,
             Alarm.status == AlarmStatus.ACTIVE,
         ).limit(1)
     )
-    has_active_alarm = result.scalar_one_or_none() is not None
+    has_active_alarm = store_alarm_result.scalar_one_or_none() is not None
+
+    # Store'un variant'ına bağlı alarm var mı?
+    if not has_active_alarm and store.variant_id is not None:
+        variant_alarm_result = await db.execute(
+            select(Alarm).where(
+                Alarm.variant_id == store.variant_id,
+                Alarm.status == AlarmStatus.ACTIVE,
+            ).limit(1)
+        )
+        has_active_alarm = variant_alarm_result.scalar_one_or_none() is not None
 
     if has_active_alarm:
         store.check_priority = 1
@@ -120,12 +131,19 @@ async def check_product_price(product_store_id) -> None:
             )
             db.add(history)
 
-            from app.models.product import Product
+            from app.models.product import Product, ProductVariant
             product = await db.get(Product, store.product_id)
             if product:
                 if product.lowest_price_ever is None or new_price < product.lowest_price_ever:
                     product.lowest_price_ever = new_price
                 db.add(product)
+
+            if store.variant_id:
+                variant = await db.get(ProductVariant, store.variant_id)
+                if variant:
+                    if variant.lowest_price_ever is None or new_price < variant.lowest_price_ever:
+                        variant.lowest_price_ever = new_price
+                    db.add(variant)
 
         # Önceliği yenile ve bir sonraki kontrol zamanını ayarla
         await refresh_store_priority(db, store)
@@ -148,15 +166,34 @@ async def _check_alarms(
     store: ProductStore,
     new_price: Decimal,
 ) -> None:
-    """Fiyat düştüğünde ilgili aktif alarmları tetikle."""
+    """Fiyat düştüğünde ilgili aktif alarmları tetikle.
+
+    Hem store bazlı hem de variant bazlı alarmları kontrol eder.
+    Variant bazlı alarm: alarmın variant_id'si bu store'un variant_id'siyle eşleşiyorsa
+    ve alarmın hedef fiyatı yeni fiyatın üzerindeyse tetiklenir.
+    """
+    from sqlalchemy import or_
+
+    conditions = [
+        Alarm.product_store_id == store.id,
+    ]
+    if store.variant_id is not None:
+        conditions.append(Alarm.variant_id == store.variant_id)
+
     result = await db.execute(
         select(Alarm).where(
-            Alarm.product_store_id == store.id,
+            or_(*conditions),
             Alarm.status == AlarmStatus.ACTIVE,
             Alarm.target_price >= new_price,
         )
     )
-    triggered_alarms: list[Alarm] = result.scalars().all()
+    # Deduplicate in case alarm matches both store and variant conditions
+    seen = set()
+    triggered_alarms: list[Alarm] = []
+    for alarm in result.scalars().all():
+        if alarm.id not in seen:
+            seen.add(alarm.id)
+            triggered_alarms.append(alarm)
 
     for alarm in triggered_alarms:
         alarm.status = AlarmStatus.TRIGGERED

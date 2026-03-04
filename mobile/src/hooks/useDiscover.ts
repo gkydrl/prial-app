@@ -18,7 +18,7 @@ export function useCategories() {
 }
 
 export function useCategoryProducts(slug: string) {
-  const [products, setProducts] = useState<ProductStoreResponse[]>([]);
+  const [products, setProducts] = useState<ProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);

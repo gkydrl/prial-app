@@ -6,11 +6,15 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
-from app.models.product import Product, ProductStore
+from app.models.product import Product, ProductStore, ProductVariant
 from app.models.alarm import Alarm, AlarmStatus
 from app.models.price_history import PriceHistory
 from app.models.category import Category
-from app.schemas.product import ProductResponse, ProductAddRequest, PriceHistoryPoint, ProductPreviewRequest, ProductPreviewResponse
+from app.schemas.product import (
+    ProductResponse, ProductAddRequest, PriceHistoryPoint,
+    ProductPreviewRequest, ProductPreviewResponse,
+    ProductVariantResponse, MatchUrlRequest, MatchUrlResponse,
+)
 from app.schemas.alarm import AlarmResponse
 from app.core.security import get_current_user
 
@@ -83,6 +87,7 @@ async def add_product_by_url(
         alarm = Alarm(
             user_id=current_user.id,
             product_id=product_store.product_id,
+            variant_id=product_store.variant_id,
             product_store_id=product_store.id,
             target_price=payload.target_price,
             status=AlarmStatus.ACTIVE,
@@ -90,9 +95,14 @@ async def add_product_by_url(
         db.add(alarm)
         await db.flush()
 
-        # Ürünün alarm sayısını artır
+        # Ürünün ve variant'ın alarm sayısını artır
         product = await db.get(Product, product_store.product_id)
         product.alarm_count += 1
+        if product_store.variant_id:
+            variant_obj = await db.get(ProductVariant, product_store.variant_id)
+            if variant_obj:
+                variant_obj.alarm_count += 1
+                db.add(variant_obj)
 
         return {"message": "Alarm kuruldu", "alarm_id": str(alarm.id)}
 
@@ -114,7 +124,10 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
 ):
     """Tüm ürünleri listeler (Keşfet ekranı için). category slug ile filtrelenebilir."""
-    query = select(Product).options(selectinload(Product.stores))
+    query = select(Product).options(
+        selectinload(Product.variants).selectinload(ProductVariant.stores),
+        selectinload(Product.stores),
+    )
     if category:
         cat_sq = select(Category.id).where(Category.slug == category).scalar_subquery()
         query = query.where(Product.category_id == cat_sq)
@@ -128,13 +141,122 @@ async def list_products(
 async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Product)
-        .options(selectinload(Product.stores))
+        .options(
+            selectinload(Product.variants).selectinload(ProductVariant.stores),
+            selectinload(Product.stores),
+        )
         .where(Product.id == product_id)
     )
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
     return product
+
+
+@router.post("/match-url", response_model=MatchUrlResponse)
+async def match_url(
+    payload: MatchUrlRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Kullanıcı dışarıdan (Trendyol, Hepsiburada, vb.) URL paylaştığında
+    kataloğumuzda eşleşen ürün+variant'ı bulur.
+
+    Eşleşme bulunamazsa 404 döner: kullanıcıya "Katalogumuzda yok" mesajı gösterilir.
+    """
+    from app.services.scraper.dispatcher import scrape_url
+    from app.services.catalog_matcher import find_best_match
+    from app.services.variant_extractor import extract_attributes
+
+    # 1. URL'yi scrape et
+    try:
+        scraped = await scrape_url(str(payload.url))
+    except Exception:
+        raise HTTPException(status_code=422, detail="Ürün bilgileri alınamadı. Linki kontrol et.")
+
+    # 2. Bu URL zaten sistemde mi?
+    existing_store = (await db.execute(
+        select(ProductStore).where(ProductStore.url == scraped.url)
+    )).scalar_one_or_none()
+
+    if existing_store:
+        # Direkt eşleşme — ProductStore var
+        product = await db.get(Product, existing_store.product_id)
+        variant = await db.get(ProductVariant, existing_store.variant_id) if existing_store.variant_id else None
+        if product and variant:
+            product_full = (await db.execute(
+                select(Product)
+                .options(
+                    selectinload(Product.variants).selectinload(ProductVariant.stores),
+                    selectinload(Product.stores),
+                )
+                .where(Product.id == product.id)
+            )).scalar_one()
+            variant_full = next((v for v in product_full.variants if v.id == variant.id), None)
+            if variant_full:
+                return MatchUrlResponse(
+                    product_id=product.id,
+                    variant_id=variant.id,
+                    product=product_full,
+                    variant=variant_full,
+                    matched_store_url=scraped.url,
+                    already_tracked=True,
+                )
+
+    # 3. Katalogda brand + attribute eşleşmesi ara
+    scraped_attrs = extract_attributes(scraped.title)
+
+    # Brand filtresiyle aday ürünleri çek
+    brand_filter = scraped.brand or ""
+    candidates_q = (
+        select(Product, ProductVariant)
+        .join(ProductVariant, ProductVariant.product_id == Product.id)
+        .options(selectinload(Product.variants), selectinload(Product.stores))
+    )
+    if brand_filter:
+        candidates_q = candidates_q.where(
+            Product.brand.ilike(f"%{brand_filter}%")
+        )
+    candidates_result = await db.execute(candidates_q.limit(50))
+    candidates = [(row[0], row[1]) for row in candidates_result.all()]
+
+    match = await find_best_match(
+        scraped_title=scraped.title,
+        scraped_brand=scraped.brand,
+        candidates=candidates,
+    )
+
+    if not match:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "NOT_IN_CATALOG",
+                "message": "Bu ürün henüz katalogumuzda yok.",
+            },
+        )
+
+    matched_product, matched_variant = match
+
+    # Tam ürün verisini yükle
+    product_full = (await db.execute(
+        select(Product)
+        .options(
+            selectinload(Product.variants).selectinload(ProductVariant.stores),
+            selectinload(Product.stores),
+        )
+        .where(Product.id == matched_product.id)
+    )).scalar_one()
+    variant_full = next((v for v in product_full.variants if v.id == matched_variant.id), matched_variant)
+
+    return MatchUrlResponse(
+        product_id=matched_product.id,
+        variant_id=matched_variant.id,
+        product=product_full,
+        variant=variant_full,
+        matched_store_url=scraped.url,
+        already_tracked=False,
+    )
 
 
 @router.get("/{product_id}/price-history", response_model=list[PriceHistoryPoint])

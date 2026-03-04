@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.user import User
 from app.models.alarm import Alarm, AlarmStatus
-from app.models.product import Product, ProductStore
+from app.models.product import Product, ProductStore, ProductVariant
 from app.schemas.alarm import AlarmCreate, AlarmResponse, AlarmUpdate
 from app.core.security import get_current_user
 from app.services.price_tracker import refresh_store_priority, next_check_delta
@@ -38,15 +38,29 @@ async def create_alarm(
     if dup.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Bu ürün için zaten aktif bir talebiniz var")
 
-    # Mağaza belirtilmemişse en ucuz mağazayı seç
-    store_id = payload.product_store_id
-    if not store_id:
-        sr = await db.execute(
-            select(ProductStore)
-            .where(ProductStore.product_id == payload.product_id, ProductStore.in_stock == True)
-            .order_by(ProductStore.current_price.asc())
+    # Variant belirtilmemişse product_id'ye ait ilk variant'ı seç
+    variant_id = payload.variant_id
+    if not variant_id:
+        vr = await db.execute(
+            select(ProductVariant)
+            .where(ProductVariant.product_id == payload.product_id)
             .limit(1)
         )
+        variant = vr.scalar_one_or_none()
+        if variant:
+            variant_id = variant.id
+
+    # Mağaza belirtilmemişse variant'a ait en ucuz mağazayı seç
+    store_id = payload.product_store_id
+    if not store_id:
+        stores_query = (
+            select(ProductStore)
+            .where(ProductStore.product_id == payload.product_id, ProductStore.in_stock == True)
+        )
+        if variant_id:
+            stores_query = stores_query.where(ProductStore.variant_id == variant_id)
+        stores_query = stores_query.order_by(ProductStore.current_price.asc()).limit(1)
+        sr = await db.execute(stores_query)
         store = sr.scalar_one_or_none()
         if store:
             store_id = store.id
@@ -54,16 +68,37 @@ async def create_alarm(
     alarm = Alarm(
         user_id=current_user.id,
         product_id=payload.product_id,
+        variant_id=variant_id,
         product_store_id=store_id,
         target_price=payload.target_price,
         status=AlarmStatus.ACTIVE,
     )
     db.add(alarm)
     product.alarm_count += 1
+
+    # variant alarm_count güncelle
+    if variant_id:
+        variant_obj = await db.get(ProductVariant, variant_id)
+        if variant_obj:
+            variant_obj.alarm_count += 1
+            db.add(variant_obj)
+
     await db.flush()
 
-    # Aktif alarm var → store'u HIGH önceliğe al, hemen kontrol edilsin
-    if store_id:
+    # Aktif alarm var → variant'a bağlı tüm store'ları HIGH önceliğe al
+    if variant_id:
+        vs_result = await db.execute(
+            select(ProductStore).where(
+                ProductStore.variant_id == variant_id,
+                ProductStore.is_active == True,
+            )
+        )
+        variant_stores = vs_result.scalars().all()
+        for vs in variant_stores:
+            vs.check_priority = 1
+            vs.next_check_at = datetime.now(timezone.utc)
+            db.add(vs)
+    elif store_id:
         target_store = await db.get(ProductStore, store_id)
         if target_store:
             target_store.check_priority = 1
@@ -75,7 +110,9 @@ async def create_alarm(
         select(Alarm)
         .options(
             selectinload(Alarm.product).selectinload(Product.stores),
+            selectinload(Alarm.product).selectinload(Product.variants).selectinload(ProductVariant.stores),
             selectinload(Alarm.product_store),
+            selectinload(Alarm.variant),
         )
         .where(Alarm.id == alarm.id)
     )
@@ -92,7 +129,9 @@ async def list_alarms(
         select(Alarm)
         .options(
             selectinload(Alarm.product).selectinload(Product.stores),
+            selectinload(Alarm.product).selectinload(Product.variants).selectinload(ProductVariant.stores),
             selectinload(Alarm.product_store),
+            selectinload(Alarm.variant),
         )
         .where(Alarm.user_id == current_user.id)
     )
@@ -144,6 +183,13 @@ async def delete_alarm(
     product = await db.get(Product, alarm.product_id)
     if product and product.alarm_count > 0:
         product.alarm_count -= 1
+
+    # Variant alarm sayısını azalt
+    if alarm.variant_id:
+        variant_obj = await db.get(ProductVariant, alarm.variant_id)
+        if variant_obj and variant_obj.alarm_count > 0:
+            variant_obj.alarm_count -= 1
+            db.add(variant_obj)
 
     # Store önceliğini MEDIUM'a düşür (geçmişte alarm aldı)
     if alarm.product_store_id:

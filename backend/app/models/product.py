@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from sqlalchemy import String, DateTime, func, ForeignKey, Numeric, Boolean, Integer, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
 import enum
 
@@ -46,10 +46,45 @@ class Product(Base):
 
     # Relationships
     category: Mapped["Category | None"] = relationship("Category", back_populates="products")
+    variants: Mapped[list["ProductVariant"]] = relationship(
+        "ProductVariant", back_populates="product", lazy="selectin"
+    )
     stores: Mapped[list["ProductStore"]] = relationship(
         "ProductStore", back_populates="product", lazy="selectin"
     )
     alarms: Mapped[list["Alarm"]] = relationship("Alarm", back_populates="product", lazy="noload")
+
+
+class ProductVariant(Base):
+    """A specific variant of a product (e.g. 256GB Blue)."""
+
+    __tablename__ = "product_variants"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str | None] = mapped_column(String(500))  # e.g. "256GB Mavi"
+    attributes: Mapped[dict | None] = mapped_column(JSONB)  # {"storage": "256GB", "color": "Mavi"}
+    image_url: Mapped[str | None] = mapped_column(String(500))
+
+    # Aggregate stats (denormalized for performance)
+    alarm_count: Mapped[int] = mapped_column(Integer, default=0)
+    lowest_price_ever: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    product: Mapped["Product"] = relationship("Product", back_populates="variants")
+    stores: Mapped[list["ProductStore"]] = relationship(
+        "ProductStore", back_populates="variant", lazy="selectin"
+    )
+    alarms: Mapped[list["Alarm"]] = relationship("Alarm", back_populates="variant", lazy="noload")
 
 
 class ProductStore(Base):
@@ -62,6 +97,9 @@ class ProductStore(Base):
     )
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    variant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="SET NULL"), nullable=True, index=True
     )
     store: Mapped[StoreName] = mapped_column(
         Enum(StoreName, name="store_name_enum"), nullable=False
@@ -90,6 +128,7 @@ class ProductStore(Base):
 
     # Relationships
     product: Mapped["Product"] = relationship("Product", back_populates="stores")
+    variant: Mapped["ProductVariant | None"] = relationship("ProductVariant", back_populates="stores")
     price_history: Mapped[list["PriceHistory"]] = relationship(
         "PriceHistory", back_populates="product_store", lazy="noload"
     )

@@ -3,12 +3,13 @@ from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
 from app.models.alarm import AlarmStatus
-from app.schemas.product import ProductResponse, ProductStoreResponse
+from app.schemas.product import ProductResponse, ProductStoreResponse, ProductVariantResponse
 
 
 class AlarmCreate(BaseModel):
     product_id: uuid.UUID
     target_price: Decimal = Field(gt=0)
+    variant_id: uuid.UUID | None = None        # Belirli bir variant için
     product_store_id: uuid.UUID | None = None  # Belirli bir mağaza için
 
 
@@ -20,6 +21,7 @@ class AlarmResponse(BaseModel):
     triggered_at: datetime | None
     created_at: datetime
     product: ProductResponse
+    variant: ProductVariantResponse | None
     product_store: ProductStoreResponse | None
 
     model_config = {"from_attributes": True}

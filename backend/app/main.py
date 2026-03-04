@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import settings
-from app.routers import auth, users, products, alarms, home, discover
+from app.routers import auth, users, products, alarms, home, discover, admin
 
 scheduler = AsyncIOScheduler()
 
@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     # Öncelik kuyruğuna göre fiyat takip zamanlayıcısı
     # Her 15 dakikada çalışır; sadece next_check_at'i geçmiş store'ları işler.
     from app.services.price_tracker import check_due_prices
+    from app.services.catalog_crawler import crawl_all_variants
 
     scheduler.add_job(
         check_due_prices,
@@ -29,6 +30,17 @@ async def lifespan(app: FastAPI):
         id="price_check",
         replace_existing=True,
     )
+
+    # Günlük katalog taraması — her gece 03:00'da
+    scheduler.add_job(
+        crawl_all_variants,
+        trigger="cron",
+        hour=3,
+        minute=0,
+        id="catalog_crawl",
+        replace_existing=True,
+    )
+
     scheduler.start()
 
     yield
@@ -57,6 +69,7 @@ app.include_router(products.router, prefix="/api/v1")
 app.include_router(alarms.router, prefix="/api/v1")
 app.include_router(home.router, prefix="/api/v1")
 app.include_router(discover.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 
 
 @app.get("/health")

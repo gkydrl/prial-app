@@ -43,15 +43,24 @@ const fmtPrice = (price: number | null) =>
   price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
 
 const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-  { label: 'Tümü', slug: null, icon: 'apps' },
-  { label: 'Telefon', slug: 'telefon', icon: 'phone-portrait' },
-  { label: 'Bilgisayar', slug: 'bilgisayar', icon: 'laptop' },
-  { label: 'Televizyon', slug: 'televizyon', icon: 'tv' },
-  { label: 'Ev Aleti', slug: 'ev-aleti', icon: 'home' },
-  { label: 'Akıllı Saat', slug: 'akilli-saat', icon: 'watch' },
-  { label: 'Oyun', slug: 'oyun-konsolu', icon: 'game-controller' },
-  { label: 'Kamera', slug: 'kamera', icon: 'camera' },
-  { label: 'Kulaklık', slug: 'kulaklik', icon: 'headset' },
+  { label: 'Tümü',       slug: null,                    icon: 'apps' },
+  { label: 'Telefon',    slug: 'akilli-telefon',         icon: 'phone-portrait' },
+  { label: 'Laptop',     slug: 'laptop',                 icon: 'laptop' },
+  { label: 'Tablet',     slug: 'tablet',                 icon: 'tablet-portrait' },
+  { label: 'Televizyon', slug: 'televizyon',             icon: 'tv' },
+  { label: 'Kulaklık',   slug: 'kulaklik-ses',           icon: 'headset' },
+  { label: 'Saat',       slug: 'akilli-saat',            icon: 'watch' },
+  { label: 'Fotoğraf',   slug: 'fotograf-makinesi',      icon: 'camera' },
+  { label: 'Oyun',       slug: 'oyun-gaming',            icon: 'game-controller' },
+  { label: 'PC',         slug: 'bilgisayar-bilesenleri', icon: 'desktop' },
+  { label: 'Akıllı Ev',  slug: 'akilli-ev',              icon: 'home' },
+  { label: 'Spor',       slug: 'spor-fitness',           icon: 'barbell' },
+  { label: 'Mobilya',    slug: 'mobilya-ofis',           icon: 'bed' },
+  { label: 'Sneaker',    slug: 'sneaker',                icon: 'footsteps' },
+  { label: 'Outdoor',    slug: 'outdoor-mont',           icon: 'rainy' },
+  { label: 'Çanta',      slug: 'canta-aksesuar',         icon: 'bag' },
+  { label: 'Kol Saati',  slug: 'kol-saati',              icon: 'time' },
+  { label: 'Giyim',      slug: 'premium-giyim',          icon: 'shirt' },
 ];
 
 // ─── Büyük öne çıkan kart (soldaki 2/3) ──────────────────────────────────────
@@ -405,13 +414,19 @@ export default function DiscoverScreen() {
     try {
       if (q.trim()) {
         const res = await client.get<ProductResponse[]>(ENDPOINTS.DISCOVER_SEARCH, {
-          params: { q: q.trim(), limit: 50 },
+          params: { q: q.trim(), page_size: 50 },
         });
         setProducts(res.data);
+      } else if (category) {
+        const res = await client.get<ProductResponse[]>(
+          ENDPOINTS.DISCOVER_CATEGORY_PRODUCTS(category),
+          { params: { page_size: 50 } },
+        );
+        setProducts(res.data);
       } else {
-        const params: Record<string, string | number> = { limit: 50 };
-        if (category) params.category = category;
-        const res = await client.get<ProductResponse[]>('/products', { params });
+        const res = await client.get<ProductResponse[]>('/discover/products', {
+          params: { page_size: 50 },
+        });
         setProducts(res.data);
       }
     } catch {

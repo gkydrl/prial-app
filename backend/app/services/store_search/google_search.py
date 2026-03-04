@@ -1,0 +1,142 @@
+"""
+Google arama adaptörü.
+ScraperAPI'nin /search endpoint'ini kullanarak Google'da ürün arar.
+Trendyol, Hepsiburada, Amazon TR, MediaMarkt, Vatan, N11 ve diğer
+tüm Türk e-ticaret sitelerini tek sorguda kapsar.
+"""
+import re
+from urllib.parse import urlencode
+
+import httpx
+
+from app.services.scraper.base import scraper_api_url
+from app.services.store_search.base import BaseSearcher, SearchResult
+from decimal import Decimal
+
+# Ürün sayfası olduğunu güçlü biçimde gösteren URL pattern'leri
+_PRODUCT_URL_PATTERNS = [
+    re.compile(r"-p-\d+"),          # Trendyol: /urun-adi-p-123456
+    re.compile(r"-pm-[A-Z0-9]+"),   # Hepsiburada: /urun-pm-XXXXX
+    re.compile(r"/dp/[A-Z0-9]{10}"),# Amazon: /dp/B08XXXXX
+    re.compile(r"/product/\d+"),    # Genel pattern
+    re.compile(r"/urun[-/]"),       # Türkçe "ürün" içeren path
+    re.compile(r"/p/\d+"),          # MediaMarkt, Teknosa
+    re.compile(r"-\d{6,}"),         # 6+ haneli sayı içeren URL (çoğu e-ticaret)
+]
+
+# Kesinlikle ürün sayfası OLMAYAN URL'ler (kategori, blog, vb.)
+_SKIP_DOMAINS = {
+    "google.com", "google.com.tr",
+    "youtube.com", "instagram.com", "facebook.com", "twitter.com",
+    "wikipedia.org", "reddit.com",
+}
+
+_SKIP_PATH_KEYWORDS = [
+    "/kategori/", "/category/", "/blog/", "/haber/", "/yorum/",
+    "/search", "/ara?", "/liste/", "/collection/",
+]
+
+
+def _is_product_url(url: str) -> bool:
+    """URL'nin bir ürün sayfası olup olmadığını heuristiklerle tahmin eder."""
+    url_lower = url.lower()
+
+    # Bilinen non-product domain'leri atla
+    for domain in _SKIP_DOMAINS:
+        if domain in url_lower:
+            return False
+
+    # Kategori/liste sayfası pattern'leri atla
+    for keyword in _SKIP_PATH_KEYWORDS:
+        if keyword in url_lower:
+            return False
+
+    # En az bir ürün pattern'i eşleşmeli
+    for pattern in _PRODUCT_URL_PATTERNS:
+        if pattern.search(url):
+            return True
+
+    return False
+
+
+class GoogleSearcher(BaseSearcher):
+    store_name = "google"
+
+    async def search(self, query: str, limit: int = 8) -> list[SearchResult]:
+        """
+        Google'da arama yapar ve ürün URL'lerini döner.
+        ScraperAPI /search endpoint'i JSON sonuç döner.
+        """
+        params = {
+            "q": query,
+            "country_code": "tr",
+            "hl": "tr",
+            "num": min(limit * 2, 20),  # Filtreleme sonrası limit'e ulaşmak için fazla çek
+        }
+        target = "https://api.scraperapi.com/search?" + urlencode(params)
+
+        # ScraperAPI /search endpoint'i API key'i query string'de ister
+        from app.config import settings
+        url_with_key = target + f"&api_key={settings.scraper_api_key}"
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(url_with_key)
+                if resp.status_code != 200:
+                    print(f"[google_search] HTTP {resp.status_code} ({query})")
+                    return []
+                data = resp.json()
+        except Exception as e:
+            print(f"[google_search] Hata ({query}): {e}")
+            return []
+
+        organic = data.get("organic_results", [])
+        results: list[SearchResult] = []
+
+        for item in organic:
+            url = item.get("link", "")
+            if not url or not _is_product_url(url):
+                continue
+
+            title = item.get("title", "").strip()
+            snippet = item.get("snippet", "")
+
+            results.append(SearchResult(
+                title=title or snippet[:100],
+                url=url,
+                store=self._store_from_url(url),
+                price=Decimal("0"),   # Fiyatı scrape adımında alacağız
+                image_url=None,
+            ))
+
+            if len(results) >= limit:
+                break
+
+        return results
+
+    def _store_from_url(self, url: str) -> str:
+        """URL'den store adını çıkarır."""
+        try:
+            from urllib.parse import urlparse
+            hostname = urlparse(url).hostname or ""
+            hostname = hostname.removeprefix("www.")
+            # Bilinen store'lar
+            if "trendyol.com" in hostname:
+                return "trendyol"
+            if "hepsiburada.com" in hostname:
+                return "hepsiburada"
+            if "amazon.com.tr" in hostname:
+                return "amazon"
+            if "n11.com" in hostname:
+                return "n11"
+            if "mediamarkt.com.tr" in hostname:
+                return "mediamarkt"
+            if "teknosa.com" in hostname:
+                return "teknosa"
+            if "vatanbilgisayar.com" in hostname:
+                return "vatan"
+            if "ciceksepeti.com" in hostname:
+                return "ciceksepeti"
+            return hostname.split(".")[0]
+        except Exception:
+            return "other"

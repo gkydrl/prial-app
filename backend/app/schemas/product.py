@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from pydantic import BaseModel, HttpUrl, Field
 from app.models.product import StoreName
 
@@ -19,6 +20,18 @@ class ProductStoreResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ProductVariantResponse(BaseModel):
+    id: uuid.UUID
+    title: str | None
+    attributes: dict[str, Any] | None
+    image_url: str | None
+    alarm_count: int
+    lowest_price_ever: Decimal | None
+    stores: list[ProductStoreResponse]
+
+    model_config = {"from_attributes": True}
+
+
 class ProductResponse(BaseModel):
     id: uuid.UUID
     title: str
@@ -27,6 +40,7 @@ class ProductResponse(BaseModel):
     image_url: str | None
     lowest_price_ever: Decimal | None
     alarm_count: int
+    variants: list[ProductVariantResponse]
     stores: list[ProductStoreResponse]
     created_at: datetime
 
@@ -78,3 +92,16 @@ class TopDropResponse(BaseModel):
     price_24h_ago: Decimal | None
     price_now: Decimal | None
     drop_percent: float | None
+
+
+class MatchUrlRequest(BaseModel):
+    url: str = Field(description="E-ticaret ürün sayfası URL'i (Trendyol, Hepsiburada, vb.)")
+
+
+class MatchUrlResponse(BaseModel):
+    product_id: uuid.UUID
+    variant_id: uuid.UUID
+    product: ProductResponse
+    variant: ProductVariantResponse
+    matched_store_url: str   # Katalogda daha önce bu store'dan kayıt var mı?
+    already_tracked: bool    # Bu URL zaten sistemde takip ediliyor mu?

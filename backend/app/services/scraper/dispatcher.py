@@ -53,6 +53,8 @@ async def scrape_and_save_product(
 
     async with AsyncSessionLocal() as db:
         try:
+            from app.services.variant_extractor import extract_attributes, find_or_create_variant
+
             # Ürün oluştur
             product = Product(
                 title=scraped.title,
@@ -65,10 +67,24 @@ async def scrape_and_save_product(
             db.add(product)
             await db.flush()
 
+            # Variant oluştur / bul
+            attributes = extract_attributes(scraped.title)
+            variant = await find_or_create_variant(
+                db,
+                product_id=product.id,
+                attributes=attributes,
+                image_url=scraped.image_url,
+            )
+            variant.alarm_count += 1
+            variant.lowest_price_ever = scraped.current_price
+            db.add(variant)
+            await db.flush()
+
             # Mağaza kaydı
             store_enum = StoreName(scraped.store)
             product_store = ProductStore(
                 product_id=product.id,
+                variant_id=variant.id,
                 store=store_enum,
                 store_product_id=scraped.store_product_id,
                 url=scraped.url,
@@ -93,6 +109,7 @@ async def scrape_and_save_product(
             alarm = Alarm(
                 user_id=user_id,
                 product_id=product.id,
+                variant_id=variant.id,
                 product_store_id=product_store.id,
                 target_price=target_price,
                 status=AlarmStatus.ACTIVE,

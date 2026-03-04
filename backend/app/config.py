@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     playwright_headless: bool = True
     scraper_api_key: str = ""
 
+    # Admin
+    admin_api_key: str = "change-me-in-production"
+
+    # Anthropic (LLM matching)
+    anthropic_api_key: str = ""
+
+    # Catalog crawler
+    crawler_search_concurrency: int = 3   # kaç variant aynı anda aransın
+    crawler_results_per_store: int = 5    # site başına kaç arama sonucu kontrol edilsin
+
     # CORS
     allowed_origins: str = "http://localhost:3000,http://localhost:8081"
 
