@@ -2,7 +2,10 @@
 Günlük katalog crawler'ı.
 
 Akış:
-  1. Her ProductVariant için Google'da arama yap
+  1. Her ProductVariant için paralel arama yap:
+     - Trendyol → TrendyolSearcher (internal API, 1 kredi)
+     - Hepsiburada → HepsiburadaSearcher (render, ~5 kredi)
+     - Küçük mağazalar → GoogleSearcher (25 kredi, tek sorgu)
   2. Gelen URL'leri teker teker scrape et
      - Trendyol/Hepsiburada → özel scraper (hızlı, güvenilir)
      - Diğer siteler → UniversalScraper (LLM tabanlı)
@@ -22,10 +25,14 @@ from app.database import AsyncSessionLocal
 from app.models.product import Product, ProductVariant, ProductStore, StoreName
 from app.models.price_history import PriceHistory
 from app.services.store_search.google_search import GoogleSearcher
+from app.services.store_search.trendyol_search import TrendyolSearcher
+from app.services.store_search.hepsiburada_search import HepsiburadaSearcher
 from app.services.store_search.base import SearchResult
 from app.services.catalog_matcher import is_match
 
 _google = GoogleSearcher()
+_trendyol = TrendyolSearcher()
+_hepsiburada = HepsiburadaSearcher()
 
 # StoreName enum'unda olmayan değerler OTHER'a map edilir
 _STORE_MAP = {
@@ -53,16 +60,10 @@ def _base_query(product: Product, variant: ProductVariant) -> str:
     return " ".join(parts)
 
 
-def _build_search_queries(product: Product, variant: ProductVariant) -> list[str]:
-    """
-    Farklı mağaza grupları için arama sorguları döner.
-    İki geçiş: büyük marketler + teknik mağazalar.
-    """
+def _google_query(product: Product, variant: ProductVariant) -> str:
+    """Küçük mağazalar için Google arama sorgusu."""
     base = _base_query(product, variant)
-    return [
-        f"{base} trendyol hepsiburada amazon",
-        f"{base} mediamarkt teknosa vatan",
-    ]
+    return f"{base} mediamarkt teknosa vatan amazon n11"
 
 
 async def _scrape_candidate(url: str):
@@ -161,16 +162,24 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
     Tek bir variant için Google araması yapar ve eşleşen store'ları kaydeder.
     Returns: {"found": int, "new": int}
     """
-    queries = _build_search_queries(product, variant)
+    base = _base_query(product, variant)
+    google_query = _google_query(product, variant)
     limit = settings.crawler_results_per_store
 
+    # Trendyol + Hepsiburada doğrudan, küçük mağazalar Google'dan — paralel
+    trendyol_task = _trendyol.search(base, limit=limit)
+    hepsiburada_task = _hepsiburada.search(base, limit=limit)
+    google_task = _google.search(google_query, limit=limit)
+
+    raw = await asyncio.gather(trendyol_task, hepsiburada_task, google_task, return_exceptions=True)
+
     search_results = []
-    for query in queries:
-        try:
-            results = await _google.search(query, limit=limit)
-            search_results.extend(results)
-        except Exception as e:
-            print(f"[crawler] Google arama hatası ({query}): {e}")
+    labels = ["trendyol", "hepsiburada", "google"]
+    for label, result in zip(labels, raw):
+        if isinstance(result, Exception):
+            print(f"[crawler] Arama hatası ({label}): {result}")
+        else:
+            search_results.extend(result)
 
     # URL tekrarlarını temizle
     seen_urls: set[str] = set()
@@ -182,7 +191,7 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
     search_results = unique_results
 
     if not search_results:
-        print(f"[crawler] Sonuç yok: {queries[0]}")
+        print(f"[crawler] Sonuç yok: {base}")
         return {"found": 0, "new": 0}
 
     stats = {"found": 0, "new": 0}
