@@ -19,7 +19,7 @@ export function useHome() {
     ]);
     setDailyDeals(deals.status === 'fulfilled' ? deals.value.data : []);
     setTopDrops(drops.status === 'fulfilled' ? drops.value.data : []);
-    setMostAlarmed(alarmed.status === 'fulfilled' ? alarmed.value.data : []);
+    setMostAlarmed(alarmed.status === 'fulfilled' ? alarmed.value.data.filter((p: ProductResponse) => p.image_url) : []);
     setIsLoading(false);
   }, []);
 
