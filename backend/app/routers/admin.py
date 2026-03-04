@@ -272,6 +272,36 @@ async def debug_crawl_full_test(
     }
 
 
+@router.post("/debug/crawl-one")
+async def debug_crawl_one(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """İlk mağazasız variant'ı crawl eder ve sonucu döner (DB'ye kaydeder)."""
+    from sqlalchemy.orm import selectinload
+    from app.services.catalog_crawler import crawl_variant
+
+    result = await db.execute(
+        select(ProductVariant)
+        .options(selectinload(ProductVariant.product), selectinload(ProductVariant.stores))
+        .join(Product)
+        .where(~ProductVariant.stores.any())  # stores yoksa
+        .limit(1)
+    )
+    variant = result.scalar_one_or_none()
+    if not variant:
+        return {"error": "Mağazasız variant bulunamadı"}
+
+    stats = await crawl_variant(variant.product, variant)
+    return {
+        "variant_id": str(variant.id),
+        "product": variant.product.title,
+        "variant_title": variant.title,
+        "variant_attrs": variant.attributes,
+        "stats": stats,
+    }
+
+
 @router.post("/crawl/trigger")
 async def trigger_crawl(
     background_tasks: BackgroundTasks,
