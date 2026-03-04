@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Linking, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
@@ -27,18 +27,35 @@ const STORE_LABELS: Record<string, string> = {
   other:       'Diğer',
 };
 
-function logoUrl(storeKey: string): string | null {
-  const domain = STORE_DOMAINS[storeKey];
-  if (!domain) return null;
-  return `https://logo.clearbit.com/${domain}`;
+function domainFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function logoUrl(storeKey: string, storeUrl: string): string {
+  const domain = STORE_DOMAINS[storeKey] ?? domainFromUrl(storeUrl);
+  return `https://logo.clearbit.com/${domain ?? 'example.com'}`;
+}
+
+function storeLabel(storeKey: string, storeUrl: string): string {
+  if (STORE_LABELS[storeKey] && storeKey !== 'other') return STORE_LABELS[storeKey];
+  const domain = domainFromUrl(storeUrl);
+  if (!domain) return storeKey;
+  // "trendyol.com" → "Trendyol", "hepsiburada.com" → "Hepsiburada"
+  const name = domain.split('.')[0];
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 export function StoreRow({ store }: { store: ProductStoreResponse }) {
-  const logo = logoUrl(store.store);
-  const label = STORE_LABELS[store.store] ?? store.store;
+  const logo = logoUrl(store.store, store.url);
+  const label = storeLabel(store.store, store.url);
   const priceStr = store.current_price != null
     ? Math.round(Number(store.current_price)).toLocaleString('tr-TR') + ' ₺'
     : '-';
+  const [logoError, setLogoError] = useState(false);
 
   return (
     <TouchableOpacity
@@ -55,11 +72,12 @@ export function StoreRow({ store }: { store: ProductStoreResponse }) {
     >
       {/* Sol: Logo */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {logo ? (
+        {!logoError ? (
           <Image
             source={{ uri: logo }}
             style={{ width: 28, height: 28, borderRadius: 6 }}
             resizeMode="contain"
+            onError={() => setLogoError(true)}
           />
         ) : (
           <View style={{

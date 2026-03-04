@@ -27,38 +27,51 @@ def _since(period: str) -> datetime:
 
 
 def _price_history_rows(db_result):
-    """Shared serializer for price-history-based endpoints."""
-    return [
-        {
+    """Shared serializer for price-history-based endpoints.
+
+    row[0] = ProductStore (with .current_price = gerçek anlık fiyat)
+    row[1] = min_price (dönemdeki en düşük)
+    row[2] = max_price (dönemdeki en yüksek)
+    """
+    rows = []
+    for row in db_result:
+        store: ProductStore = row[0]
+        min_price = float(row[1])
+        max_price = float(row[2])
+        # Gerçek anlık fiyat — tarihsel min değil
+        current = float(store.current_price) if store.current_price else min_price
+        # Fiyat geri çıkmışsa (şu an tarihsel maksimuma yakınsa) listeye alma
+        if max_price > 0 and current >= max_price * 0.95:
+            continue
+        rows.append({
             "product": {
-                "id": str(row[0].product.id),
-                "title": row[0].product.title,
-                "brand": row[0].product.brand,
+                "id": str(store.product.id),
+                "title": store.product.title,
+                "brand": store.product.brand,
                 "description": None,
-                "image_url": row[0].product.image_url,
-                "lowest_price_ever": float(row[0].product.lowest_price_ever) if row[0].product.lowest_price_ever else None,
-                "alarm_count": row[0].product.alarm_count,
+                "image_url": store.product.image_url,
+                "lowest_price_ever": float(store.product.lowest_price_ever) if store.product.lowest_price_ever else None,
+                "alarm_count": store.product.alarm_count,
                 "stores": [],
-                "created_at": row[0].product.created_at.isoformat(),
+                "created_at": store.product.created_at.isoformat(),
             },
             "store": {
-                "id": str(row[0].id),
-                "store": row[0].store.value,
-                "url": row[0].url,
-                "current_price": float(row[1]),
-                "original_price": float(row[2]),
-                "currency": row[0].currency,
-                "discount_percent": row[0].discount_percent,
-                "in_stock": row[0].in_stock,
-                "last_checked_at": row[0].last_checked_at.isoformat() if row[0].last_checked_at else None,
+                "id": str(store.id),
+                "store": store.store.value,
+                "url": store.url,
+                "current_price": current,
+                "original_price": max_price,
+                "currency": store.currency,
+                "discount_percent": store.discount_percent,
+                "in_stock": store.in_stock,
+                "last_checked_at": store.last_checked_at.isoformat() if store.last_checked_at else None,
             },
-            "price_24h_ago": float(row[2]),
-            "price_now": float(row[1]),
-            "drop_amount": float(row[2] - row[1]),
-            "drop_percent": round(float((row[2] - row[1]) / row[2] * 100), 1),
-        }
-        for row in db_result
-    ]
+            "price_24h_ago": max_price,
+            "price_now": current,
+            "drop_amount": max_price - current,
+            "drop_percent": round((max_price - current) / max_price * 100, 1),
+        })
+    return rows
 
 
 def _price_history_subquery(since: datetime):
@@ -75,13 +88,54 @@ def _price_history_subquery(since: datetime):
     )
 
 
+def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
+    """original_price > current_price olan mağazaları TopDropResponse formatında döndürür."""
+    rows = []
+    for s in stores:
+        if not s.current_price or not s.original_price:
+            continue
+        cur = float(s.current_price)
+        orig = float(s.original_price)
+        if orig <= cur:
+            continue
+        rows.append({
+            "product": {
+                "id": str(s.product.id),
+                "title": s.product.title,
+                "brand": s.product.brand,
+                "description": None,
+                "image_url": s.product.image_url,
+                "lowest_price_ever": float(s.product.lowest_price_ever) if s.product.lowest_price_ever else None,
+                "alarm_count": s.product.alarm_count,
+                "stores": [],
+                "created_at": s.product.created_at.isoformat(),
+            },
+            "store": {
+                "id": str(s.id),
+                "store": s.store.value,
+                "url": s.url,
+                "current_price": cur,
+                "original_price": orig,
+                "currency": s.currency,
+                "discount_percent": s.discount_percent,
+                "in_stock": s.in_stock,
+                "last_checked_at": s.last_checked_at.isoformat() if s.last_checked_at else None,
+            },
+            "price_24h_ago": orig,
+            "price_now": cur,
+            "drop_amount": orig - cur,
+            "drop_percent": round((orig - cur) / orig * 100, 1),
+        })
+    return rows
+
+
 @router.get("/daily-deals")
 async def daily_deals(
     limit: int = 20,
-    period: str = Query(default="1d"),
+    period: str = Query(default="30d"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Son dönemde en çok oransal düşen ürünler (Bugünün Fırsatları)."""
+    """Son dönemde en çok oransal düşen ürünler. Yeterli history yoksa indirimli ürünler gösterilir."""
     since = _since(period)
     subquery = _price_history_subquery(since)
 
@@ -89,20 +143,43 @@ async def daily_deals(
         select(ProductStore, subquery.c.min_price, subquery.c.max_price)
         .join(subquery, ProductStore.id == subquery.c.product_store_id)
         .options(selectinload(ProductStore.product))
-        .where(subquery.c.max_price > subquery.c.min_price)
+        .where(
+            subquery.c.max_price > subquery.c.min_price,
+            ProductStore.in_stock == True,
+            ProductStore.is_active == True,
+        )
         .order_by(desc((subquery.c.max_price - subquery.c.min_price) / subquery.c.max_price))
         .limit(limit)
     )
-    return _price_history_rows(result.all())
+    rows = _price_history_rows(result.all())
+
+    if len(rows) < 5:
+        fb_result = await db.execute(
+            select(ProductStore)
+            .options(selectinload(ProductStore.product))
+            .where(
+                ProductStore.is_active == True,
+                ProductStore.in_stock == True,
+                ProductStore.original_price > ProductStore.current_price,
+                ProductStore.current_price > 0,
+            )
+            .order_by(desc(
+                (ProductStore.original_price - ProductStore.current_price) / ProductStore.original_price
+            ))
+            .limit(limit)
+        )
+        rows = _discount_fallback_rows(fb_result.scalars().all())
+
+    return rows
 
 
 @router.get("/top-drops")
 async def top_drops(
     limit: int = 20,
-    period: str = Query(default="1d"),
+    period: str = Query(default="30d"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Son dönemde en çok fiyat düşen ürünler (₺ bazında)."""
+    """Son dönemde en çok ₺ düşen ürünler. Yeterli history yoksa indirimli ürünler gösterilir."""
     since = _since(period)
     subquery = _price_history_subquery(since)
 
@@ -110,11 +187,32 @@ async def top_drops(
         select(ProductStore, subquery.c.min_price, subquery.c.max_price)
         .join(subquery, ProductStore.id == subquery.c.product_store_id)
         .options(selectinload(ProductStore.product))
-        .where(subquery.c.max_price > subquery.c.min_price)
+        .where(
+            subquery.c.max_price > subquery.c.min_price,
+            ProductStore.in_stock == True,
+            ProductStore.is_active == True,
+        )
         .order_by(desc(subquery.c.max_price - subquery.c.min_price))
         .limit(limit)
     )
-    return _price_history_rows(result.all())
+    rows = _price_history_rows(result.all())
+
+    if len(rows) < 5:
+        fb_result = await db.execute(
+            select(ProductStore)
+            .options(selectinload(ProductStore.product))
+            .where(
+                ProductStore.is_active == True,
+                ProductStore.in_stock == True,
+                ProductStore.original_price > ProductStore.current_price,
+                ProductStore.current_price > 0,
+            )
+            .order_by(desc(ProductStore.original_price - ProductStore.current_price))
+            .limit(limit)
+        )
+        rows = _discount_fallback_rows(fb_result.scalars().all())
+
+    return rows
 
 
 @router.get("/most-alarmed")

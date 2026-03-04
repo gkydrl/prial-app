@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useAlarms } from '@/hooks/useAlarms';
 import { useAuthStore } from '@/store/authStore';
 import { SectionHeader } from '@/components/home/SectionHeader';
+import { openAlarmSheet } from '@/store/alarmSheetStore';
 import type { AlarmResponse, ProductResponse } from '@/types/api';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
@@ -120,6 +121,7 @@ function AlarmListCard({
 // ─── Popüler Kart ─────────────────────────────────────────────────────────────
 
 function PopularCard({ product }: { product: ProductResponse }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const store = product.stores[0];
   const price = store?.current_price != null ? Number(store.current_price) : null;
   const originalPrice = store?.original_price != null ? Number(store.original_price) : null;
@@ -184,7 +186,27 @@ function PopularCard({ product }: { product: ProductResponse }) {
               )}
             </View>
           </View>
-          <Ionicons name="pricetag-outline" size={20} color="#1D4ED8" />
+          <TouchableOpacity
+            onPress={() => {
+              if (!isAuthenticated) {
+                router.push('/(auth)/login');
+                return;
+              }
+              openAlarmSheet({
+                productId: product.id,
+                storeUrl: store?.url ?? null,
+                currentPrice: price,
+              });
+            }}
+            activeOpacity={0.8}
+            style={{
+              width: 32, height: 32, borderRadius: 16,
+              backgroundColor: '#1D4ED8',
+              justifyContent: 'center', alignItems: 'center',
+            }}
+          >
+            <Ionicons name="add" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -235,7 +257,9 @@ export default function AlarmsScreen() {
   const [popularProducts, setPopularProducts] = useState<ProductResponse[]>([]);
 
   useEffect(() => {
-    homeApi.mostAlarmed(10).then((res) => setPopularProducts(res.data)).catch(() => {});
+    homeApi.mostAlarmed(20)
+      .then((res) => setPopularProducts(res.data.filter((p: ProductResponse) => p.image_url)))
+      .catch(() => {});
   }, []);
 
   if (!isAuthenticated) return <GuestWall />;

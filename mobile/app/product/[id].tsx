@@ -1,10 +1,12 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import {
   ScrollView,
   View,
   Text,
   TouchableOpacity,
   Platform,
+  Linking,
+  Image as RNImage,
 } from 'react-native';
 import { showAlert } from '@/store/alertStore';
 import { useAuthStore } from '@/store/authStore';
@@ -17,6 +19,7 @@ import { useProduct } from '@/hooks/useProduct';
 import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
+import type { ProductStoreResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD = '#1E293B';
@@ -24,6 +27,75 @@ const BRAND_GREEN = '#22C55E';
 const BRAND = '#1D4ED8';
 const MUTED = '#64748B';
 const WHITE = '#FFFFFF';
+
+// ─── Mağaza logosu yardımcıları ───────────────────────────────────────────────
+
+const STORE_DOMAINS: Record<string, string> = {
+  trendyol:    'trendyol.com',
+  hepsiburada: 'hepsiburada.com',
+  amazon:      'amazon.com.tr',
+  n11:         'n11.com',
+  ciceksepeti: 'ciceksepeti.com',
+  mediamarkt:  'mediamarkt.com.tr',
+  teknosa:     'teknosa.com',
+  vatan:       'vatanbilgisayar.com',
+};
+
+function getLogoUrl(storeKey: string, storeUrl: string): string {
+  const domain = STORE_DOMAINS[storeKey] ?? (() => {
+    try { return new URL(storeUrl).hostname.replace(/^www\./, ''); } catch { return null; }
+  })();
+  if (!domain) return '';
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+}
+
+/** Görsel üzerindeki overlay şeridinde kullanılan kompakt store pill'i */
+function StorePill({ store }: { store: ProductStoreResponse }) {
+  const [err, setErr] = useState(false);
+  const logo = getLogoUrl(store.store, store.url);
+  const price = store.current_price != null
+    ? Math.round(Number(store.current_price)).toLocaleString('tr-TR') + ' ₺'
+    : '-';
+
+  return (
+    <TouchableOpacity
+      onPress={() => Linking.openURL(store.url)}
+      activeOpacity={0.75}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(10, 22, 40, 0.75)',
+        borderRadius: 20,
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+      }}
+    >
+      <View style={{
+        width: 20, height: 20, borderRadius: 10,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center', alignItems: 'center',
+        overflow: 'hidden',
+      }}>
+        {!err ? (
+          <RNImage
+            source={{ uri: logo }}
+            style={{ width: 16, height: 16 }}
+            resizeMode="contain"
+            onError={() => setErr(true)}
+          />
+        ) : (
+          <Ionicons name="storefront-outline" size={11} color="#64748B" />
+        )}
+      </View>
+      <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
+        {price}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 // ─── Fiyat formatlayıcı ───────────────────────────────────────────────────────
 
@@ -83,7 +155,7 @@ export default function ProductDetailScreen() {
   const { product, history, isLoading, error } = useProduct(id);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const alarmSheetRef = useRef<BottomSheet>(null);
-  const stores = product?.stores ?? [];
+  const stores = (product?.stores ?? []).filter(s => s.in_stock === true);
   const lowestStore = useMemo(() => {
     return stores.reduce<typeof stores[0] | null>((min, s) => {
       if (!s.current_price) return min;
@@ -95,6 +167,14 @@ export default function ProductDetailScreen() {
   // Decimal → string olarak gelebilir, Number() ile normalize et
   const currentPrice = lowestStore?.current_price != null ? Number(lowestStore.current_price) : null;
   const alarmCount = product?.alarm_count ?? 0;
+
+  const low30d = useMemo(() => {
+    if (!history.length) return null;
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const recent = history.filter(h => new Date(h.recorded_at).getTime() >= cutoff);
+    if (!recent.length) return null;
+    return Math.min(...recent.map(h => Number(h.price)));
+  }, [history]);
 
   const demandBars = useMemo(() => {
     if (!currentPrice) return [];
@@ -168,6 +248,20 @@ export default function ProductDetailScreen() {
               contentFit="contain"
               placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
             />
+            {/* Mağaza pill overlay */}
+            {stores.length > 0 && (
+              <View style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                paddingHorizontal: 12, paddingVertical: 10,
+              }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 8 }}>
+                  {[...stores]
+                    .sort((a, b) => Number(a.current_price ?? Infinity) - Number(b.current_price ?? Infinity))
+                    .map(s => <StorePill key={s.id} store={s} />)
+                  }
+                </ScrollView>
+              </View>
+            )}
           </View>
         </View>
 
@@ -216,9 +310,9 @@ export default function ProductDetailScreen() {
               </View>
             </View>
 
-            {product.lowest_price_ever && (
+            {low30d != null && (
               <Text style={{ color: BRAND_GREEN, fontSize: 12, fontFamily: 'Inter_500Medium' }}>
-                En düşük fiyat: {fmt(product.lowest_price_ever)}
+                Son 30 gün en düşük: {fmt(low30d)}
               </Text>
             )}
           </View>
@@ -312,53 +406,6 @@ export default function ProductDetailScreen() {
             );
           })()}
 
-          {/* ── Mağazalar ── */}
-          {stores.length > 0 && (
-            <View style={{ backgroundColor: CARD, borderRadius: 16, padding: 16, gap: 12 }}>
-              <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-                Mağazalar ({stores.length})
-              </Text>
-              {stores.map((store) => (
-                <View
-                  key={store.id}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingVertical: 10,
-                    borderBottomWidth: 1,
-                    borderBottomColor: '#334155',
-                  }}
-                >
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ color: WHITE, fontSize: 14, fontFamily: 'Inter_600SemiBold', textTransform: 'capitalize' }}>
-                      {store.store}
-                    </Text>
-                    {!store.in_stock && (
-                      <Text style={{ color: '#EF4444', fontSize: 11 }}>Stokta yok</Text>
-                    )}
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                    <Text style={{ color: WHITE, fontSize: 15, fontFamily: 'Inter_700Bold' }}>
-                      {fmt(store.current_price)}
-                    </Text>
-                    {store.discount_percent != null && store.discount_percent > 0 && (
-                      <View style={{
-                        backgroundColor: `${BRAND_GREEN}25`,
-                        borderRadius: 6,
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                      }}>
-                        <Text style={{ color: BRAND_GREEN, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                          %{store.discount_percent} indirim
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
         </View>
       </ScrollView>
 

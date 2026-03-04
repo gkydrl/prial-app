@@ -40,27 +40,29 @@ _STORE_MAP = {
 }
 
 
-def _build_search_query(product: Product, variant: ProductVariant) -> str:
-    """
-    Variant için optimize edilmiş Google arama sorgusu.
-    Trendyol/Hepsiburada ürün sayfalarını hedefler.
-    Ör: "Apple iPhone 16 Pro 256GB trendyol hepsiburada"
-    """
+def _base_query(product: Product, variant: ProductVariant) -> str:
+    """Mağaza adı olmadan temel arama sorgusu."""
     parts: list[str] = []
     brand = (product.brand or "").strip()
     title = product.title.strip()
-
-    # Ürün başlığı zaten marka adıyla başlıyorsa tekrar ekleme
-    # Örn: "Bugaboo Bugaboo Fox 5" → "Bugaboo Fox 5"
     if brand and not title.lower().startswith(brand.lower()):
         parts.append(brand)
     parts.append(title)
-
     if variant.title:
         parts.append(variant.title)
-    # Mağaza adları ekle → Google kategori yerine ürün sayfalarını önceliklendirir
-    parts.append("trendyol hepsiburada")
     return " ".join(parts)
+
+
+def _build_search_queries(product: Product, variant: ProductVariant) -> list[str]:
+    """
+    Farklı mağaza grupları için arama sorguları döner.
+    İki geçiş: büyük marketler + teknik mağazalar.
+    """
+    base = _base_query(product, variant)
+    return [
+        f"{base} trendyol hepsiburada amazon",
+        f"{base} mediamarkt teknosa vatan",
+    ]
 
 
 async def _scrape_candidate(url: str):
@@ -159,17 +161,28 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
     Tek bir variant için Google araması yapar ve eşleşen store'ları kaydeder.
     Returns: {"found": int, "new": int}
     """
-    query = _build_search_query(product, variant)
+    queries = _build_search_queries(product, variant)
     limit = settings.crawler_results_per_store
 
-    try:
-        search_results = await _google.search(query, limit=limit)
-    except Exception as e:
-        print(f"[crawler] Google arama hatası ({query}): {e}")
-        return {"found": 0, "new": 0}
+    search_results = []
+    for query in queries:
+        try:
+            results = await _google.search(query, limit=limit)
+            search_results.extend(results)
+        except Exception as e:
+            print(f"[crawler] Google arama hatası ({query}): {e}")
+
+    # URL tekrarlarını temizle
+    seen_urls: set[str] = set()
+    unique_results = []
+    for r in search_results:
+        if r.url not in seen_urls:
+            seen_urls.add(r.url)
+            unique_results.append(r)
+    search_results = unique_results
 
     if not search_results:
-        print(f"[crawler] Sonuç yok: {query}")
+        print(f"[crawler] Sonuç yok: {queries[0]}")
         return {"found": 0, "new": 0}
 
     stats = {"found": 0, "new": 0}
@@ -185,6 +198,8 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
             # 1. Scrape et
             scraped = await _scrape_candidate(result.url)
             if not scraped or not scraped.current_price or scraped.current_price <= 0:
+                continue
+            if not scraped.in_stock:
                 continue
 
             # 2. Catalog matcher — bu ürün doğru mu?
