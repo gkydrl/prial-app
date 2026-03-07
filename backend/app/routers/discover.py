@@ -90,11 +90,35 @@ async def get_all_products(
 
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(db: AsyncSession = Depends(get_db)):
-    """Tüm üst kategoriler ve alt kategorileri."""
-    result = await db.execute(
-        select(Category).where(Category.parent_id.is_(None))
+    """Tüm üst kategoriler — ürün sayısı ile birlikte (aktif mağazası olanlar)."""
+    # Her kategori için aktif mağazası+fiyatı olan ürün sayısı
+    store_exists = (
+        exists()
+        .where(
+            ProductStore.product_id == Product.id,
+            ProductStore.is_active == True,
+            ProductStore.current_price > 0,
+        )
     )
-    return result.scalars().all()
+    count_subq = (
+        select(func.count(Product.id))
+        .where(Product.category_id == Category.id, store_exists)
+        .correlate(Category)
+        .scalar_subquery()
+    )
+
+    result = await db.execute(
+        select(Category, count_subq.label("product_count"))
+        .where(Category.parent_id.is_(None))
+    )
+
+    categories = []
+    for row in result.all():
+        cat = row[0]
+        cat.product_count = row[1] or 0
+        categories.append(cat)
+
+    return categories
 
 
 @router.get("/categories/{slug}/products", response_model=list[ProductResponse])
@@ -115,13 +139,9 @@ async def get_category_products(
     if not category:
         raise HTTPException(status_code=404, detail="Kategori bulunamadı")
 
-    has_store = _has_store_subquery()
-    # Mağazası olanlar (0) önce, olmayanlar (1) sonra
-    has_store_rank = case((has_store, 0), else_=1)
-
     query = (
         select(Product)
-        .where(Product.category_id == category.id)
+        .where(Product.category_id == category.id, _has_store_subquery())
         .options(
             selectinload(Product.variants).selectinload(ProductVariant.stores),
             selectinload(Product.stores),
@@ -129,11 +149,11 @@ async def get_category_products(
     )
 
     if sort_by == "price_asc":
-        query = query.order_by(has_store_rank, Product.lowest_price_ever.asc().nulls_last())
+        query = query.order_by(Product.lowest_price_ever.asc().nulls_last())
     elif sort_by == "price_desc":
-        query = query.order_by(has_store_rank, Product.lowest_price_ever.desc().nulls_last())
+        query = query.order_by(Product.lowest_price_ever.desc().nulls_last())
     else:
-        query = query.order_by(has_store_rank, desc(Product.alarm_count), desc(Product.lowest_price_ever))
+        query = query.order_by(desc(Product.alarm_count), desc(Product.lowest_price_ever))
 
     offset = (page - 1) * page_size
     result = await db.execute(query.offset(offset).limit(page_size))

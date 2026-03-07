@@ -25,8 +25,7 @@ function fmt(price: number): string {
 }
 
 function sliderStep(p: number): number {
-  if (p >= 50_000) return 5000;
-  if (p >= 10_000) return 500;
+  if (p >= 50_000) return 1000;
   if (p >= 1_000) return 100;
   return 50;
 }

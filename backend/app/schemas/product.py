@@ -74,6 +74,7 @@ class CategoryResponse(BaseModel):
     name: str
     slug: str
     image_url: str | None
+    product_count: int = 0
     children: list["CategoryResponse"] = []
 
     model_config = {"from_attributes": True}

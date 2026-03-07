@@ -27,9 +27,11 @@ const CARD = '#1E293B';
 function AlarmListCard({
   alarm,
   onToggle,
+  onPress,
 }: {
   alarm: AlarmResponse;
   onToggle: () => void;
+  onPress: () => void;
 }) {
   const product = alarm.product;
   const store = alarm.product_store;
@@ -52,7 +54,9 @@ function AlarmListCard({
   const isActive = alarm.status === 'active';
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
       style={{
         backgroundColor: CARD,
         borderRadius: 16,
@@ -63,14 +67,12 @@ function AlarmListCard({
       }}
     >
       {/* Ürün görseli */}
-      <TouchableOpacity activeOpacity={0.85} onPress={() => router.push(`/product/${product.id}`)}>
-        <Image
-          source={imageSource(product.image_url)}
-          style={{ width: 70, height: 70, borderRadius: 12 }}
-          contentFit="cover"
-          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-        />
-      </TouchableOpacity>
+      <Image
+        source={imageSource(product.image_url)}
+        style={{ width: 70, height: 70, borderRadius: 12 }}
+        contentFit="cover"
+        placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+      />
 
       {/* İçerik */}
       <View style={{ flex: 1, gap: 6 }}>
@@ -115,7 +117,7 @@ function AlarmListCard({
           />
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -340,6 +342,17 @@ export default function AlarmsScreen() {
                 <AlarmListCard
                   alarm={alarm}
                   onToggle={() => handleToggle(alarm)}
+                  onPress={() => {
+                    const store = alarm.product_store;
+                    const price = store?.current_price != null ? Number(store.current_price) : null;
+                    openAlarmSheet({
+                      productId: alarm.product.id,
+                      storeUrl: store?.url ?? null,
+                      currentPrice: price,
+                      existingAlarmId: alarm.id,
+                      existingTargetPrice: alarm.target_price,
+                    });
+                  }}
                 />
               </Swipeable>
             ))}

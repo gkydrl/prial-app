@@ -42,7 +42,33 @@ const SIDE_IMAGE_H = 76;
 const fmtPrice = (price: number | null) =>
   price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
 
-const CATEGORIES: { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
+// Slug → icon eşleştirmesi
+const CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  'akilli-telefon': 'phone-portrait',
+  'laptop': 'laptop',
+  'tablet': 'tablet-portrait',
+  'televizyon': 'tv',
+  'kulaklik-ses': 'headset',
+  'akilli-saat': 'watch',
+  'fotograf-makinesi': 'camera',
+  'oyun-gaming': 'game-controller',
+  'bilgisayar-bilesenleri': 'desktop',
+  'akilli-ev': 'home',
+  'spor-fitness': 'barbell',
+  'mobilya-ofis': 'bed',
+  'sneaker': 'footsteps',
+  'outdoor-mont': 'rainy',
+  'canta-aksesuar': 'bag',
+  'kol-saati': 'time',
+  'premium-giyim': 'shirt',
+  'e-mobilite': 'bicycle',
+  'bebek-cocuk': 'happy',
+  'el-aletleri': 'hammer',
+};
+
+type CategoryItem = { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] };
+
+const FALLBACK_CATEGORIES: CategoryItem[] = [
   { label: 'Tümü',       slug: null,                    icon: 'apps' },
   { label: 'Telefon',    slug: 'akilli-telefon',         icon: 'phone-portrait' },
   { label: 'Laptop',     slug: 'laptop',                 icon: 'laptop' },
@@ -431,9 +457,29 @@ export default function DiscoverScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState<CategoryItem[]>(FALLBACK_CATEGORIES);
 
   const productGroups = useMemo(() => groupProducts(products, FEATURED_INTERVAL), [products]);
   const fadeStyle = useFadeIn();
+
+  // Kategorileri API'den çek — product_count varsa sadece ürünü olanları göster
+  useEffect(() => {
+    client.get(ENDPOINTS.DISCOVER_CATEGORIES)
+      .then((res) => {
+        const all: CategoryItem[] = [{ label: 'Tümü', slug: null, icon: 'apps' }];
+        for (const cat of res.data) {
+          // product_count alanı varsa filtrele, yoksa tümünü göster
+          if (cat.product_count !== undefined && cat.product_count === 0) continue;
+          all.push({
+            label: cat.name,
+            slug: cat.slug,
+            icon: CATEGORY_ICONS[cat.slug] ?? 'pricetag',
+          });
+        }
+        if (all.length > 1) setCategories(all);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchProducts = useCallback(async (q: string, category: string | null) => {
     setIsLoading(true);
@@ -531,7 +577,7 @@ export default function DiscoverScreen() {
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 4, gap: 8 }}
       >
-        {CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const isActive = selectedCategory === cat.slug;
           return (
             <TouchableOpacity
