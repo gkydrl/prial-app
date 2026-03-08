@@ -68,6 +68,9 @@ def _is_product_url(url: str) -> bool:
     # Kategori/liste sayfası pattern'leri atla
     for keyword in _SKIP_PATH_KEYWORDS:
         if keyword in url_lower:
+            # Trendyol-specific pattern'ler sadece trendyol URL'lerinde geçerli
+            if keyword in ("-x-c", "-x-b", "-g2-c") and "trendyol.com" not in url_lower:
+                continue
             return False
 
     # Skip domain/path filtresine takılmadıysa kabul et.
