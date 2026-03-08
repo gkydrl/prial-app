@@ -247,6 +247,95 @@ async def test_crawl_one(
     }
 
 
+# ─── Search & Scrape Debug Endpoint ──────────────────────────────────────────
+
+
+@router.post("/crawl/debug-search")
+async def debug_search(
+    query: str = "Tommy Hilfiger Polo Tişört",
+    _: None = Depends(require_admin),
+):
+    """Her search provider'ı ve scraper'ı ayrı ayrı test eder."""
+    import time, io, contextlib
+
+    from app.services.store_search.trendyol_search import TrendyolSearcher
+    from app.services.store_search.hepsiburada_search import HepsiburadaSearcher
+    from app.services.store_search.google_search import GoogleSearcher
+    from app.services.scraper.dispatcher import scrape_url
+
+    results = {}
+
+    # 1. Trendyol Search
+    t0 = time.time()
+    try:
+        ts = TrendyolSearcher()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            tr_results = await ts.search(query, limit=3)
+        results["trendyol_search"] = {
+            "count": len(tr_results),
+            "results": [{"title": r.title[:60], "url": r.url[:100]} for r in tr_results],
+            "logs": buf.getvalue().splitlines(),
+            "elapsed_s": round(time.time() - t0, 1),
+        }
+    except Exception as e:
+        results["trendyol_search"] = {"error": str(e), "elapsed_s": round(time.time() - t0, 1)}
+
+    # 2. Hepsiburada Search
+    t0 = time.time()
+    try:
+        hs = HepsiburadaSearcher()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            hb_results = await hs.search(query, limit=3)
+        results["hepsiburada_search"] = {
+            "count": len(hb_results),
+            "results": [{"title": r.title[:60], "url": r.url[:100]} for r in hb_results],
+            "logs": buf.getvalue().splitlines(),
+            "elapsed_s": round(time.time() - t0, 1),
+        }
+    except Exception as e:
+        results["hepsiburada_search"] = {"error": str(e), "elapsed_s": round(time.time() - t0, 1)}
+
+    # 3. Google Search
+    t0 = time.time()
+    try:
+        gs = GoogleSearcher()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            g_results = await gs.search(f"{query} satın al fiyat", limit=3)
+        results["google_search"] = {
+            "count": len(g_results),
+            "results": [{"title": r.title[:60], "url": r.url[:100], "store": r.store} for r in g_results],
+            "logs": buf.getvalue().splitlines(),
+            "elapsed_s": round(time.time() - t0, 1),
+        }
+    except Exception as e:
+        results["google_search"] = {"error": str(e), "elapsed_s": round(time.time() - t0, 1)}
+
+    # 4. İlk Google sonucunu scrape et
+    if results.get("google_search", {}).get("count", 0) > 0:
+        test_url = g_results[0].url
+        t0 = time.time()
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                scraped = await scrape_url(test_url)
+            results["scrape_test"] = {
+                "url": test_url,
+                "title": scraped.title[:80],
+                "price": str(scraped.current_price),
+                "in_stock": scraped.in_stock,
+                "store": scraped.store,
+                "logs": buf.getvalue().splitlines(),
+                "elapsed_s": round(time.time() - t0, 1),
+            }
+        except Exception as e:
+            results["scrape_test"] = {"url": test_url, "error": str(e), "elapsed_s": round(time.time() - t0, 1)}
+
+    return results
+
+
 # ─── Push Notification Test Endpoints ────────────────────────────────────────
 
 
