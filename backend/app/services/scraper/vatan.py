@@ -7,7 +7,7 @@ import json
 import html as html_module
 from decimal import Decimal
 import httpx
-from app.services.scraper.base import BaseScraper, ScrapedProduct
+from app.services.scraper.base import BaseScraper, ScrapedProduct, scraper_api_url
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -24,15 +24,26 @@ class VatanScraper(BaseScraper):
         return "vatanbilgisayar.com" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
-        async with httpx.AsyncClient(timeout=20, headers=_HEADERS, follow_redirects=True) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-
-        html_text = resp.text
+        html_text = await self._fetch(url)
         product = self._parse_ld_json(html_text)
         if product:
             return self._from_ld_json(url, product)
         return self._from_regex(url, html_text)
+
+    async def _fetch(self, url: str) -> str:
+        """Direkt dene, 403 → ScraperAPI fallback."""
+        try:
+            async with httpx.AsyncClient(timeout=20, headers=_HEADERS, follow_redirects=True) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200 and len(resp.text) > 1000:
+                    return resp.text
+        except Exception:
+            pass
+        proxy = scraper_api_url(url, render=False)
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.get(proxy)
+            resp.raise_for_status()
+            return resp.text
 
     def _parse_ld_json(self, html_text: str) -> dict | None:
         matches = re.findall(

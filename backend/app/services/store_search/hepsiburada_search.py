@@ -54,11 +54,13 @@ class HepsiburadaSearcher(BaseSearcher):
 
         results = self._parse_results(html, limit)
         if not results:
-            # Debug: HTML'de ne var?
-            import re
-            card_count = len(re.findall(r'product-card', html, re.I))
-            li_count = len(re.findall(r'<li[^>]*class', html))
-            print(f"[hepsiburada_search] Parse 0 sonuç — 'product-card' x{card_count}, <li> x{li_count}", flush=True)
+            # CSS selector eşleşmedi — regex fallback dene
+            results = self._parse_results_regex(html, limit)
+            if not results:
+                import re
+                card_count = len(re.findall(r'product-card', html, re.I))
+                link_count = len(re.findall(r'hepsiburada\.com/[^"]*-p-', html))
+                print(f"[hepsiburada_search] Parse 0 sonuç — 'product-card' x{card_count}, product links x{link_count}", flush=True)
         return results
 
     def _parse_results(self, html: str, limit: int) -> list[SearchResult]:
@@ -120,6 +122,38 @@ class HepsiburadaSearcher(BaseSearcher):
             except Exception:
                 continue
 
+        return results
+
+    def _parse_results_regex(self, html: str, limit: int) -> list[SearchResult]:
+        """CSS selector'lar eşleşmezse regex ile ürün linklerini çıkarır."""
+        import re
+        # Hepsiburada ürün URL pattern'i: /urun-adi-p-HBCV000XXXX
+        urls = re.findall(r'https?://www\.hepsiburada\.com/[^"]*?-p-[A-Z0-9]+', html)
+        seen = set()
+        results = []
+        for url in urls:
+            # Temizle (fragment, query kaldır)
+            clean = url.split("?")[0].split("#")[0]
+            if clean in seen:
+                continue
+            seen.add(clean)
+
+            # URL'den title çıkar: /urun-adi-uzun-p-HBC... → "urun adi uzun"
+            m = re.search(r'hepsiburada\.com/(.+?)-p-', clean)
+            title = m.group(1).replace("-", " ").title() if m else ""
+
+            results.append(SearchResult(
+                title=title,
+                url=clean,
+                store=self.store_name,
+                price=Decimal("0"),
+                store_product_id=self._extract_product_id(clean),
+            ))
+            if len(results) >= limit:
+                break
+
+        if results:
+            print(f"[hepsiburada_search] Regex fallback: {len(results)} ürün", flush=True)
         return results
 
     def _parse_price(self, text: str) -> Decimal:
