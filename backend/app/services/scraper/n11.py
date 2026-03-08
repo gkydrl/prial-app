@@ -1,11 +1,11 @@
 """
-N11 scraper — direkt HTTP, LLM/ScraperAPI gerekmez.
+N11 scraper — direkt HTTP, ScraperAPI fallback.
 Fiyat inline JS objesinden regex ile çekilir (ld+json Product yok).
 """
 import re
 from decimal import Decimal
 import httpx
-from app.services.scraper.base import BaseScraper, ScrapedProduct
+from app.services.scraper.base import BaseScraper, ScrapedProduct, scraper_api_url
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -22,11 +22,26 @@ class N11Scraper(BaseScraper):
         return "n11.com" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
-        async with httpx.AsyncClient(timeout=20, headers=_HEADERS, follow_redirects=True) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
+        html = await self._fetch(url)
+        return self._parse(url, html)
 
-        html = resp.text
+    async def _fetch(self, url: str) -> str:
+        """Direkt dene, 403/hata → ScraperAPI fallback."""
+        try:
+            async with httpx.AsyncClient(timeout=20, headers=_HEADERS, follow_redirects=True) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200 and len(resp.text) > 1000:
+                    return resp.text
+        except Exception:
+            pass
+        # ScraperAPI fallback
+        proxy = scraper_api_url(url, render=True)
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(proxy)
+            resp.raise_for_status()
+            return resp.text
+
+    def _parse(self, url: str, html: str) -> ScrapedProduct:
 
         # Title — <h1>
         title = ""
