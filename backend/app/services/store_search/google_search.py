@@ -63,12 +63,9 @@ def _is_product_url(url: str) -> bool:
         if keyword in url_lower:
             return False
 
-    # En az bir ürün pattern'i eşleşmeli
-    for pattern in _PRODUCT_URL_PATTERNS:
-        if pattern.search(url):
-            return True
-
-    return False
+    # Skip domain/path filtresine takılmadıysa kabul et.
+    # Scraper zaten fiyat bulamazsa eşleşmez, matcher da yanlış ürünleri reddeder.
+    return True
 
 
 class GoogleSearcher(BaseSearcher):
