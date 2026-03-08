@@ -8,6 +8,9 @@ from app.services.scraper.base import BaseScraper, ScrapedProduct
 from app.services.scraper.trendyol import TrendyolScraper
 from app.services.scraper.hepsiburada import HepsiburadaScraper
 from app.services.scraper.amazon import AmazonScraper
+from app.services.scraper.n11 import N11Scraper
+from app.services.scraper.mediamarkt import MediaMarktScraper
+from app.services.scraper.vatan import VatanScraper
 from app.services.scraper.universal_scraper import UniversalScraper
 
 # Bilinen siteler — sırayla denenir
@@ -15,6 +18,9 @@ SCRAPERS: list[BaseScraper] = [
     TrendyolScraper(),
     HepsiburadaScraper(),
     AmazonScraper(),
+    N11Scraper(),
+    MediaMarktScraper(),
+    VatanScraper(),
 ]
 
 _universal = UniversalScraper()

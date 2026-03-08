@@ -5,11 +5,11 @@ ProductVariant ile eşleşip eşleşmediğini belirler.
 Adım 1 — Regex/attribute karşılaştırma (hızlı, ücretsiz)
   • Brand kontrolü
   • Çıkarılan özellikler (storage, ram, color) karşılaştırması
-  → Kesin eşleşme veya kesin red: LLM'e gerek kalmaz.
+  → Kesin eşleşme veya kesin red.
   → Belirsiz durum: Adım 2'ye geç.
 
-Adım 2 — LLM doğrulaması (Claude Haiku, ~$0.0001/istek)
-  • Sadece belirsiz durumlarda çağrılır.
+Adım 2 — Fuzzy title karşılaştırma (Jaccard benzerliği)
+  • LLM kullanmaz, kelime bazlı benzerlik hesaplar.
 """
 from __future__ import annotations
 
@@ -103,42 +103,40 @@ async def is_match(
                 return False
         return True
 
-    # 3. Belirsiz durum → LLM
-    return await _llm_confirm(
+    # 3. Belirsiz durum → fuzzy title karşılaştırma (LLM yerine)
+    return _fuzzy_title_match(
         catalog_label=f"{product_brand or ''} {product_title} {variant_title or ''}".strip(),
         scraped_title=scraped_title,
     )
 
 
-async def _llm_confirm(catalog_label: str, scraped_title: str) -> bool:
-    """Claude Haiku ile iki ürün başlığının aynı ürünü temsil edip etmediğini sorar."""
-    try:
-        import anthropic
-        from app.config import settings
+def _normalize(text: str) -> set[str]:
+    """Başlığı küçük harfe çevirip anlamlı kelimelere böler."""
+    import re
+    text = text.lower()
+    # Parantez içindekiler dahil tüm kelimeleri al
+    words = re.findall(r'[a-zçğıöşü0-9]+', text)
+    # Çok kısa / anlamsız kelimeleri at
+    stop = {"ve", "ile", "icin", "için", "the", "and", "for", "with", "in", "de", "da"}
+    return {w for w in words if len(w) > 1 and w not in stop}
 
-        if not settings.anthropic_api_key:
-            # API key yoksa belirsiz durumda False döner (güvenli taraf)
-            return False
 
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+def _fuzzy_title_match(catalog_label: str, scraped_title: str) -> bool:
+    """
+    İki ürün başlığı arasında kelime bazlı Jaccard benzerliği hesaplar.
+    Eşik: %40 — belirsiz durumlarda makul eşleşme için yeterli.
+    """
+    cat_words = _normalize(catalog_label)
+    scr_words = _normalize(scraped_title)
 
-        prompt = (
-            f"Aşağıdaki iki ürün aynı fiziksel ürün mü? Sadece EVET veya HAYIR yaz.\n\n"
-            f"Katalog: {catalog_label}\n"
-            f"Site ürünü: {scraped_title}"
-        )
-
-        message = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=5,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        answer = message.content[0].text.strip().upper()
-        return answer.startswith("EVET")
-
-    except Exception as e:
-        print(f"[catalog_matcher] LLM hatası: {e}")
+    if not cat_words or not scr_words:
         return False
+
+    intersection = cat_words & scr_words
+    union = cat_words | scr_words
+
+    similarity = len(intersection) / len(union)
+    return similarity >= 0.40
 
 
 async def find_best_match(
