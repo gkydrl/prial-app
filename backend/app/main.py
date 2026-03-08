@@ -42,11 +42,11 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # Günlük özet bildirimi — her gün 09:00
+    # Günlük özet bildirimi — her gün 10:00
     scheduler.add_job(
         send_daily_summaries,
         trigger="cron",
-        hour=9,
+        hour=10,
         minute=0,
         id="daily_summary",
         replace_existing=True,
