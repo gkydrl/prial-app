@@ -17,18 +17,27 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.prial.app",
+      "buildNumber": "1",
+      "deploymentTarget": "16.0",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserNotificationsUsageDescription": "Fiyat düşüşlerinde ve talep güncellemelerinde bildirim almak için"
       }
     },
     "android": {
       "package": "com.prial.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#6C47FF"
+        "backgroundColor": "#0A1628"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED"]
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -57,8 +66,10 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id"
-      }
-    }
+        "projectId": "2fbd9598-9d82-46af-b1d5-fbb5a8d8c4c9"
+      },
+      "router": {}
+    },
+    "owner": "gkydrl"
   }
 }
