@@ -154,17 +154,14 @@ async def debug_config(_: None = Depends(require_admin)):
 
 @router.post("/crawl/trigger")
 async def trigger_crawl(
-    background_tasks: BackgroundTasks,
     new_only: bool = False,
     _: None = Depends(require_admin),
 ):
     """Katalog crawler'ını manuel tetikler. new_only=true → sadece mağazasız variant'ları işler."""
+    import asyncio
     from app.services.catalog_crawler import crawl_all_variants
 
-    async def _run():
-        await crawl_all_variants(new_only=new_only)
-
-    background_tasks.add_task(_run)
+    asyncio.create_task(crawl_all_variants(new_only=new_only))
     mode = "sadece yeni variant'lar" if new_only else "tüm variant'lar"
     return {"message": f"Crawler başlatıldı ({mode}, arka planda çalışıyor)"}
 
