@@ -17,8 +17,12 @@ from app.services.notification_service import notify_daily_summary, notify_weekl
 
 
 async def send_daily_summaries() -> None:
-    """Her gun 09:00 — takip edilen urunlerdeki son 24 saatteki fiyat dususlerini ozetle."""
+    """Her gun 10:00 — takip edilen urunlerdeki son 24 saatteki fiyat dususlerini ozetle.
+    Pazartesi gunleri calistirilmaz (haftalik ozet gider)."""
     now = datetime.now(timezone.utc)
+    if now.weekday() == 0:  # 0 = Pazartesi
+        print("[daily_summary] Pazartesi — haftalik ozet gidecek, gunluk atlanıyor.")
+        return
     cutoff = now - timedelta(hours=24)
 
     async with AsyncSessionLocal() as db:
