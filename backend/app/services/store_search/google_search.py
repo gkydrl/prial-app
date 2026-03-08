@@ -102,11 +102,16 @@ class GoogleSearcher(BaseSearcher):
             return []
 
         organic = data.get("organic_results", [])
+        if not organic:
+            print(f"[google_search] organic_results boş, keys: {list(data.keys())[:10]}", flush=True)
         results: list[SearchResult] = []
 
         for item in organic:
             url = item.get("link", "")
-            if not url or not _is_product_url(url):
+            if not url:
+                continue
+            if not _is_product_url(url):
+                print(f"[google_search] Filtre: {url[:80]}", flush=True)
                 continue
 
             title = item.get("title", "").strip()

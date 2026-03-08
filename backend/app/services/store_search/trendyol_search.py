@@ -71,13 +71,14 @@ class TrendyolSearcher(BaseSearcher):
     async def _fetch_proxy(self, target: str, query: str) -> dict | None:
         proxy_url = scraper_api_url(target, render=False)
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=45) as client:
                 resp = await client.get(proxy_url)
                 if resp.status_code != 200:
+                    print(f"[trendyol_search] Proxy HTTP {resp.status_code} ({query})", flush=True)
                     return None
                 return resp.json()
         except Exception as e:
-            print(f"[trendyol_search] Proxy hata ({query}): {e}")
+            print(f"[trendyol_search] Proxy hata ({query}): {type(e).__name__}: {e}", flush=True)
             return None
 
     def _parse_results(self, data: dict, limit: int) -> list[SearchResult]:
