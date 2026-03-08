@@ -5,11 +5,11 @@ Akış:
   1. Her ProductVariant için paralel arama yap:
      - Trendyol → TrendyolSearcher (internal API, 1 kredi)
      - Hepsiburada → HepsiburadaSearcher (render, ~5 kredi)
-     - Küçük mağazalar → GoogleSearcher (25 kredi, tek sorgu)
+     - Diğer mağazalar → GoogleSearcher (25 kredi, tek sorgu)
   2. Gelen URL'leri teker teker scrape et
-     - Trendyol/Hepsiburada → özel scraper (hızlı, güvenilir)
-     - Diğer siteler → UniversalScraper (LLM tabanlı)
-  3. Catalog matcher ile doğrula (regex → LLM)
+     - Trendyol/Hepsiburada/N11/MediaMarkt/Vatan → özel scraper
+     - Diğer siteler → UniversalScraper (ld+json/meta tags)
+  3. Catalog matcher ile doğrula (regex → fuzzy → LLM son çare)
   4. Eşleşirse ProductStore oluştur / güncelle
 
 Scheduler: her gün 03:00'da çalışır (main.py).
@@ -61,9 +61,9 @@ def _base_query(product: Product, variant: ProductVariant) -> str:
 
 
 def _google_query(product: Product, variant: ProductVariant) -> str:
-    """Küçük mağazalar için Google arama sorgusu."""
+    """Tüm mağazalar için Google arama sorgusu."""
     base = _base_query(product, variant)
-    return f"{base} mediamarkt teknosa vatan amazon n11"
+    return f"{base} satın al fiyat"
 
 
 async def _scrape_candidate(url: str):
