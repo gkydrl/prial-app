@@ -33,6 +33,9 @@ _SKIP_DOMAINS = {
     "cimri.com",        # Fiyat karşılaştırma
     "incehesap.com",    # Fiyat karşılaştırma
     "fiyatlar.com",     # Fiyat karşılaştırma
+    "epey.com",         # Fiyat karşılaştırma
+    "yandex.com.tr",    # Fiyat karşılaştırma (market)
+    "pricena.com",      # Fiyat karşılaştırma
     "sahibinden.com",   # İkinci el
     "letgo.com",        # İkinci el
     "apple.com",        # Marka sitesi (ürün sayfası ama mağaza değil)
