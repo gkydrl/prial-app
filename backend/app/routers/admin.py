@@ -3,13 +3,15 @@ Admin endpoints — ürün kataloğu yönetimi.
 X-Admin-Key header ile korunur.
 """
 import uuid
+from decimal import Decimal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.config import settings
 from app.database import get_db
-from app.models.product import Product, ProductVariant
+from app.models.product import Product, ProductStore, ProductVariant
+from app.models.user import User
 from app.models.category import Category
 from app.schemas.admin import AdminProductCreate, AdminProductResponse
 
@@ -165,3 +167,201 @@ async def trigger_crawl(
     background_tasks.add_task(_run)
     mode = "sadece yeni variant'lar" if new_only else "tüm variant'lar"
     return {"message": f"Crawler başlatıldı ({mode}, arka planda çalışıyor)"}
+
+
+# ─── Push Notification Test Endpoints ────────────────────────────────────────
+
+
+@router.post("/test-notifications/target-reached")
+async def test_target_reached(
+    user_email: str,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Senaryo 1: Hedef fiyata ulaşıldı bildirimi test eder."""
+    from app.services.notification_service import _send_push
+    from app.models.notification import NotificationCategory
+
+    user = await _get_test_user(db, user_email)
+    await _send_push(
+        user=user,
+        title="Hedef fiyata ulasildi! Test Urun",
+        body="Hedef fiyat 2.500 TL'ye ulasildi! Su an: 2.399 TL",
+        category=NotificationCategory.TARGET_REACHED,
+        data={"test": "true"},
+        db=db,
+    )
+    await db.commit()
+    return {"status": "sent", "scenario": "target_reached"}
+
+
+@router.post("/test-notifications/price-drop")
+async def test_price_drop(
+    user_email: str,
+    drop_percent: int = 15,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Senaryo 2/3: Fiyat düşüşü bildirimi test eder."""
+    from app.services.notification_service import _send_push
+    from app.models.notification import NotificationCategory
+
+    user = await _get_test_user(db, user_email)
+    display_pct = 20 if drop_percent >= 20 else 10
+    await _send_push(
+        user=user,
+        title=f"%{display_pct} fiyat dususu! Test Urun",
+        body=f"Fiyat %{display_pct} dustu, su an 1.899 TL",
+        category=NotificationCategory.PRICE_DROP,
+        data={"test": "true"},
+        db=db,
+    )
+    await db.commit()
+    return {"status": "sent", "scenario": "price_drop", "percent": display_pct}
+
+
+@router.post("/test-notifications/milestone")
+async def test_milestone(
+    user_email: str,
+    milestone: int = 100,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Senaryo 4: Topluluk milestone bildirimi test eder."""
+    from app.services.notification_service import _send_push
+    from app.models.notification import NotificationCategory
+
+    user = await _get_test_user(db, user_email)
+    await _send_push(
+        user=user,
+        title=f"{milestone:,} kisi takip ediyor!".replace(",", "."),
+        body=f"Test Urun artik {milestone:,} kisi tarafindan takip ediliyor".replace(",", "."),
+        category=NotificationCategory.MILESTONE,
+        data={"test": "true"},
+        db=db,
+    )
+    await db.commit()
+    return {"status": "sent", "scenario": "milestone", "count": milestone}
+
+
+@router.post("/test-notifications/daily-summary")
+async def test_daily_summary(
+    user_email: str,
+    drop_count: int = 3,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Senaryo 5: Günlük özet bildirimi test eder."""
+    from app.services.notification_service import notify_daily_summary
+
+    user = await _get_test_user(db, user_email)
+    await notify_daily_summary(user=user, drop_count=drop_count, db=db)
+    await db.commit()
+    return {"status": "sent", "scenario": "daily_summary", "drop_count": drop_count}
+
+
+@router.post("/test-notifications/weekly-summary")
+async def test_weekly_summary(
+    user_email: str,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Senaryo 6: Haftalık özet bildirimi test eder."""
+    from app.services.notification_service import notify_weekly_summary
+
+    user = await _get_test_user(db, user_email)
+    await notify_weekly_summary(
+        user=user,
+        top_product_name="iPhone 16 Pro Max 256GB",
+        drop_percent=18,
+        db=db,
+    )
+    await db.commit()
+    return {"status": "sent", "scenario": "weekly_summary"}
+
+
+@router.post("/test-notifications/all")
+async def test_all_notifications(
+    user_email: str,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Tüm 6 senaryoyu sırayla test eder."""
+    from app.services.notification_service import (
+        _send_push, notify_daily_summary, notify_weekly_summary,
+    )
+    from app.models.notification import NotificationCategory
+
+    user = await _get_test_user(db, user_email)
+    results = []
+
+    # 1. Target reached
+    await _send_push(
+        user=user,
+        title="Hedef fiyata ulasildi! iPhone 16 Pro",
+        body="Hedef fiyat 45.000 TL'ye ulasildi! Su an: 44.799 TL",
+        category=NotificationCategory.TARGET_REACHED,
+        data={"test": "true"},
+        db=db,
+    )
+    results.append("target_reached")
+
+    # 2. Price drop %10
+    await _send_push(
+        user=user,
+        title="%10 fiyat dususu! AirPods Pro 2",
+        body="Fiyat %10 dustu, su an 6.299 TL",
+        category=NotificationCategory.PRICE_DROP,
+        data={"test": "true"},
+        db=db,
+    )
+    results.append("price_drop_10")
+
+    # 3. Price drop %20
+    await _send_push(
+        user=user,
+        title="%20 fiyat dususu! Samsung Galaxy S24",
+        body="Fiyat %20 dustu, su an 29.999 TL",
+        category=NotificationCategory.PRICE_DROP,
+        data={"test": "true"},
+        db=db,
+    )
+    results.append("price_drop_20")
+
+    # 4. Milestone
+    await _send_push(
+        user=user,
+        title="500 kisi takip ediyor!",
+        body="MacBook Air M3 artik 500 kisi tarafindan takip ediliyor",
+        category=NotificationCategory.MILESTONE,
+        data={"test": "true"},
+        db=db,
+    )
+    results.append("milestone")
+
+    # 5. Daily summary
+    await notify_daily_summary(user=user, drop_count=5, db=db)
+    results.append("daily_summary")
+
+    # 6. Weekly summary
+    await notify_weekly_summary(
+        user=user,
+        top_product_name="iPad Air M2 256GB",
+        drop_percent=22,
+        db=db,
+    )
+    results.append("weekly_summary")
+
+    await db.commit()
+    return {"status": "all_sent", "scenarios": results}
+
+
+async def _get_test_user(db: AsyncSession, email: str) -> User:
+    """E-posta ile kullanıcıyı bulur, yoksa 404 döner."""
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Kullanıcı bulunamadı: {email}")
+    if not user.firebase_token:
+        raise HTTPException(status_code=400, detail="Kullanıcının push token'ı yok")
+    return user

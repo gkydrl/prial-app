@@ -18,6 +18,14 @@ class NotificationStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class NotificationCategory(str, enum.Enum):
+    TARGET_REACHED = "target_reached"
+    PRICE_DROP = "price_drop"
+    MILESTONE = "milestone"
+    DAILY_SUMMARY = "daily_summary"
+    WEEKLY_SUMMARY = "weekly_summary"
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 
@@ -30,8 +38,14 @@ class Notification(Base):
     alarm_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("alarms.id", ondelete="SET NULL"), nullable=True
     )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     type: Mapped[NotificationType] = mapped_column(
         Enum(NotificationType, name="notification_type_enum"), nullable=False
+    )
+    category: Mapped[NotificationCategory | None] = mapped_column(
+        Enum(NotificationCategory, name="notification_category_enum"), nullable=True, index=True
     )
     status: Mapped[NotificationStatus] = mapped_column(
         Enum(NotificationStatus, name="notification_status_enum"), default=NotificationStatus.PENDING

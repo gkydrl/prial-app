@@ -11,7 +11,10 @@ from app.models.product import Product, ProductStore, ProductVariant
 from app.schemas.alarm import AlarmCreate, AlarmResponse, AlarmUpdate
 from app.core.security import get_current_user
 from app.services.price_tracker import refresh_store_priority, next_check_delta
+from app.services.notification_service import notify_community_milestone
 from datetime import datetime, timezone
+
+MILESTONES = [100, 500, 1000, 5000]
 
 router = APIRouter(prefix="/alarms", tags=["alarms"])
 
@@ -75,6 +78,11 @@ async def create_alarm(
     )
     db.add(alarm)
     product.alarm_count += 1
+
+    # Milestone kontrolu — arka planda gonder
+    if product.alarm_count in MILESTONES:
+        import asyncio
+        asyncio.ensure_future(notify_community_milestone(product, product.alarm_count))
 
     # variant alarm_count güncelle
     if variant_id:

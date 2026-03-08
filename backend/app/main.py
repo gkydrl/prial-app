@@ -22,6 +22,7 @@ async def lifespan(app: FastAPI):
     # Her 15 dakikada çalışır; sadece next_check_at'i geçmiş store'ları işler.
     from app.services.price_tracker import check_due_prices
     from app.services.catalog_crawler import crawl_all_variants
+    from app.services.summary_service import send_daily_summaries, send_weekly_summaries
 
     scheduler.add_job(
         check_due_prices,
@@ -38,6 +39,27 @@ async def lifespan(app: FastAPI):
         hour=3,
         minute=0,
         id="catalog_crawl",
+        replace_existing=True,
+    )
+
+    # Günlük özet bildirimi — her gün 09:00
+    scheduler.add_job(
+        send_daily_summaries,
+        trigger="cron",
+        hour=9,
+        minute=0,
+        id="daily_summary",
+        replace_existing=True,
+    )
+
+    # Haftalık özet bildirimi — her Pazartesi 10:00
+    scheduler.add_job(
+        send_weekly_summaries,
+        trigger="cron",
+        day_of_week="mon",
+        hour=10,
+        minute=0,
+        id="weekly_summary",
         replace_existing=True,
     )
 

@@ -20,7 +20,7 @@ from app.models.product import ProductStore
 from app.models.price_history import PriceHistory
 from app.models.alarm import Alarm, AlarmStatus
 from app.services.scraper.dispatcher import scrape_url
-from app.services.notification_service import send_alarm_notifications
+from app.services.notification_service import send_alarm_notifications, notify_price_drop
 
 PRIORITY_INTERVALS = {
     1: timedelta(hours=2),   # HIGH  — aktif alarmı var
@@ -162,6 +162,14 @@ async def check_product_price(product_store_id) -> None:
             await db.flush()
             await _check_alarms(db, store, new_price)
 
+            # Fiyat dususu bildirimi (%10 / %20)
+            if old_price and old_price > 0 and new_price < old_price:
+                drop_pct = float((old_price - new_price) / old_price * 100)
+                if drop_pct >= 10:
+                    await _notify_price_drop_users(
+                        db, store, new_price, int(drop_pct)
+                    )
+
         await db.commit()
 
         if price_changed:
@@ -211,3 +219,48 @@ async def _check_alarms(
     if triggered_alarms:
         await db.flush()
         await send_alarm_notifications(triggered_alarms, store, new_price)
+
+
+async def _notify_price_drop_users(
+    db: AsyncSession,
+    store: ProductStore,
+    new_price: Decimal,
+    drop_percent: int,
+) -> None:
+    """Fiyat %10+ dustugunde bu urunu takip eden tum kullanicilara bildirim gonder."""
+    from app.models.user import User
+    from app.models.product import Product
+
+    product = await db.get(Product, store.product_id)
+    if not product:
+        return
+
+    # Bu urunu aktif olarak takip eden kullanicilari bul
+    result = await db.execute(
+        select(Alarm.user_id).where(
+            Alarm.product_id == store.product_id,
+            Alarm.status == AlarmStatus.ACTIVE,
+        ).distinct()
+    )
+    user_ids = [row[0] for row in result.all()]
+    if not user_ids:
+        return
+
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users = users_result.scalars().all()
+
+    # Gosterilecek dusus yuzdesi: %10 veya %20 (esik degerleri)
+    display_percent = 20 if drop_percent >= 20 else 10
+
+    for user in users:
+        try:
+            await notify_price_drop(
+                db=db,
+                user=user,
+                product=product,
+                store=store,
+                drop_percent=display_percent,
+                new_price=new_price,
+            )
+        except Exception as e:
+            print(f"[price_tracker] Price drop bildirim hatasi (user={user.id}): {e}")

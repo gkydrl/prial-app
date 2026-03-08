@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     # Firebase
     firebase_credentials_path: str = "firebase-credentials.json"
+    firebase_credentials_json: str = ""  # JSON içeriği (Railway env var)
 
     # Scraping
     scrape_interval_minutes: int = 30
