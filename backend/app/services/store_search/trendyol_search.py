@@ -1,6 +1,6 @@
 """
 Trendyol arama adaptörü.
-public.trendyol.com arama API'sini ScraperAPI proxy üzerinden kullanır.
+Önce direkt API dener (0 kredi), başarısız olursa ScraperAPI fallback (1 kredi).
 """
 from decimal import Decimal
 from urllib.parse import urlencode
@@ -9,6 +9,15 @@ import httpx
 
 from app.services.scraper.base import scraper_api_url
 from app.services.store_search.base import BaseSearcher, SearchResult
+
+# Direkt istek için browser-like header'lar
+_DIRECT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Referer": "https://www.trendyol.com/",
+    "Origin": "https://www.trendyol.com",
+}
 
 
 class TrendyolSearcher(BaseSearcher):
@@ -30,18 +39,44 @@ class TrendyolSearcher(BaseSearcher):
             "fixSlotProductAdsIncluded": "true",
         }
         target = self._SEARCH_API + "?" + urlencode(params)
-        proxy_url = scraper_api_url(target, render=False)
 
+        # 1) Direkt dene (0 kredi)
+        data = await self._fetch_direct(target, query)
+        # 2) Fallback: ScraperAPI (1 kredi)
+        if data is None:
+            data = await self._fetch_proxy(target, query)
+        if data is None:
+            return []
+
+        return self._parse_results(data, limit)
+
+    async def _fetch_direct(self, url: str, query: str) -> dict | None:
+        try:
+            async with httpx.AsyncClient(timeout=15, headers=_DIRECT_HEADERS) as client:
+                resp = await client.get(url)
+                if resp.status_code in (403, 429):
+                    print(f"[trendyol_search] Direkt bloklandı ({resp.status_code}), fallback'e geçiliyor")
+                    return None
+                if resp.status_code != 200:
+                    return None
+                return resp.json()
+        except Exception as e:
+            print(f"[trendyol_search] Direkt hata ({query}): {e}")
+            return None
+
+    async def _fetch_proxy(self, target: str, query: str) -> dict | None:
+        proxy_url = scraper_api_url(target, render=False)
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(proxy_url)
                 if resp.status_code != 200:
-                    return []
-                data = resp.json()
+                    return None
+                return resp.json()
         except Exception as e:
-            print(f"[trendyol_search] Hata ({query}): {e}")
-            return []
+            print(f"[trendyol_search] Proxy hata ({query}): {e}")
+            return None
 
+    def _parse_results(self, data: dict, limit: int) -> list[SearchResult]:
         products = (
             data.get("result", {}).get("products", [])
             or data.get("data", {}).get("products", [])

@@ -4,6 +4,15 @@ from decimal import Decimal
 import httpx
 from app.services.scraper.base import BaseScraper, ScrapedProduct, scraper_api_url
 
+# Trendyol public API için browser-like header'lar
+_DIRECT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Referer": "https://www.trendyol.com/",
+    "Origin": "https://www.trendyol.com",
+}
+
 
 class TrendyolScraper(BaseScraper):
     store_name = "trendyol"
@@ -12,73 +21,106 @@ class TrendyolScraper(BaseScraper):
         return "trendyol.com" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
-        # Internal API hem orijinal fiyatı hem indirimli fiyatı döndürür.
-        # ld+json schema'sında original_price (highPrice) bulunmuyor.
         product_id = self._extract_product_id(url)
         if product_id:
-            result = await self._scrape_via_api(url, product_id)
+            # 1) Direkt API dene (0 kredi)
+            result = await self._scrape_direct_api(url, product_id)
             if result:
                 return result
-        return await self._scrape_via_html(url)
+            # 2) ScraperAPI fallback (1 kredi)
+            result = await self._scrape_proxy_api(url, product_id)
+            if result:
+                return result
+        # 3) HTML fallback — önce direkt, sonra ScraperAPI
+        return await self._scrape_html_with_fallback(url)
 
-    async def _scrape_via_api(self, url: str, product_id: str) -> ScrapedProduct | None:
-        """Trendyol internal product API'si üzerinden ScraperAPI proxy ile çeker."""
+    async def _scrape_direct_api(self, url: str, product_id: str) -> ScrapedProduct | None:
+        """Direkt Trendyol API — 0 kredi."""
+        target = (
+            f"https://public.trendyol.com/discovery-web-productgw-service/api/"
+            f"renderingserviceproductpage/pdp/{product_id}?channelId=1&gender=na"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=15, headers=_DIRECT_HEADERS) as client:
+                resp = await client.get(target)
+                if resp.status_code in (403, 429):
+                    print(f"[trendyol] Direkt API bloklandı ({resp.status_code}), fallback'e geçiliyor")
+                    return None
+                if resp.status_code != 200:
+                    return None
+                return self._parse_api_response(url, product_id, resp.json())
+        except Exception:
+            return None
+
+    async def _scrape_proxy_api(self, url: str, product_id: str) -> ScrapedProduct | None:
+        """ScraperAPI proxy ile API — 1 kredi."""
         target = (
             f"https://public.trendyol.com/discovery-web-productgw-service/api/"
             f"renderingserviceproductpage/pdp/{product_id}?channelId=1&gender=na"
         )
         proxy_url = scraper_api_url(target, render=False)
-
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(proxy_url)
                 if resp.status_code != 200:
                     return None
-
-                data = resp.json()
-                result = data.get("result", {})
-                product = result.get("product", {})
-                if not product:
-                    return None
-
-                price_info = product.get("price", {})
-                current_price = Decimal(str(
-                    price_info.get("discountedPrice", {}).get("value", 0)
-                    or price_info.get("originalPrice", {}).get("value", 0)
-                ))
-                original_price_val = price_info.get("originalPrice", {}).get("value")
-                original_price = Decimal(str(original_price_val)) if original_price_val else None
-
-                images = product.get("images", [])
-                image_url = None
-                if images:
-                    img = images[0]
-                    image_url = f"https://cdn.dsmcdn.com{img}" if img.startswith("/") else img
-
-                return ScrapedProduct(
-                    title=product.get("name", "").strip(),
-                    url=url,
-                    store=self.store_name,
-                    current_price=current_price,
-                    original_price=original_price,
-                    brand=product.get("brand", {}).get("name"),
-                    image_url=image_url,
-                    store_product_id=product_id,
-                    in_stock=product.get("inStock", True),
-                )
+                return self._parse_api_response(url, product_id, resp.json())
         except Exception:
             return None
 
-    async def _scrape_via_html(self, url: str) -> ScrapedProduct:
-        """ScraperAPI (render=False) ile HTML çeker, ld+json'dan ürün bilgisi parse eder."""
-        proxy_url = scraper_api_url(url, render=False)
+    def _parse_api_response(self, url: str, product_id: str, data: dict) -> ScrapedProduct | None:
+        """API JSON response'unu ScrapedProduct'a çevirir."""
+        result = data.get("result", {})
+        product = result.get("product", {})
+        if not product:
+            return None
 
+        price_info = product.get("price", {})
+        current_price = Decimal(str(
+            price_info.get("discountedPrice", {}).get("value", 0)
+            or price_info.get("originalPrice", {}).get("value", 0)
+        ))
+        original_price_val = price_info.get("originalPrice", {}).get("value")
+        original_price = Decimal(str(original_price_val)) if original_price_val else None
+
+        images = product.get("images", [])
+        image_url = None
+        if images:
+            img = images[0]
+            image_url = f"https://cdn.dsmcdn.com{img}" if img.startswith("/") else img
+
+        return ScrapedProduct(
+            title=product.get("name", "").strip(),
+            url=url,
+            store=self.store_name,
+            current_price=current_price,
+            original_price=original_price,
+            brand=product.get("brand", {}).get("name"),
+            image_url=image_url,
+            store_product_id=product_id,
+            in_stock=product.get("inStock", True),
+        )
+
+    async def _scrape_html_with_fallback(self, url: str) -> ScrapedProduct:
+        """HTML scraping — önce direkt, sonra ScraperAPI."""
+        # Direkt dene
+        try:
+            async with httpx.AsyncClient(timeout=15, headers={
+                **_DIRECT_HEADERS,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    return self._parse_ld_json(url, resp.text)
+        except Exception:
+            pass
+
+        # ScraperAPI fallback
+        proxy_url = scraper_api_url(url, render=False)
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.get(proxy_url)
             resp.raise_for_status()
-            html = resp.text
-
-        return self._parse_ld_json(url, html)
+            return self._parse_ld_json(url, resp.text)
 
     def _parse_ld_json(self, url: str, html: str) -> ScrapedProduct:
         """HTML içindeki application/ld+json ProductGroup verisini parse eder."""
@@ -104,7 +146,6 @@ class TrendyolScraper(BaseScraper):
         title = product_data.get("name", "").strip()
         brand = product_data.get("manufacturer") or product_data.get("brand", {}).get("name")
 
-        # Görsel
         image_raw = product_data.get("image", {})
         image_url: str | None = None
         if isinstance(image_raw, dict):
@@ -113,7 +154,6 @@ class TrendyolScraper(BaseScraper):
         elif isinstance(image_raw, str):
             image_url = image_raw
 
-        # Fiyat
         offers = product_data.get("offers", {})
         current_price = Decimal(str(offers.get("price", 0) or 0))
         original_price: Decimal | None = None
@@ -121,7 +161,6 @@ class TrendyolScraper(BaseScraper):
         if high_price and Decimal(str(high_price)) > current_price:
             original_price = Decimal(str(high_price))
 
-        # Stok
         availability = offers.get("availability", "")
         in_stock = "OutOfStock" not in availability
 

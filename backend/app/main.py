@@ -32,10 +32,11 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # Günlük katalog taraması — her gece 03:00'da
+    # Haftalık katalog taraması — her Pazar gece 03:00'da (sadece store'u olmayan variant'lar)
     scheduler.add_job(
-        crawl_all_variants,
+        lambda: crawl_all_variants(new_only=True),
         trigger="cron",
+        day_of_week="sun",
         hour=3,
         minute=0,
         id="catalog_crawl",
