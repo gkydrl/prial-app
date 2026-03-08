@@ -178,6 +178,56 @@ async def trigger_crawl(
     return {"message": f"Crawler başlatıldı ({mode}, arka planda çalışıyor)"}
 
 
+@router.post("/crawl/test-one")
+async def test_crawl_one(
+    _: None = Depends(require_admin),
+):
+    """Tek bir variant için crawler test — sonucu senkron döner."""
+    from sqlalchemy.orm import selectinload
+    from app.services.catalog_crawler import crawl_variant, _base_query, _google_query
+
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(ProductVariant)
+            .options(selectinload(ProductVariant.product), selectinload(ProductVariant.stores))
+            .join(Product)
+            .limit(20)
+        )
+        all_v = result.scalars().all()
+        variant = next((v for v in all_v if not v.stores), None)
+        if not variant:
+            return {"error": "Store'suz variant bulunamadı"}
+
+        product = variant.product
+        base = _base_query(product, variant)
+        google = _google_query(product, variant)
+
+    import time
+    t0 = time.time()
+    try:
+        stats = await crawl_variant(product, variant)
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "product": f"{product.brand} {product.title}",
+            "variant": variant.title,
+            "base_query": base,
+            "google_query": google,
+        }
+
+    return {
+        "product": f"{product.brand} {product.title}",
+        "variant": variant.title,
+        "base_query": base,
+        "google_query": google,
+        "stats": stats,
+        "elapsed_s": round(time.time() - t0, 1),
+    }
+
+
 # ─── Push Notification Test Endpoints ────────────────────────────────────────
 
 
