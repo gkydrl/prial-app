@@ -9,7 +9,12 @@ Adım 1 — Regex/attribute karşılaştırma (hızlı, ücretsiz)
   → Belirsiz durum: Adım 2'ye geç.
 
 Adım 2 — Fuzzy title karşılaştırma (Jaccard benzerliği)
-  • LLM kullanmaz, kelime bazlı benzerlik hesaplar.
+  • Kelime bazlı benzerlik hesaplar (ücretsiz).
+  → Eşleşme veya red bulursa sonuç döner.
+  → Eşleşmezse: Adım 3'e geç.
+
+Adım 3 — LLM doğrulaması (Claude Haiku, son çare)
+  • Sadece fuzzy match de eşleşmezse çağrılır (~çok nadir).
 """
 from __future__ import annotations
 
@@ -103,11 +108,13 @@ async def is_match(
                 return False
         return True
 
-    # 3. Belirsiz durum → fuzzy title karşılaştırma (LLM yerine)
-    return _fuzzy_title_match(
-        catalog_label=f"{product_brand or ''} {product_title} {variant_title or ''}".strip(),
-        scraped_title=scraped_title,
-    )
+    # 3. Belirsiz durum → fuzzy title karşılaştırma
+    catalog_label = f"{product_brand or ''} {product_title} {variant_title or ''}".strip()
+    if _fuzzy_title_match(catalog_label, scraped_title):
+        return True
+
+    # 4. Son çare → LLM (çok nadir çağrılır)
+    return await _llm_confirm(catalog_label, scraped_title)
 
 
 def _normalize(text: str) -> set[str]:
@@ -137,6 +144,36 @@ def _fuzzy_title_match(catalog_label: str, scraped_title: str) -> bool:
 
     similarity = len(intersection) / len(union)
     return similarity >= 0.40
+
+
+async def _llm_confirm(catalog_label: str, scraped_title: str) -> bool:
+    """Son çare: Claude Haiku ile iki ürün başlığının aynı ürünü temsil edip etmediğini sorar."""
+    try:
+        import anthropic
+        from app.config import settings
+
+        if not settings.anthropic_api_key:
+            return False
+
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        prompt = (
+            f"Aşağıdaki iki ürün aynı fiziksel ürün mü? Sadece EVET veya HAYIR yaz.\n\n"
+            f"Katalog: {catalog_label}\n"
+            f"Site ürünü: {scraped_title}"
+        )
+
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=5,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        answer = message.content[0].text.strip().upper()
+        return answer.startswith("EVET")
+
+    except Exception as e:
+        print(f"[catalog_matcher] LLM hatası: {e}", flush=True)
+        return False
 
 
 async def find_best_match(
