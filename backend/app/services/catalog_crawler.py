@@ -177,8 +177,11 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
     labels = ["trendyol", "hepsiburada", "google"]
     for label, result in zip(labels, raw):
         if isinstance(result, Exception):
-            print(f"[crawler] Arama hatası ({label}): {result}")
+            print(f"[crawler] Arama hatası ({label}): {result}", flush=True)
         else:
+            print(f"[crawler] {label}: {len(result)} sonuç", flush=True)
+            for r in result:
+                print(f"[crawler]   → {r.store}: {r.url[:80]}", flush=True)
             search_results.extend(result)
 
     # URL tekrarlarını temizle
@@ -191,9 +194,10 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
     search_results = unique_results
 
     if not search_results:
-        print(f"[crawler] Sonuç yok: {base}")
+        print(f"[crawler] Sonuç yok: {base}", flush=True)
         return {"found": 0, "new": 0}
 
+    print(f"[crawler] {len(search_results)} unique URL scrape edilecek", flush=True)
     stats = {"found": 0, "new": 0}
 
     async with AsyncSessionLocal() as db:
@@ -207,9 +211,13 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
             # 1. Scrape et
             scraped = await _scrape_candidate(result.url)
             if not scraped or not scraped.current_price or scraped.current_price <= 0:
+                print(f"[crawler]   ✗ scrape başarısız/fiyatsız: {result.url[:60]}", flush=True)
                 continue
             if not scraped.in_stock:
+                print(f"[crawler]   ✗ stokta yok: {result.url[:60]}", flush=True)
                 continue
+
+            print(f"[crawler]   scrape OK: '{scraped.title[:50]}' — {scraped.current_price}₺", flush=True)
 
             # 2. Catalog matcher — bu ürün doğru mu?
             matched = await is_match(
@@ -221,6 +229,7 @@ async def crawl_variant(product: Product, variant: ProductVariant) -> dict:
                 scraped_brand=scraped.brand,
             )
             if not matched:
+                print(f"[crawler]   ✗ eşleşmedi: '{scraped.title[:50]}'", flush=True)
                 continue
 
             stats["found"] += 1

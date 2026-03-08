@@ -214,10 +214,14 @@ async def test_crawl_one(
         base = _base_query(product, variant)
         google = _google_query(product, variant)
 
-    import time
+    import time, io, contextlib
     t0 = time.time()
+
+    # Crawler print loglarını yakala
+    log_buffer = io.StringIO()
     try:
-        stats = await crawl_variant(product, variant)
+        with contextlib.redirect_stdout(log_buffer):
+            stats = await crawl_variant(product, variant)
     except Exception as e:
         import traceback
         return {
@@ -227,7 +231,10 @@ async def test_crawl_one(
             "variant": variant.title,
             "base_query": base,
             "google_query": google,
+            "logs": log_buffer.getvalue().splitlines(),
         }
+
+    logs = log_buffer.getvalue().splitlines()
 
     return {
         "product": f"{product.brand} {product.title}",
@@ -236,6 +243,7 @@ async def test_crawl_one(
         "google_query": google,
         "stats": stats,
         "elapsed_s": round(time.time() - t0, 1),
+        "logs": logs,
     }
 
 
