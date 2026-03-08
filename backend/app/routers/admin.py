@@ -159,9 +159,21 @@ async def trigger_crawl(
 ):
     """Katalog crawler'ını manuel tetikler. new_only=true → sadece mağazasız variant'ları işler."""
     import asyncio
+    import sys
     from app.services.catalog_crawler import crawl_all_variants
 
-    asyncio.create_task(crawl_all_variants(new_only=new_only))
+    async def _safe_crawl():
+        try:
+            print("[crawl/trigger] Crawler başlıyor...", flush=True)
+            await crawl_all_variants(new_only=new_only)
+            print("[crawl/trigger] Crawler tamamlandı.", flush=True)
+        except Exception as e:
+            print(f"[crawl/trigger] HATA: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            sys.stdout.flush()
+
+    asyncio.create_task(_safe_crawl())
     mode = "sadece yeni variant'lar" if new_only else "tüm variant'lar"
     return {"message": f"Crawler başlatıldı ({mode}, arka planda çalışıyor)"}
 

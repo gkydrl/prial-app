@@ -250,7 +250,8 @@ async def crawl_all_variants(new_only: bool = False) -> None:
 
     new_only=True → Yalnızca hiç mağazası olmayan variant'ları işler (ilk dolum için).
     """
-    print(f"[crawler] Katalog taraması başladı (new_only={new_only})...")
+    import sys
+    print(f"[crawler] Katalog taraması başladı (new_only={new_only})...", flush=True)
     start = datetime.now(timezone.utc)
 
     async with AsyncSessionLocal() as db:
@@ -262,15 +263,15 @@ async def crawl_all_variants(new_only: bool = False) -> None:
         all_variants: list[ProductVariant] = result.scalars().all()
 
     if not all_variants:
-        print("[crawler] Katalogda variant yok.")
+        print("[crawler] Katalogda variant yok.", flush=True)
         return
 
     if new_only:
         variants = [v for v in all_variants if not v.stores]
-        print(f"[crawler] {len(variants)}/{len(all_variants)} variant mağazasız → taranacak...")
+        print(f"[crawler] {len(variants)}/{len(all_variants)} variant mağazasız → taranacak...", flush=True)
     else:
         variants = all_variants
-        print(f"[crawler] {len(variants)} variant taranacak...")
+        print(f"[crawler] {len(variants)} variant taranacak...", flush=True)
 
     if not variants:
         print("[crawler] Taranacak yeni variant yok.")
