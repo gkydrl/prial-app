@@ -97,3 +97,59 @@ app.include_router(admin.router, prefix="/api/v1")
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": settings.app_version}
+
+
+@app.get("/health/deep")
+async def health_deep():
+    """Tum kritik endpoint'leri ve DB baglantisini kontrol eder."""
+    import time
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    results = {}
+    all_ok = True
+    start = time.time()
+
+    # 1. DB baglantisi
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        results["database"] = "ok"
+    except Exception as e:
+        results["database"] = f"FAIL: {str(e)[:100]}"
+        all_ok = False
+
+    # 2. Kritik endpoint'leri internal olarak test et
+    from starlette.testclient import TestClient
+    import httpx
+
+    checks = [
+        ("discover_categories", "/api/v1/discover/categories"),
+        ("discover_products", "/api/v1/discover/products?page=1&page_size=1"),
+        ("home_daily_deals", "/api/v1/home/daily-deals?limit=1"),
+        ("home_top_drops", "/api/v1/home/top-drops?limit=1"),
+        ("home_most_alarmed", "/api/v1/home/most-alarmed?limit=1"),
+        ("products_list", "/api/v1/products?limit=1"),
+    ]
+
+    async with httpx.AsyncClient(app=app, base_url="http://test") as client:
+        for name, path in checks:
+            try:
+                resp = await client.get(path)
+                if resp.status_code == 200:
+                    results[name] = "ok"
+                else:
+                    results[name] = f"FAIL: HTTP {resp.status_code}"
+                    all_ok = False
+            except Exception as e:
+                results[name] = f"FAIL: {str(e)[:100]}"
+                all_ok = False
+
+    elapsed = round((time.time() - start) * 1000)
+
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "version": settings.app_version,
+        "checks": results,
+        "elapsed_ms": elapsed,
+    }

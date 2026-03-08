@@ -185,8 +185,8 @@ async def test_target_reached(
     user = await _get_test_user(db, user_email)
     await _send_push(
         user=user,
-        title="Hedef fiyata ulasildi! Test Urun",
-        body="Hedef fiyat 2.500 TL'ye ulasildi! Su an: 2.399 TL",
+        title="🎯 Hedefine ulaştın!",
+        body="iPhone 16 Pro Max artık 44.799 ₺. Hemen al!",
         category=NotificationCategory.TARGET_REACHED,
         data={"test": "true"},
         db=db,
@@ -207,17 +207,22 @@ async def test_price_drop(
     from app.models.notification import NotificationCategory
 
     user = await _get_test_user(db, user_email)
-    display_pct = 20 if drop_percent >= 20 else 10
+    if drop_percent >= 20:
+        title = "🔥 Büyük indirim!"
+        body = "AirPods Pro 2 %20 düştü, şu an 5.299 ₺"
+    else:
+        title = "📉 AirPods Pro 2 %10 indi!"
+        body = "Şu an 6.299 ₺ — hedefe yaklaşıyor"
     await _send_push(
         user=user,
-        title=f"%{display_pct} fiyat dususu! Test Urun",
-        body=f"Fiyat %{display_pct} dustu, su an 1.899 TL",
+        title=title,
+        body=body,
         category=NotificationCategory.PRICE_DROP,
         data={"test": "true"},
         db=db,
     )
     await db.commit()
-    return {"status": "sent", "scenario": "price_drop", "percent": display_pct}
+    return {"status": "sent", "scenario": "price_drop", "percent": drop_percent}
 
 
 @router.post("/test-notifications/milestone")
@@ -232,10 +237,11 @@ async def test_milestone(
     from app.models.notification import NotificationCategory
 
     user = await _get_test_user(db, user_email)
+    count_str = f"{milestone:,}".replace(",", ".")
     await _send_push(
         user=user,
-        title=f"{milestone:,} kisi takip ediyor!".replace(",", "."),
-        body=f"Test Urun artik {milestone:,} kisi tarafindan takip ediliyor".replace(",", "."),
+        title="🚀 MacBook Air M3 trend oldu!",
+        body=f"{count_str} kişi bu ürünü bekliyor, sen de katıl",
         category=NotificationCategory.MILESTONE,
         data={"test": "true"},
         db=db,
@@ -298,8 +304,8 @@ async def test_all_notifications(
     # 1. Target reached
     await _send_push(
         user=user,
-        title="Hedef fiyata ulasildi! iPhone 16 Pro",
-        body="Hedef fiyat 45.000 TL'ye ulasildi! Su an: 44.799 TL",
+        title="🎯 Hedefine ulaştın!",
+        body="iPhone 16 Pro Max artık 44.799 ₺. Hemen al!",
         category=NotificationCategory.TARGET_REACHED,
         data={"test": "true"},
         db=db,
@@ -309,8 +315,8 @@ async def test_all_notifications(
     # 2. Price drop %10
     await _send_push(
         user=user,
-        title="%10 fiyat dususu! AirPods Pro 2",
-        body="Fiyat %10 dustu, su an 6.299 TL",
+        title="📉 AirPods Pro 2 %10 indi!",
+        body="Şu an 6.299 ₺ — hedefe yaklaşıyor",
         category=NotificationCategory.PRICE_DROP,
         data={"test": "true"},
         db=db,
@@ -320,8 +326,8 @@ async def test_all_notifications(
     # 3. Price drop %20
     await _send_push(
         user=user,
-        title="%20 fiyat dususu! Samsung Galaxy S24",
-        body="Fiyat %20 dustu, su an 29.999 TL",
+        title="🔥 Büyük indirim!",
+        body="Samsung Galaxy S24 %20 düştü, şu an 29.999 ₺",
         category=NotificationCategory.PRICE_DROP,
         data={"test": "true"},
         db=db,
@@ -331,8 +337,8 @@ async def test_all_notifications(
     # 4. Milestone
     await _send_push(
         user=user,
-        title="500 kisi takip ediyor!",
-        body="MacBook Air M3 artik 500 kisi tarafindan takip ediliyor",
+        title="🚀 MacBook Air M3 trend oldu!",
+        body="500 kişi bu ürünü bekliyor, sen de katıl",
         category=NotificationCategory.MILESTONE,
         data={"test": "true"},
         db=db,

@@ -123,11 +123,9 @@ async def send_alarm_notifications(
                 continue
 
             display_name = product.short_title or product.title[:38]
-            title = f"Hedef fiyata ulasildi! {display_name}"
-            body = (
-                f"Hedef fiyat {int(alarm.target_price):,} TL'ye ulasildi! "
-                f"Su an: {int(new_price):,} TL"
-            ).replace(",", ".")
+            price_str = f"{int(new_price):,}".replace(",", ".")
+            title = "🎯 Hedefine ulaştın!"
+            body = f"{display_name} artık {price_str} ₺. Hemen al!"
 
             # Push
             await _send_push(
@@ -193,8 +191,13 @@ async def notify_price_drop(
         return
 
     display_name = product.short_title or product.title[:38]
-    title = f"%{drop_percent} fiyat dususu! {display_name}"
-    body = f"Fiyat %{drop_percent} dustu, su an {int(new_price):,} TL".replace(",", ".")
+    price_str = f"{int(new_price):,}".replace(",", ".")
+    if drop_percent >= 20:
+        title = "🔥 Büyük indirim!"
+        body = f"{display_name} %20 düştü, şu an {price_str} ₺"
+    else:
+        title = f"📉 {display_name} %10 indi!"
+        body = f"Şu an {price_str} ₺ — hedefe yaklaşıyor"
 
     await _send_push(
         user=user,
@@ -232,10 +235,9 @@ async def notify_community_milestone(
         users = users_result.scalars().all()
 
         display_name = product.short_title or product.title[:38]
-        title = f"{milestone_count:,} kisi takip ediyor!".replace(",", ".")
-        body = (
-            f"{display_name} artik {milestone_count:,} kisi tarafindan takip ediliyor"
-        ).replace(",", ".")
+        count_str = f"{milestone_count:,}".replace(",", ".")
+        title = f"🚀 {display_name} trend oldu!"
+        body = f"{count_str} kişi bu ürünü bekliyor, sen de katıl"
 
         for user in users:
             await _send_push(
@@ -260,11 +262,8 @@ async def notify_daily_summary(
     db: AsyncSession,
 ) -> None:
     """Kullaniciya gunluk fiyat dususu ozeti gonderir."""
-    title = f"Gunluk ozet: {drop_count} urunde fiyat dustu!"
-    body = (
-        f"Takip ettiginiz {drop_count} urunde son 24 saatte fiyat dususu oldu. "
-        f"Detaylar icin uygulamayi acin."
-    )
+    title = "☀️ Günaydın!"
+    body = f"Bugün takip ettiğin {drop_count} üründe fiyat düşüşü var"
 
     await _send_push(
         user=user,
@@ -285,11 +284,8 @@ async def notify_weekly_summary(
     db: AsyncSession,
 ) -> None:
     """Kullaniciya haftalik en cok dusen urun bildirimini gonderir."""
-    title = "Haftalik ozet"
-    body = (
-        f"Bu hafta en cok dusen urun: {top_product_name} (%{drop_percent} dusus). "
-        f"Detaylar icin uygulamayi acin."
-    )
+    title = "📊 Haftalık özet"
+    body = f"Bu hafta en çok düşen: {top_product_name} — %{drop_percent} indirim"
 
     await _send_push(
         user=user,

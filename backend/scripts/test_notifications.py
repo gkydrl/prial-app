@@ -31,23 +31,23 @@ from app.services.notification_service import _send_push, notify_daily_summary, 
 
 SCENARIOS = {
     "target_reached": {
-        "title": "Hedef fiyata ulasildi! iPhone 16 Pro",
-        "body": "Hedef fiyat 45.000 TL'ye ulasildi! Su an: 44.799 TL",
+        "title": "🎯 Hedefine ulaştın!",
+        "body": "iPhone 16 Pro Max artık 44.799 ₺. Hemen al!",
         "category": NotificationCategory.TARGET_REACHED,
     },
     "price_drop_10": {
-        "title": "%10 fiyat dususu! AirPods Pro 2",
-        "body": "Fiyat %10 dustu, su an 6.299 TL",
+        "title": "📉 AirPods Pro 2 %10 indi!",
+        "body": "Şu an 6.299 ₺ — hedefe yaklaşıyor",
         "category": NotificationCategory.PRICE_DROP,
     },
     "price_drop_20": {
-        "title": "%20 fiyat dususu! Samsung Galaxy S24",
-        "body": "Fiyat %20 dustu, su an 29.999 TL",
+        "title": "🔥 Büyük indirim!",
+        "body": "Samsung Galaxy S24 %20 düştü, şu an 29.999 ₺",
         "category": NotificationCategory.PRICE_DROP,
     },
     "milestone": {
-        "title": "500 kisi takip ediyor!",
-        "body": "MacBook Air M3 artik 500 kisi tarafindan takip ediliyor",
+        "title": "🚀 MacBook Air M3 trend oldu!",
+        "body": "500 kişi bu ürünü bekliyor, sen de katıl",
         "category": NotificationCategory.MILESTONE,
     },
 }
