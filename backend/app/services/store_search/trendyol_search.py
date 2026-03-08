@@ -24,19 +24,23 @@ class TrendyolSearcher(BaseSearcher):
     store_name = "trendyol"
 
     _SEARCH_API = (
-        "https://public.trendyol.com/discovery-web-searchgw-service/api/filter/"
-        "search/v2"
+        "https://public.trendyol.com/discovery-web-searchgw-service/v2/api/infinite-scroll/"
+        "sr"
     )
 
     async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         params = {
             "q": query,
+            "pi": "1",
+            "storefrontId": "1",
             "culture": "tr-TR",
-            "channelId": "1",
-            "userGenderId": "2",
+            "userGenderId": "1",
+            "pId": "0",
+            "scoringAlgorithmId": "2",
+            "categoryRelevancyEnabled": "false",
+            "isLegalRequirementConfirmed": "false",
             "searchStrategyType": "DEFAULT",
             "productStampType": "TypeA",
-            "fixSlotProductAdsIncluded": "true",
         }
         target = self._SEARCH_API + "?" + urlencode(params)
 

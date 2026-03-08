@@ -91,7 +91,7 @@ class GoogleSearcher(BaseSearcher):
         url_with_key = target + f"&api_key={settings.scraper_api_key}"
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=60) as client:
                 resp = await client.get(url_with_key)
                 if resp.status_code != 200:
                     print(f"[google_search] HTTP {resp.status_code} ({query})")
