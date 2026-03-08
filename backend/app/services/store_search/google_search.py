@@ -37,15 +37,22 @@ _SKIP_DOMAINS = {
     "letgo.com",        # İkinci el
     "apple.com",        # Marka sitesi (ürün sayfası ama mağaza değil)
     "samsung.com",
+    "tommy.com",        # Marka sitesi
+    "nike.com",
+    "adidas.com",
 }
 
 _SKIP_PATH_KEYWORDS = [
     "/kategori/", "/category/", "/blog/", "/haber/", "/yorum/",
     "/search", "/ara?", "/liste/", "/collection/",
-    # Trendyol kategori URL pattern'leri ("-x-c" veya "-c-" olmadan "-p-" içermeyen)
+    # Trendyol kategori URL pattern'leri
     "-x-c",   # Trendyol kategori: /brand-x-c12345-v678
+    "-x-b",   # Trendyol brand/kategori: /brand-x-b300-g2-c12345
+    "-g2-c",  # Trendyol alt kategori
     # Teknosa/MediaMarkt kategori
     "/c-1",   # Teknosa: /iphone-c-100001
+    # Amazon search/liste sayfaları
+    "/s?k=",  # Amazon arama: /s?k=query
 ]
 
 
@@ -80,7 +87,7 @@ class GoogleSearcher(BaseSearcher):
             "query": query,
             "country_code": "tr",
             "hl": "tr",
-            "num": min(limit * 2, 20),  # Filtreleme sonrası limit'e ulaşmak için fazla çek
+            "num": min(limit * 3, 30),  # Filtreleme sonrası limit'e ulaşmak için fazla çek
         }
         target = "https://api.scraperapi.com/structured/google/search?" + urlencode(params)
 
