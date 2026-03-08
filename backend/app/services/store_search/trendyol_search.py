@@ -1,9 +1,11 @@
 """
 Trendyol arama adaptörü.
-Önce direkt API dener (0 kredi), başarısız olursa ScraperAPI fallback (1 kredi).
+Önce direkt API dener (0 kredi), başarısız olursa ScraperAPI ile
+arama sayfası HTML'ini çeker ve regex ile ürün linklerini parse eder.
 """
+import re
 from decimal import Decimal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 
 import httpx
 
@@ -29,6 +31,52 @@ class TrendyolSearcher(BaseSearcher):
     )
 
     async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
+        # 1) Direkt API dene (0 kredi)
+        data = await self._fetch_direct_api(query)
+        if data:
+            results = self._parse_api_results(data, limit)
+            if results:
+                return results
+
+        # 2) ScraperAPI ile API dene (1 kredi)
+        data = await self._fetch_proxy_api(query)
+        if data:
+            results = self._parse_api_results(data, limit)
+            if results:
+                return results
+
+        # 3) ScraperAPI ile arama sayfası HTML (1 kredi)
+        html = await self._fetch_search_html(query)
+        if html:
+            return self._parse_html_results(html, limit)
+
+        return []
+
+    async def _fetch_direct_api(self, query: str) -> dict | None:
+        params = {
+            "q": query,
+            "pi": "1",
+            "storefrontId": "1",
+            "culture": "tr-TR",
+            "userGenderId": "1",
+            "pId": "0",
+            "scoringAlgorithmId": "2",
+            "categoryRelevancyEnabled": "false",
+            "isLegalRequirementConfirmed": "false",
+            "searchStrategyType": "DEFAULT",
+            "productStampType": "TypeA",
+        }
+        url = self._SEARCH_API + "?" + urlencode(params)
+        try:
+            async with httpx.AsyncClient(timeout=15, headers=_DIRECT_HEADERS) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    return resp.json()
+        except Exception as e:
+            print(f"[trendyol_search] Direkt API hata ({query}): {e}", flush=True)
+        return None
+
+    async def _fetch_proxy_api(self, query: str) -> dict | None:
         params = {
             "q": query,
             "pi": "1",
@@ -43,45 +91,33 @@ class TrendyolSearcher(BaseSearcher):
             "productStampType": "TypeA",
         }
         target = self._SEARCH_API + "?" + urlencode(params)
-
-        # 1) Direkt dene (0 kredi)
-        data = await self._fetch_direct(target, query)
-        # 2) Fallback: ScraperAPI (1 kredi)
-        if data is None:
-            data = await self._fetch_proxy(target, query)
-        if data is None:
-            return []
-
-        return self._parse_results(data, limit)
-
-    async def _fetch_direct(self, url: str, query: str) -> dict | None:
-        try:
-            async with httpx.AsyncClient(timeout=15, headers=_DIRECT_HEADERS) as client:
-                resp = await client.get(url)
-                if resp.status_code in (403, 429):
-                    print(f"[trendyol_search] Direkt bloklandı ({resp.status_code}), fallback'e geçiliyor")
-                    return None
-                if resp.status_code != 200:
-                    return None
-                return resp.json()
-        except Exception as e:
-            print(f"[trendyol_search] Direkt hata ({query}): {e}")
-            return None
-
-    async def _fetch_proxy(self, target: str, query: str) -> dict | None:
         proxy_url = scraper_api_url(target, render=False)
         try:
-            async with httpx.AsyncClient(timeout=45) as client:
+            async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(proxy_url)
-                if resp.status_code != 200:
-                    print(f"[trendyol_search] Proxy HTTP {resp.status_code} ({query})", flush=True)
-                    return None
-                return resp.json()
+                if resp.status_code == 200:
+                    return resp.json()
+                print(f"[trendyol_search] Proxy API HTTP {resp.status_code} ({query})", flush=True)
         except Exception as e:
-            print(f"[trendyol_search] Proxy hata ({query}): {type(e).__name__}: {e}", flush=True)
-            return None
+            print(f"[trendyol_search] Proxy API hata ({query}): {type(e).__name__}", flush=True)
+        return None
 
-    def _parse_results(self, data: dict, limit: int) -> list[SearchResult]:
+    async def _fetch_search_html(self, query: str) -> str | None:
+        """Son çare: Trendyol arama sayfası HTML'ini ScraperAPI ile çek."""
+        search_url = f"https://www.trendyol.com/sr?q={quote_plus(query)}"
+        proxy_url = scraper_api_url(search_url, render=False)
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(proxy_url)
+                if resp.status_code == 200 and len(resp.text) > 2000:
+                    print(f"[trendyol_search] HTML fallback OK ({len(resp.text)} chars)", flush=True)
+                    return resp.text
+                print(f"[trendyol_search] HTML fallback HTTP {resp.status_code}", flush=True)
+        except Exception as e:
+            print(f"[trendyol_search] HTML fallback hata: {type(e).__name__}", flush=True)
+        return None
+
+    def _parse_api_results(self, data: dict, limit: int) -> list[SearchResult]:
         products = (
             data.get("result", {}).get("products", [])
             or data.get("data", {}).get("products", [])
@@ -124,6 +160,39 @@ class TrendyolSearcher(BaseSearcher):
             except Exception:
                 continue
 
+        return results
+
+    def _parse_html_results(self, html: str, limit: int) -> list[SearchResult]:
+        """Trendyol arama sayfası HTML'inden ürün linklerini regex ile çıkarır."""
+        # Trendyol ürün URL pattern: /marka/urun-adi-p-123456
+        urls = re.findall(r'href="(/[^"]*?-p-\d+[^"]*)"', html)
+        seen = set()
+        results = []
+
+        for path in urls:
+            # Temizle
+            clean = path.split("?")[0]
+            if clean in seen:
+                continue
+            seen.add(clean)
+
+            full_url = f"https://www.trendyol.com{clean}"
+
+            # URL'den title çıkar: /marka/urun-adi-p-123 → "urun adi"
+            m = re.search(r'/[^/]+/(.+?)-p-\d+', clean)
+            title = m.group(1).replace("-", " ").title() if m else ""
+
+            results.append(SearchResult(
+                title=title,
+                url=full_url,
+                store=self.store_name,
+                price=Decimal("0"),
+            ))
+            if len(results) >= limit:
+                break
+
+        if results:
+            print(f"[trendyol_search] HTML parse: {len(results)} ürün", flush=True)
         return results
 
     def _build_url(self, p: dict) -> str | None:

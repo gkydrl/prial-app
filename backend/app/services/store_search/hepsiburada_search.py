@@ -37,20 +37,25 @@ class HepsiburadaSearcher(BaseSearcher):
         except Exception as e:
             print(f"[hepsiburada_search] Direkt hata: {e}", flush=True)
 
-        # ScraperAPI fallback (5 kredi)
+        # ScraperAPI fallback — önce render=false (1 kredi), sonra render=true (5 kredi)
         if not html:
-            proxy_url = scraper_api_url(search_url, render=True)
-            try:
-                async with httpx.AsyncClient(timeout=60) as client:
-                    resp = await client.get(proxy_url)
-                    if resp.status_code != 200:
-                        print(f"[hepsiburada_search] Proxy HTTP {resp.status_code}", flush=True)
-                        return []
-                    html = resp.text
-                    print(f"[hepsiburada_search] Proxy OK ({len(html)} chars)", flush=True)
-            except Exception as e:
-                print(f"[hepsiburada_search] Proxy hata ({query}): {e}", flush=True)
-                return []
+            for render in [False, True]:
+                proxy_url = scraper_api_url(search_url, render=render)
+                label = "render" if render else "static"
+                try:
+                    timeout = 30 if not render else 60
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        resp = await client.get(proxy_url)
+                        if resp.status_code == 200 and len(resp.text) > 2000:
+                            html = resp.text
+                            print(f"[hepsiburada_search] Proxy {label} OK ({len(html)} chars)", flush=True)
+                            break
+                        print(f"[hepsiburada_search] Proxy {label} HTTP {resp.status_code}", flush=True)
+                except Exception as e:
+                    print(f"[hepsiburada_search] Proxy {label} hata: {type(e).__name__}", flush=True)
+
+        if not html:
+            return []
 
         results = self._parse_results(html, limit)
         if not results:
