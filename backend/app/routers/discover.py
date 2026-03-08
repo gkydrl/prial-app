@@ -107,9 +107,12 @@ async def get_categories(db: AsyncSession = Depends(get_db)):
         .scalar_subquery()
     )
 
+    from sqlalchemy.orm import selectinload
+
     result = await db.execute(
         select(Category, count_subq.label("product_count"))
         .where(Category.parent_id.is_(None))
+        .options(selectinload(Category.children))
     )
 
     categories = []
