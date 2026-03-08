@@ -180,6 +180,7 @@ async def trigger_crawl(
 
 @router.post("/crawl/test-one")
 async def test_crawl_one(
+    variant_id: uuid.UUID | None = None,
     _: None = Depends(require_admin),
 ):
     """Tek bir variant için crawler test — sonucu senkron döner."""
@@ -188,16 +189,26 @@ async def test_crawl_one(
 
     from app.database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(ProductVariant)
-            .options(selectinload(ProductVariant.product), selectinload(ProductVariant.stores))
-            .join(Product)
-            .limit(20)
-        )
-        all_v = result.scalars().all()
-        variant = next((v for v in all_v if not v.stores), None)
-        if not variant:
-            return {"error": "Store'suz variant bulunamadı"}
+        if variant_id:
+            result = await db.execute(
+                select(ProductVariant)
+                .options(selectinload(ProductVariant.product), selectinload(ProductVariant.stores))
+                .where(ProductVariant.id == variant_id)
+            )
+            variant = result.scalar_one_or_none()
+            if not variant:
+                return {"error": f"Variant bulunamadı: {variant_id}"}
+        else:
+            result = await db.execute(
+                select(ProductVariant)
+                .options(selectinload(ProductVariant.product), selectinload(ProductVariant.stores))
+                .join(Product)
+                .limit(20)
+            )
+            all_v = result.scalars().all()
+            variant = next((v for v in all_v if not v.stores), None)
+            if not variant:
+                return {"error": "Store'suz variant bulunamadı"}
 
         product = variant.product
         base = _base_query(product, variant)
