@@ -23,6 +23,10 @@ import { imageSource } from '@/utils/imageSource';
 import { useAuthStore } from '@/store/authStore';
 import { openAlarmSheet } from '@/store/alarmSheetStore';
 import { showAlert } from '@/store/alertStore';
+import { getCached, setCache } from '@/utils/apiCache';
+
+const PRODUCTS_CACHE_KEY = 'cache:discover:products';
+const CATEGORIES_CACHE_KEY = 'cache:discover:categories';
 
 const BG = '#0A1628';
 const CARD_BG = '#1E293B';
@@ -464,11 +468,14 @@ export default function DiscoverScreen() {
 
   // Kategorileri API'den çek — product_count varsa sadece ürünü olanları göster
   useEffect(() => {
+    // Önce cache'ten yükle
+    getCached<CategoryItem[]>(CATEGORIES_CACHE_KEY).then((cached) => {
+      if (cached && cached.length > 1) setCategories(cached);
+    });
     client.get(ENDPOINTS.DISCOVER_CATEGORIES)
       .then((res) => {
         const all: CategoryItem[] = [{ label: 'Tümü', slug: null, icon: 'apps' }];
         for (const cat of res.data) {
-          // product_count alanı varsa filtrele, yoksa tümünü göster
           if (cat.product_count !== undefined && cat.product_count === 0) continue;
           all.push({
             label: cat.name,
@@ -476,7 +483,10 @@ export default function DiscoverScreen() {
             icon: CATEGORY_ICONS[cat.slug] ?? 'pricetag',
           });
         }
-        if (all.length > 1) setCategories(all);
+        if (all.length > 1) {
+          setCategories(all);
+          setCache(CATEGORIES_CACHE_KEY, all);
+        }
       })
       .catch(() => {});
   }, []);
@@ -484,31 +494,50 @@ export default function DiscoverScreen() {
   const fetchProducts = useCallback(async (q: string, category: string | null) => {
     setIsLoading(true);
     try {
+      let data: ProductResponse[];
       if (q.trim()) {
         const res = await client.get<ProductResponse[]>(ENDPOINTS.DISCOVER_SEARCH, {
           params: { q: q.trim(), page_size: 50 },
         });
-        setProducts(res.data);
+        data = res.data;
       } else if (category) {
         const res = await client.get<ProductResponse[]>(
           ENDPOINTS.DISCOVER_CATEGORY_PRODUCTS(category),
           { params: { page_size: 50 } },
         );
-        setProducts(res.data);
+        data = res.data;
       } else {
         const res = await client.get<ProductResponse[]>('/discover/products', {
           params: { page_size: 50, sort_by: 'alarm_count' },
         });
-        setProducts(res.data);
+        data = res.data;
+      }
+      setProducts(data);
+      // Sadece varsayılan listeyi (arama/kategori yok) cache'le
+      if (!q.trim() && !category) {
+        setCache(PRODUCTS_CACHE_KEY, data);
       }
     } catch {
-      setProducts([]);
+      // Varsayılan listede hata → cache'ten oku
+      if (!q.trim() && !category) {
+        const cached = await getCached<ProductResponse[]>(PRODUCTS_CACHE_KEY);
+        setProducts(cached ?? []);
+      } else {
+        setProducts([]);
+      }
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // Önce cache'ten yükle (anında göster), sonra API'den güncelle
+    getCached<ProductResponse[]>(PRODUCTS_CACHE_KEY).then((cached) => {
+      if (cached && cached.length > 0) {
+        setProducts(cached);
+        setIsLoading(false);
+      }
+    });
     fetchProducts('', null);
   }, []);
 

@@ -1,10 +1,19 @@
 import { create } from 'zustand';
 import { homeApi } from '@/api/home';
 import { CACHE_TTL_MS } from '@/constants/config';
+import { getCached, setCache } from '@/utils/apiCache';
 import type { ProductResponse, TopDropResponse } from '@/types/api';
 
+const CACHE_KEY = 'cache:home';
+
+interface HomeCacheData {
+  dailyDeals: TopDropResponse[];
+  topDrops: TopDropResponse[];
+  mostAlarmed: ProductResponse[];
+}
+
 interface HomeState {
-  dailyDeals: ProductResponse[];
+  dailyDeals: TopDropResponse[];
   topDrops: TopDropResponse[];
   mostAlarmed: ProductResponse[];
   isLoading: boolean;
@@ -16,7 +25,7 @@ interface HomeState {
 }
 
 export const useHomeStore = create<HomeState>((set, get) => ({
-  dailyDeals: [] as ProductResponse[],
+  dailyDeals: [] as TopDropResponse[],
   topDrops: [],
   mostAlarmed: [],
   isLoading: false,
@@ -38,16 +47,39 @@ export const useHomeStore = create<HomeState>((set, get) => ({
     const topDrops = drops.status === 'fulfilled' ? drops.value.data : [];
     const mostAlarmed = alarmed.status === 'fulfilled' ? alarmed.value.data : [];
 
-    // Tüm istekler başarısız olduysa (timeout/hata) cache'leme — bir sonraki mount'ta yeniden dene
     const hasData = dailyDeals.length > 0 || mostAlarmed.length > 0;
 
-    set({
-      dailyDeals,
-      topDrops,
-      mostAlarmed,
-      lastFetchedAt: hasData ? Date.now() : null,
-      isLoading: false,
-    });
+    if (hasData) {
+      // Başarılı → diske yaz
+      setCache(CACHE_KEY, { dailyDeals, topDrops, mostAlarmed } as HomeCacheData);
+      set({
+        dailyDeals,
+        topDrops,
+        mostAlarmed,
+        lastFetchedAt: Date.now(),
+        isLoading: false,
+      });
+    } else {
+      // Tüm istekler başarısız → diskten oku
+      const cached = await getCached<HomeCacheData>(CACHE_KEY);
+      if (cached) {
+        set({
+          dailyDeals: cached.dailyDeals,
+          topDrops: cached.topDrops,
+          mostAlarmed: cached.mostAlarmed,
+          lastFetchedAt: null,
+          isLoading: false,
+        });
+      } else {
+        set({
+          dailyDeals: [],
+          topDrops: [],
+          mostAlarmed: [],
+          lastFetchedAt: null,
+          isLoading: false,
+        });
+      }
+    }
   },
 
   invalidate: () => set({ lastFetchedAt: null }),
