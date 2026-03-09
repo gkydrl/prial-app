@@ -141,7 +141,9 @@ async def _enrich_with_lowest_price(rows: list[dict], db) -> list[dict]:
         )
         .group_by(ProductStore.product_id)
     )
-    min_prices = {str(r[0]): float(r[1]) for r in result.all()}
+    raw = result.all()
+    min_prices = {str(r[0]): float(r[1]) for r in raw}
+    print(f"[enrich] product_ids={product_ids[:3]}, min_prices={min_prices}", flush=True)
 
     for r in rows:
         pid = r["product"]["id"]
