@@ -11,7 +11,8 @@ from app.services.scraper.hepsiburada import HepsiburadaScraper
 # from app.services.scraper.amazon import AmazonScraper
 from app.services.scraper.n11 import N11Scraper
 from app.services.scraper.mediamarkt import MediaMarktScraper
-from app.services.scraper.vatan import VatanScraper
+# Vatan devre dışı — taksit fiyatı scrape ediyor (7.50 TL Samsung Watch gibi)
+# from app.services.scraper.vatan import VatanScraper
 from app.services.scraper.universal_scraper import UniversalScraper
 
 # Bilinen siteler — sırayla denenir
@@ -20,7 +21,6 @@ SCRAPERS: list[BaseScraper] = [
     HepsiburadaScraper(),
     N11Scraper(),
     MediaMarktScraper(),
-    VatanScraper(),
 ]
 
 _universal = UniversalScraper()

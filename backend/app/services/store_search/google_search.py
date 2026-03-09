@@ -44,6 +44,7 @@ _SKIP_DOMAINS = {
     "ebay.co.uk",
     "amazon.com",       # Amazon devre dışı — USD/fiyat karışıklığı
     "amazon.com.tr",
+    "vatanbilgisayar.com",  # Vatan devre dışı — taksit fiyatı scrape ediyor
     "apple.com",        # Marka sitesi (ürün sayfası ama mağaza değil)
     "samsung.com",
     "tommy.com",        # Marka sitesi
