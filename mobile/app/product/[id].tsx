@@ -160,7 +160,7 @@ export default function ProductDetailScreen() {
     return stores.reduce<typeof stores[0] | null>((min, s) => {
       if (!s.current_price) return min;
       if (!min || !min.current_price) return s;
-      return s.current_price < min.current_price ? s : min;
+      return Number(s.current_price) < Number(min.current_price) ? s : min;
     }, null);
   }, [stores]);
 

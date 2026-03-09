@@ -236,7 +236,7 @@ export function AlarmSetupSheet({ productId, storeUrl, currentPrice, onSuccess, 
     <BottomSheet
       ref={sheetRef}
       index={-1}
-      snapPoints={['55%']}
+      snapPoints={['42%']}
       enablePanDownToClose
       backgroundStyle={{ backgroundColor: SHEET_BG }}
       handleIndicatorStyle={{ backgroundColor: BORDER }}

@@ -73,8 +73,12 @@ def _price_history_rows(db_result):
 
         drop_pct = (price_before - current) / price_before * 100
 
-        # Sanity check: %90+ düşüş → muhtemelen hatalı scrape (ör. 2 TL sandalye)
-        if drop_pct > 90:
+        # Sanity check: %65+ düşüş → muhtemelen hatalı scrape
+        if drop_pct > 65:
+            continue
+
+        # store='other' güvenilmez kaynak (alibaba, turkcell, vb.)
+        if store.store.value == "other":
             continue
 
         rows.append({
@@ -119,8 +123,11 @@ def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
         if orig <= cur or cur <= 0:
             continue
         drop_pct = (orig - cur) / orig * 100
-        # Sanity: %90+ düşüş → hatalı veri
-        if drop_pct > 90:
+        # Sanity: %65+ düşüş → hatalı veri
+        if drop_pct > 65:
+            continue
+        # store='other' güvenilmez kaynak
+        if s.store.value == "other":
             continue
         rows.append({
             "product": {

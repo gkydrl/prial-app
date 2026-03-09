@@ -38,6 +38,8 @@ _SKIP_DOMAINS = {
     "pricena.com",      # Fiyat karşılaştırma
     "sahibinden.com",   # İkinci el
     "letgo.com",        # İkinci el
+    "alibaba.com",      # Toptan satış
+    "turkish.alibaba.com",
     "apple.com",        # Marka sitesi (ürün sayfası ama mağaza değil)
     "samsung.com",
     "tommy.com",        # Marka sitesi
