@@ -9,7 +9,7 @@ class AmazonScraper(BaseScraper):
     store_name = "amazon"
 
     def can_handle(self, url: str) -> bool:
-        return "amazon.com.tr" in url or "amazon.com" in url
+        return "amazon.com.tr" in url
 
     async def scrape(self, url: str) -> ScrapedProduct:
         proxy_url = scraper_api_url(url, render=True)
@@ -46,12 +46,11 @@ class AmazonScraper(BaseScraper):
         if img_el:
             image_url = img_el.get("src") or img_el.get("data-src")
 
-        in_stock = True
-        avail_el = soup.select_one("#availability .a-color-price")
-        if avail_el:
-            avail_text = avail_el.get_text(strip=True).lower()
-            if "stokta yok" in avail_text or "out of stock" in avail_text:
-                in_stock = False
+        in_stock = self._check_stock(soup)
+
+        # Fiyat 0 ise stokta yok kabul et
+        if current_price <= 0:
+            in_stock = False
 
         return ScrapedProduct(
             title=title,
@@ -63,6 +62,30 @@ class AmazonScraper(BaseScraper):
             store_product_id=self._extract_asin(url),
             in_stock=in_stock,
         )
+
+    def _check_stock(self, soup: BeautifulSoup) -> bool:
+        """Amazon stok durumunu birden fazla göstergeden kontrol eder."""
+        # 1. #availability alanı
+        avail_el = soup.select_one("#availability")
+        if avail_el:
+            avail_text = avail_el.get_text(strip=True).lower()
+            out_phrases = [
+                "stokta yok", "out of stock",
+                "mevcut değil", "currently unavailable",
+                "temin edilemiyor", "unavailable",
+                "stokta kalmadı",
+            ]
+            for phrase in out_phrases:
+                if phrase in avail_text:
+                    return False
+
+        # 2. Sepete ekle butonu yoksa → stokta yok
+        add_to_cart = soup.select_one("#add-to-cart-button")
+        buy_now = soup.select_one("#buy-now-button")
+        if not add_to_cart and not buy_now:
+            return False
+
+        return True
 
     def _parse_price(self, text: str) -> Decimal:
         cleaned = re.sub(r"[^\d,]", "", text).replace(",", ".")
