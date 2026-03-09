@@ -42,6 +42,8 @@ _SKIP_DOMAINS = {
     "turkish.alibaba.com",
     "ebay.com",         # USD fiyatlar, ikinci el
     "ebay.co.uk",
+    "amazon.com",       # Amazon devre dışı — USD/fiyat karışıklığı
+    "amazon.com.tr",
     "apple.com",        # Marka sitesi (ürün sayfası ama mağaza değil)
     "samsung.com",
     "tommy.com",        # Marka sitesi

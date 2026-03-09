@@ -7,7 +7,8 @@ from decimal import Decimal
 from app.services.scraper.base import BaseScraper, ScrapedProduct
 from app.services.scraper.trendyol import TrendyolScraper
 from app.services.scraper.hepsiburada import HepsiburadaScraper
-from app.services.scraper.amazon import AmazonScraper
+# Amazon devre dışı — fiyat/stok verileri güvenilmez (USD karışıklığı)
+# from app.services.scraper.amazon import AmazonScraper
 from app.services.scraper.n11 import N11Scraper
 from app.services.scraper.mediamarkt import MediaMarktScraper
 from app.services.scraper.vatan import VatanScraper
@@ -17,7 +18,6 @@ from app.services.scraper.universal_scraper import UniversalScraper
 SCRAPERS: list[BaseScraper] = [
     TrendyolScraper(),
     HepsiburadaScraper(),
-    AmazonScraper(),
     N11Scraper(),
     MediaMarktScraper(),
     VatanScraper(),
