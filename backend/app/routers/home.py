@@ -81,9 +81,10 @@ def _price_history_rows(db_result):
         if store.store.value == "other":
             continue
 
-        rows.append({
+        product_id = str(store.product.id)
+        entry = {
             "product": {
-                "id": str(store.product.id),
+                "id": product_id,
                 "title": store.product.title,
                 "brand": store.product.brand,
                 "description": None,
@@ -108,8 +109,16 @@ def _price_history_rows(db_result):
             "price_now": current,
             "drop_amount": price_before - current,
             "drop_percent": round(drop_pct, 1),
-        })
-    return rows
+        }
+        rows.append(entry)
+
+    # Aynı ürün birden fazla store ile çıkabilir — en düşük fiyatlı olanı tut
+    seen: dict[str, dict] = {}
+    for r in rows:
+        pid = r["product"]["id"]
+        if pid not in seen or r["price_now"] < seen[pid]["price_now"]:
+            seen[pid] = r
+    return list(seen.values())
 
 
 def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
@@ -157,7 +166,14 @@ def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
             "drop_amount": orig - cur,
             "drop_percent": round(drop_pct, 1),
         })
-    return rows
+
+    # Aynı ürün birden fazla store ile çıkabilir — en düşük fiyatlı olanı tut
+    seen: dict[str, dict] = {}
+    for r in rows:
+        pid = r["product"]["id"]
+        if pid not in seen or r["price_now"] < seen[pid]["price_now"]:
+            seen[pid] = r
+    return list(seen.values())
 
 
 @router.get("/daily-deals")

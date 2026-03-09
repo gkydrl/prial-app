@@ -18,7 +18,13 @@ interface ProductCardProps {
 export function ProductCard({ product, store, width = 160 }: ProductCardProps & { width?: number }) {
   const [imgError, setImgError] = useState(false);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const activeStore = store ?? product.stores[0];
+  const activeStore = store ?? product.stores
+    .filter(s => s.in_stock)
+    .reduce<ProductStoreResponse | undefined>((min, s) => {
+      if (!s.current_price) return min;
+      if (!min || !min.current_price) return s;
+      return Number(s.current_price) < Number(min.current_price) ? s : min;
+    }, undefined) ?? product.stores[0];
 
   const price = activeStore?.current_price;
   const originalPrice = activeStore?.original_price;
