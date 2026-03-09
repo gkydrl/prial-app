@@ -121,6 +121,39 @@ def _price_history_rows(db_result):
     return list(seen.values())
 
 
+async def _enrich_with_lowest_price(rows: list[dict], db) -> list[dict]:
+    """Deal satırlarındaki price_now'u ürünün gerçek en düşük in-stock fiyatıyla günceller."""
+    if not rows:
+        return rows
+
+    import uuid as _uuid
+    from sqlalchemy import and_
+    product_ids = [_uuid.UUID(r["product"]["id"]) for r in rows]
+    result = await db.execute(
+        select(ProductStore.product_id, func.min(ProductStore.current_price).label("min_price"))
+        .where(
+            and_(
+                ProductStore.product_id.in_(product_ids),
+                ProductStore.in_stock == True,
+                ProductStore.is_active == True,
+                ProductStore.current_price > 0,
+            )
+        )
+        .group_by(ProductStore.product_id)
+    )
+    min_prices = {str(r[0]): float(r[1]) for r in result.all()}
+
+    for r in rows:
+        pid = r["product"]["id"]
+        lowest = min_prices.get(pid)
+        if lowest and lowest < r["price_now"]:
+            r["price_now"] = lowest
+            r["drop_amount"] = r["price_24h_ago"] - lowest
+            r["drop_percent"] = round((r["price_24h_ago"] - lowest) / r["price_24h_ago"] * 100, 1)
+
+    return rows
+
+
 def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
     """original_price > current_price olan mağazaları TopDropResponse formatında döndürür."""
     rows = []
@@ -203,7 +236,7 @@ async def daily_deals(
         )
         rows = _price_history_rows(result.all())
         if len(rows) >= 3:
-            return rows
+            return await _enrich_with_lowest_price(rows, db)
 
     # Son çare: scraper'ın tespit ettiği anlık indirimler
     fb_result = await db.execute(
@@ -220,7 +253,7 @@ async def daily_deals(
         ))
         .limit(limit)
     )
-    return _discount_fallback_rows(fb_result.scalars().all())
+    return await _enrich_with_lowest_price(_discount_fallback_rows(fb_result.scalars().all()), db)
 
 
 @router.get("/top-drops")
@@ -248,7 +281,7 @@ async def top_drops(
         )
         rows = _price_history_rows(result.all())
         if len(rows) >= 3:
-            return rows
+            return await _enrich_with_lowest_price(rows, db)
 
     fb_result = await db.execute(
         select(ProductStore)
@@ -262,7 +295,7 @@ async def top_drops(
         .order_by(desc(ProductStore.original_price - ProductStore.current_price))
         .limit(limit)
     )
-    return _discount_fallback_rows(fb_result.scalars().all())
+    return await _enrich_with_lowest_price(_discount_fallback_rows(fb_result.scalars().all()), db)
 
 
 @router.get("/most-alarmed")
