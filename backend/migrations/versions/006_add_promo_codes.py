@@ -13,11 +13,28 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Raw SQL — asyncpg + Alembic enum sorunu bypass
+    # Enum values must match Python enum NAMES (uppercase) — same as store_name_enum pattern
     op.execute("""
         DO $$ BEGIN
-            CREATE TYPE discount_type_enum AS ENUM ('percentage', 'fixed');
+            CREATE TYPE discount_type_enum AS ENUM ('PERCENTAGE', 'FIXED');
         EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
+
+    # Drop if exists with wrong case values (from previous failed attempts)
+    op.execute("""
+        DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'discount_type_enum') THEN
+                -- Check if values are lowercase (wrong)
+                IF EXISTS (
+                    SELECT 1 FROM pg_enum e
+                    JOIN pg_type t ON e.enumtypid = t.oid
+                    WHERE t.typname = 'discount_type_enum' AND e.enumlabel = 'percentage'
+                ) THEN
+                    DROP TYPE discount_type_enum;
+                    CREATE TYPE discount_type_enum AS ENUM ('PERCENTAGE', 'FIXED');
+                END IF;
+            END IF;
         END $$;
     """)
 
@@ -37,12 +54,8 @@ def upgrade() -> None:
         );
     """)
 
-    op.execute("""
-        CREATE INDEX IF NOT EXISTS ix_promo_codes_expires_at ON promo_codes (expires_at);
-    """)
-    op.execute("""
-        CREATE INDEX IF NOT EXISTS ix_promo_codes_store ON promo_codes (store);
-    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_promo_codes_expires_at ON promo_codes (expires_at);")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_promo_codes_store ON promo_codes (store);")
 
     op.execute("""
         CREATE TABLE IF NOT EXISTS promo_code_products (
