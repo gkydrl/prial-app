@@ -150,6 +150,7 @@ async def debug_config(_: None = Depends(require_admin)):
         "admin_api_key": f"{settings.admin_api_key[:4]}...",
         "crawler_search_concurrency": settings.crawler_search_concurrency,
         "crawler_results_per_store": settings.crawler_results_per_store,
+        "promo_code_support": True,
     }
 
 
