@@ -562,13 +562,15 @@ async def create_promo_code(
     db.add(promo)
     await db.flush()
 
-    # Ürün bağlantıları
+    # Ürün bağlantıları — raw insert ile (async uyumlu)
     if payload.product_ids:
         for pid in payload.product_ids:
             product = await db.get(Product, pid)
             if not product:
                 raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: {pid}")
-            promo.products.append(product)
+            await db.execute(
+                promo_code_products.insert().values(promo_code_id=promo.id, product_id=pid)
+            )
 
     await db.flush()
     return promo
@@ -605,12 +607,16 @@ async def update_promo_code(
         setattr(promo, field, value)
 
     if product_ids is not None:
-        promo.products.clear()
+        await db.execute(
+            promo_code_products.delete().where(promo_code_products.c.promo_code_id == promo_id)
+        )
         for pid in product_ids:
             product = await db.get(Product, pid)
             if not product:
                 raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: {pid}")
-            promo.products.append(product)
+            await db.execute(
+                promo_code_products.insert().values(promo_code_id=promo.id, product_id=pid)
+            )
 
     await db.flush()
     return promo

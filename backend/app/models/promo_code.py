@@ -39,8 +39,7 @@ class PromoCode(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     discount_type: Mapped[DiscountType] = mapped_column(
-        Enum(DiscountType, name="discount_type_enum", create_type=False,
-             values_callable=lambda x: [e.value for e in x]), nullable=False
+        Enum(DiscountType, name="discount_type_enum", create_type=False), nullable=False
     )
     discount_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     store: Mapped[StoreName | None] = mapped_column(
