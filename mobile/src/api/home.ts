@@ -13,4 +13,7 @@ export const homeApi = {
     client.get<ProductResponse[]>(ENDPOINTS.HOME_MOST_ALARMED, {
       params: period ? { limit, period } : { limit },
     }),
+
+  stats: () =>
+    client.get<{ user_count: number; active_alarm_count: number; triggered_count: number }>(ENDPOINTS.HOME_STATS),
 };

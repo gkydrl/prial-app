@@ -135,3 +135,34 @@ async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depen
     user.reset_token_hash = None
     user.reset_token_expires = None
     db.add(user)
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Hesabı kalıcı olarak devre dışı bırakır ve kişisel verileri temizler.
+    Apple App Store Review Guidelines 5.1.1 gereği in-app hesap silme.
+    """
+    from app.models.alarm import Alarm, AlarmStatus
+
+    # Alarmları iptal et
+    result = await db.execute(
+        select(Alarm).where(Alarm.user_id == current_user.id, Alarm.status == AlarmStatus.ACTIVE)
+    )
+    for alarm in result.scalars().all():
+        alarm.status = AlarmStatus.DELETED
+        db.add(alarm)
+
+    # Kişisel verileri temizle
+    current_user.is_active = False
+    current_user.full_name = None
+    current_user.email = f"deleted_{current_user.id}@deleted.prial.app"
+    current_user.firebase_token = None
+    current_user.avatar_url = None
+    current_user.reset_token_hash = None
+    current_user.reset_token_expires = None
+    db.add(current_user)
+    await db.commit()

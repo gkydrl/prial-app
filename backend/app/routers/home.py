@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.product import Product, ProductStore
 from app.models.price_history import PriceHistory
 from app.models.alarm import Alarm, AlarmStatus
+from app.models.user import User
 from app.schemas.product import ProductResponse, ProductStoreResponse
 
 router = APIRouter(prefix="/home", tags=["home"])
@@ -28,29 +29,24 @@ def _since(period: str) -> datetime:
 
 def _price_before_subquery(since: datetime):
     """
-    Her product_store için 'since' öncesindeki en son fiyatı döner.
-    Bu referans fiyat, dönem başlamadan önceki son kayıttır.
-    Day-over-day karşılaştırma için kullanılır (max/min yanılgısı yok).
+    Her product_store için 'since' öncesindeki en düşük fiyatı döner.
+    Tek bir kayıt yerine bir window (since'den önceki 1 dönem) içindeki
+    MIN(price) alınır — uçuk scrape verilerine karşı dayanıklı.
     """
-    rn_inner = (
-        select(
-            PriceHistory.product_store_id,
-            PriceHistory.price,
-            func.row_number().over(
-                partition_by=PriceHistory.product_store_id,
-                order_by=desc(PriceHistory.recorded_at),
-            ).label("rn"),
-        )
-        .where(PriceHistory.recorded_at < since)
-        .where(PriceHistory.price > 0)
-        .subquery()
-    )
+    # since'den önceki 1 dönem kadar geriye bak (en az 24 saat)
+    lookback = since - (datetime.now(timezone.utc) - since)
+    if lookback >= since:
+        lookback = since - timedelta(hours=24)
+
     return (
         select(
-            rn_inner.c.product_store_id,
-            rn_inner.c.price.label("price_before"),
+            PriceHistory.product_store_id,
+            func.min(PriceHistory.price).label("price_before"),
         )
-        .where(rn_inner.c.rn == 1)
+        .where(PriceHistory.recorded_at < since)
+        .where(PriceHistory.recorded_at >= lookback)
+        .where(PriceHistory.price > 0)
+        .group_by(PriceHistory.product_store_id)
         .subquery()
     )
 
@@ -332,3 +328,22 @@ async def most_alarmed(
             .limit(limit)
         )
     return result.scalars().all()
+
+
+@router.get("/stats")
+async def home_stats(db: AsyncSession = Depends(get_db)):
+    """Ana sayfa istatistikleri: kullanıcı, aktif talep, gerçekleşen."""
+    user_count = await db.execute(
+        select(func.count(User.id)).where(User.is_active == True)
+    )
+    active_alarms = await db.execute(
+        select(func.coalesce(func.sum(Product.alarm_count), 0))
+    )
+    triggered_count = await db.execute(
+        select(func.count(Alarm.id)).where(Alarm.status == AlarmStatus.TRIGGERED)
+    )
+    return {
+        "user_count": user_count.scalar() or 0,
+        "active_alarm_count": int(active_alarms.scalar() or 0),
+        "triggered_count": triggered_count.scalar() or 0,
+    }

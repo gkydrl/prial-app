@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { usersApi } from '@/api/users';
+import { authApi } from '@/api/auth';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
 
@@ -180,6 +181,29 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleDeleteAccount = () => {
+    showAlert(
+      'Hesabı Sil',
+      'Hesabınız kalıcı olarak silinecek ve tüm verileriniz kaldırılacaktır. Bu işlem geri alınamaz.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Hesabı Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authApi.deleteAccount();
+              logout();
+              router.replace('/(auth)/login');
+            } catch {
+              showAlert('Hata', 'Hesap silinemedi. Lütfen tekrar deneyin.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (!user) return null;
 
   return (
@@ -281,7 +305,22 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
 
-          <View style={{ paddingTop: 20, alignItems: 'center' }}>
+          {/* Hesabı Sil */}
+          <TouchableOpacity
+            onPress={handleDeleteAccount}
+            activeOpacity={0.8}
+            style={{
+              marginTop: 12,
+              paddingVertical: 14,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' }}>
+              Hesabı Sil
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ paddingTop: 8, alignItems: 'center' }}>
             <Text style={{ color: '#334155', fontSize: 11, fontFamily: 'Inter_400Regular' }}>
               Prial v1.0.0
             </Text>

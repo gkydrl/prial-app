@@ -11,6 +11,7 @@ import { DailyBanner } from '@/components/home/DailyBanner';
 import { OnboardingModal } from '@/components/home/OnboardingModal';
 import { useAuthStore } from '@/store/authStore';
 import { useHome } from '@/hooks/useHome';
+import { homeApi } from '@/api/home';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
 
@@ -20,16 +21,25 @@ const BG = '#0A1628';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const STATS: { icon: IoniconName; target: number; label: string }[] = [
-  { icon: 'people-outline', target: 12847, label: 'Kullanıcı' },
-  { icon: 'flag-outline', target: 48392, label: 'Aktif Talep' },
-  { icon: 'checkmark-circle-outline', target: 3241, label: 'Gerçekleşen' },
+const STAT_META: { icon: IoniconName; label: string }[] = [
+  { icon: 'people-outline', label: 'Kullanıcı' },
+  { icon: 'flag-outline', label: 'Aktif Talep' },
+  { icon: 'checkmark-circle-outline', label: 'Gerçekleşen' },
 ];
 
 function StatsCard() {
+  const [targets, setTargets] = useState([0, 0, 0]);
   const [counts, setCounts] = useState([0, 0, 0]);
 
   useEffect(() => {
+    homeApi.stats().then((res) => {
+      const data = res.data;
+      setTargets([data.user_count, data.active_alarm_count, data.triggered_count]);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (targets.every((t) => t === 0)) return;
     const DURATION = 1500;
     const FPS = 60;
     const STEP_MS = DURATION / FPS;
@@ -38,11 +48,11 @@ function StatsCard() {
       frame++;
       const t = Math.min(frame / FPS, 1);
       const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
-      setCounts(STATS.map((s) => Math.round(s.target * ease)));
+      setCounts(targets.map((target) => Math.round(target * ease)));
       if (t >= 1) clearInterval(timer);
     }, STEP_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [targets]);
 
   return (
     <View style={{
@@ -54,7 +64,7 @@ function StatsCard() {
       flexDirection: 'row',
       overflow: 'hidden',
     }}>
-      {STATS.map((stat, i) => (
+      {STAT_META.map((stat, i) => (
         <Fragment key={stat.label}>
           <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, gap: 3 }}>
             <Ionicons name={stat.icon} size={16} color="#64748B" />
@@ -65,7 +75,7 @@ function StatsCard() {
               {stat.label}
             </Text>
           </View>
-          {i < STATS.length - 1 && (
+          {i < STAT_META.length - 1 && (
             <View style={{ width: 1, backgroundColor: '#334155', marginVertical: 10 }} />
           )}
         </Fragment>

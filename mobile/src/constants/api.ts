@@ -8,6 +8,7 @@ export const ENDPOINTS = {
   ME: '/auth/me',
   FORGOT_PASSWORD: '/auth/forgot-password',
   RESET_PASSWORD: '/auth/reset-password',
+  DELETE_ACCOUNT: '/auth/account',
 
   // Users
   USER_ME: '/users/me',
@@ -28,6 +29,7 @@ export const ENDPOINTS = {
   HOME_DAILY_DEALS: '/home/daily-deals',
   HOME_TOP_DROPS: '/home/top-drops',
   HOME_MOST_ALARMED: '/home/most-alarmed',
+  HOME_STATS: '/home/stats',
 
   // Discover
   DISCOVER_CATEGORIES: '/discover/categories',
