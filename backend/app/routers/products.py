@@ -139,6 +139,9 @@ async def list_products(
 
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    from datetime import datetime, timezone
+    from app.models.promo_code import PromoCode, promo_code_products
+
     result = await db.execute(
         select(Product)
         .options(
@@ -150,6 +153,33 @@ async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    # Fetch active promo codes for this product
+    now = datetime.now(timezone.utc)
+    promo_result = await db.execute(
+        select(PromoCode).where(
+            PromoCode.is_active == True,
+            PromoCode.starts_at <= now,
+            PromoCode.expires_at > now,
+        )
+    )
+    all_promos = promo_result.scalars().all()
+
+    # For each store, find applicable promo codes
+    for store in product.stores:
+        store.promo_codes = [
+            p for p in all_promos
+            if (p.store is None or p.store == store.store)
+            and (len(p.products) == 0 or product_id in [pr.id for pr in p.products])
+        ]
+    for variant in product.variants:
+        for store in variant.stores:
+            store.promo_codes = [
+                p for p in all_promos
+                if (p.store is None or p.store == store.store)
+                and (len(p.products) == 0 or product_id in [pr.id for pr in p.products])
+            ]
+
     return product
 
 

@@ -42,6 +42,20 @@ export type StoreName =
   | 'vatan'
   | 'other';
 
+export type DiscountType = 'percentage' | 'fixed';
+
+export interface PromoCodeResponse {
+  id: string;
+  code: string;
+  title: string;
+  discount_type: DiscountType;
+  discount_value: number;
+  store: StoreName | null;
+  min_price: number | null;
+  starts_at: string;
+  expires_at: string;
+}
+
 export interface ProductStoreResponse {
   id: string;
   store: StoreName;
@@ -52,6 +66,7 @@ export interface ProductStoreResponse {
   discount_percent: number | null;
   in_stock: boolean;
   last_checked_at: string | null;
+  promo_codes: PromoCodeResponse[];
 }
 
 export interface ProductResponse {

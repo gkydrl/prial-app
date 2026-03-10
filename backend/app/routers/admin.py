@@ -13,7 +13,9 @@ from app.database import get_db
 from app.models.product import Product, ProductStore, ProductVariant
 from app.models.user import User
 from app.models.category import Category
+from app.models.promo_code import PromoCode, promo_code_products
 from app.schemas.admin import AdminProductCreate, AdminProductResponse
+from app.schemas.promo_code import PromoCodeCreate, PromoCodeUpdate, PromoCodeResponse
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -527,6 +529,107 @@ async def test_all_notifications(
 
     await db.commit()
     return {"status": "all_sent", "scenarios": results}
+
+
+# ─── Promo Code CRUD ─────────────────────────────────────────────────────────
+
+
+@router.post("/promo-codes", response_model=PromoCodeResponse, status_code=201)
+async def create_promo_code(
+    payload: PromoCodeCreate,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Yeni promo code oluşturur."""
+    # Kod benzersiz mi?
+    existing = (await db.execute(
+        select(PromoCode).where(PromoCode.code == payload.code)
+    )).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Bu kod zaten mevcut: {payload.code}")
+
+    promo = PromoCode(
+        code=payload.code,
+        title=payload.title,
+        discount_type=payload.discount_type,
+        discount_value=payload.discount_value,
+        store=payload.store,
+        min_price=payload.min_price,
+        starts_at=payload.starts_at,
+        expires_at=payload.expires_at,
+        is_active=payload.is_active,
+    )
+    db.add(promo)
+    await db.flush()
+
+    # Ürün bağlantıları
+    if payload.product_ids:
+        for pid in payload.product_ids:
+            product = await db.get(Product, pid)
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: {pid}")
+            promo.products.append(product)
+
+    await db.flush()
+    return promo
+
+
+@router.get("/promo-codes", response_model=list[PromoCodeResponse])
+async def list_promo_codes(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Tüm promo code'ları listeler."""
+    result = await db.execute(
+        select(PromoCode).order_by(PromoCode.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.patch("/promo-codes/{promo_id}", response_model=PromoCodeResponse)
+async def update_promo_code(
+    promo_id: uuid.UUID,
+    payload: PromoCodeUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Promo code günceller."""
+    promo = await db.get(PromoCode, promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo code bulunamadı")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    product_ids = update_data.pop("product_ids", None)
+
+    for field, value in update_data.items():
+        setattr(promo, field, value)
+
+    if product_ids is not None:
+        promo.products.clear()
+        for pid in product_ids:
+            product = await db.get(Product, pid)
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: {pid}")
+            promo.products.append(product)
+
+    await db.flush()
+    return promo
+
+
+@router.delete("/promo-codes/{promo_id}", status_code=204)
+async def delete_promo_code(
+    promo_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Promo code siler."""
+    promo = await db.get(PromoCode, promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo code bulunamadı")
+    await db.delete(promo)
+
+
+# ─── Test Helpers ────────────────────────────────────────────────────────────
 
 
 async def _get_test_user(db: AsyncSession, email: str) -> User:

@@ -19,7 +19,7 @@ import { useProduct } from '@/hooks/useProduct';
 import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
-import type { ProductStoreResponse } from '@/types/api';
+import type { ProductStoreResponse, PromoCodeResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD = '#1E293B';
@@ -92,6 +92,51 @@ function StorePill({ store }: { store: ProductStoreResponse }) {
       </View>
       <Text style={{ color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' }}>
         {price}
+      </Text>
+      {(store.promo_codes ?? []).length > 0 && (
+        <View style={{ marginLeft: 2 }}>
+          <PromoBadge promo={store.promo_codes[0]} />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+/** Promo code badge — tıklayınca kodu kopyalar */
+function PromoBadge({ promo }: { promo: PromoCodeResponse }) {
+  const label = promo.discount_type === 'percentage'
+    ? `${promo.code} ile %${Math.round(Number(promo.discount_value))}`
+    : `${promo.code} ile ${Math.round(Number(promo.discount_value))}₺`;
+
+  const handleCopy = async () => {
+    try {
+      const Clipboard = await import('expo-clipboard');
+      await Clipboard.setStringAsync(promo.code);
+    } catch {
+      // Fallback: expo-clipboard not installed — silently ignore
+    }
+    showAlert('Kod Kopyalandı!', `${promo.code} panoya kopyalandı.`);
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handleCopy}
+      activeOpacity={0.7}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(234, 179, 8, 0.15)',
+        borderRadius: 12,
+        paddingVertical: 3,
+        paddingHorizontal: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(234, 179, 8, 0.3)',
+      }}
+    >
+      <Text style={{ fontSize: 11 }}>🏷️</Text>
+      <Text style={{ color: '#EAB308', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>
+        {label}
       </Text>
     </TouchableOpacity>
   );
@@ -315,6 +360,18 @@ export default function ProductDetailScreen() {
                 Son 30 gün en düşük: {fmt(low30d)}
               </Text>
             )}
+
+            {/* Promo code'lar */}
+            {(() => {
+              const allPromos = stores.flatMap(s => s.promo_codes ?? []);
+              const unique = allPromos.filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i);
+              if (unique.length === 0) return null;
+              return (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {unique.map(p => <PromoBadge key={p.id} promo={p} />)}
+                </View>
+              );
+            })()}
           </View>
 
           {/* ── Talep Fiyat Dağılımı ── */}

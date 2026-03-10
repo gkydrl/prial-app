@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any
 from pydantic import BaseModel, HttpUrl, Field
 from app.models.product import StoreName
+from app.schemas.promo_code import PromoCodeResponse
 
 
 class ProductStoreResponse(BaseModel):
@@ -16,6 +17,7 @@ class ProductStoreResponse(BaseModel):
     discount_percent: int | None
     in_stock: bool
     last_checked_at: datetime | None
+    promo_codes: list[PromoCodeResponse] = []
 
     model_config = {"from_attributes": True}
 

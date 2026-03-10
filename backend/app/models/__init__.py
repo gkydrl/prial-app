@@ -4,6 +4,7 @@ from app.models.product import Product, ProductStore
 from app.models.price_history import PriceHistory
 from app.models.alarm import Alarm
 from app.models.notification import Notification
+from app.models.promo_code import PromoCode
 
 __all__ = [
     "User",
@@ -13,4 +14,5 @@ __all__ = [
     "PriceHistory",
     "Alarm",
     "Notification",
+    "PromoCode",
 ]
