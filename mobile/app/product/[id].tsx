@@ -94,26 +94,30 @@ function StorePill({ store }: { store: ProductStoreResponse }) {
         {price}
       </Text>
       {(store.promo_codes ?? []).length > 0 && (
-        <View style={{ marginLeft: 2 }}>
-          <PromoBadge promo={store.promo_codes[0]} />
-        </View>
+        <View style={{
+          width: 6, height: 6, borderRadius: 3,
+          backgroundColor: '#EAB308',
+          marginLeft: -2,
+        }} />
       )}
     </TouchableOpacity>
   );
 }
 
-/** Promo code badge — tıklayınca kodu kopyalar */
-function PromoBadge({ promo }: { promo: PromoCodeResponse }) {
-  const label = promo.discount_type === 'percentage'
-    ? `${promo.code} ile %${Math.round(Number(promo.discount_value))}`
-    : `${promo.code} ile ${Math.round(Number(promo.discount_value))}₺`;
+/** Promo code satırı — indirimli fiyat + kod + kopyala */
+function PromoLine({ promo, currentPrice }: { promo: PromoCodeResponse; currentPrice: number | null }) {
+  const discountedPrice = currentPrice != null
+    ? promo.discount_type === 'percentage'
+      ? currentPrice * (1 - Number(promo.discount_value) / 100)
+      : currentPrice - Number(promo.discount_value)
+    : null;
 
   const handleCopy = async () => {
     try {
       const Clipboard = await import('expo-clipboard');
       await Clipboard.setStringAsync(promo.code);
     } catch {
-      // Fallback: expo-clipboard not installed — silently ignore
+      // expo-clipboard not installed
     }
     showAlert('Kod Kopyalandı!', `${promo.code} panoya kopyalandı.`);
   };
@@ -125,19 +129,39 @@ function PromoBadge({ promo }: { promo: PromoCodeResponse }) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(234, 179, 8, 0.15)',
+        gap: 8,
+        backgroundColor: 'rgba(234, 179, 8, 0.10)',
         borderRadius: 12,
-        paddingVertical: 3,
-        paddingHorizontal: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
         borderWidth: 1,
-        borderColor: 'rgba(234, 179, 8, 0.3)',
+        borderColor: 'rgba(234, 179, 8, 0.25)',
       }}
     >
-      <Text style={{ fontSize: 11 }}>🏷️</Text>
-      <Text style={{ color: '#EAB308', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>
-        {label}
-      </Text>
+      <Text style={{ fontSize: 14 }}>🏷️</Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        {discountedPrice != null && (
+          <Text style={{ color: '#EAB308', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
+            ~{Math.round(discountedPrice).toLocaleString('tr-TR')} ₺
+          </Text>
+        )}
+        <Text style={{ color: '#CA8A04', fontSize: 11, fontFamily: 'Inter_500Medium' }}>
+          {promo.code} ile{' '}
+          {promo.discount_type === 'percentage'
+            ? `%${Math.round(Number(promo.discount_value))} indirim`
+            : `${Math.round(Number(promo.discount_value))}₺ indirim`}
+        </Text>
+      </View>
+      <View style={{
+        backgroundColor: 'rgba(234, 179, 8, 0.20)',
+        borderRadius: 8,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+      }}>
+        <Text style={{ color: '#EAB308', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+          Kopyala
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -367,8 +391,8 @@ export default function ProductDetailScreen() {
               const unique = allPromos.filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i);
               if (unique.length === 0) return null;
               return (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {unique.map(p => <PromoBadge key={p.id} promo={p} />)}
+                <View style={{ gap: 8 }}>
+                  {unique.map(p => <PromoLine key={p.id} promo={p} currentPrice={currentPrice} />)}
                 </View>
               );
             })()}
