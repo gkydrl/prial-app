@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import settings
-from app.routers import auth, users, products, alarms, home, discover, admin
+from app.routers import auth, users, products, alarms, home, discover, admin, store_panel
 
 scheduler = AsyncIOScheduler()
 
@@ -93,6 +93,7 @@ app.include_router(alarms.router, prefix="/api/v1")
 app.include_router(home.router, prefix="/api/v1")
 app.include_router(discover.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
+app.include_router(store_panel.router, prefix="/api/v1")
 
 
 @app.get("/health")

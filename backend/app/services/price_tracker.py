@@ -218,6 +218,17 @@ async def _check_alarms(
 
     if triggered_alarms:
         await db.flush()
+
+        # Kampanya kodu atama
+        from app.services.promo_assignment import assign_promo_for_alarm
+        for alarm in triggered_alarms:
+            try:
+                assigned_code = await assign_promo_for_alarm(db, alarm, store, new_price)
+                alarm._promo_code = assigned_code  # transient attribute for notification
+            except Exception as e:
+                print(f"[price_tracker] Promo atama hatası (alarm={alarm.id}): {e}")
+                alarm._promo_code = None
+
         await send_alarm_notifications(triggered_alarms, store, new_price)
 
 

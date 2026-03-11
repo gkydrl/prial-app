@@ -17,8 +17,32 @@ from app.schemas.product import (
 )
 from app.schemas.alarm import AlarmResponse
 from app.core.security import get_current_user
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+async def _optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Token varsa kullanıcıyı döndür, yoksa None."""
+    if credentials is None:
+        return None
+    try:
+        from app.core.security import decode_token
+        payload = decode_token(credentials.credentials)
+        if payload.get("type") != "access":
+            return None
+        import uuid as _uuid
+        user_id = payload.get("sub")
+        result = await db.execute(select(User).where(User.id == _uuid.UUID(user_id)))
+        user = result.scalar_one_or_none()
+        return user if user and user.is_active else None
+    except Exception:
+        return None
 
 
 @router.post("/preview", response_model=ProductPreviewResponse)
@@ -138,7 +162,11 @@ async def list_products(
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_product(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(_optional_user),
+):
     from datetime import datetime, timezone
     from app.models.promo_code import PromoCode, promo_code_products
 
@@ -165,13 +193,36 @@ async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     )
     all_promos = promo_result.scalars().all()
 
-    # For each store, find applicable promo codes
+    # Kullanıcıya atanmış kampanya kodlarını çek
+    assigned_promos = []
+    if current_user:
+        from app.models.campaign import UserPromoAssignment, Campaign
+        assign_result = await db.execute(
+            select(UserPromoAssignment, Campaign)
+            .join(Campaign, UserPromoAssignment.campaign_id == Campaign.id)
+            .where(
+                UserPromoAssignment.user_id == current_user.id,
+                UserPromoAssignment.product_id == product_id,
+            )
+        )
+        for assignment, campaign in assign_result.all():
+            assigned_promos.append({
+                "campaign_id": campaign.id,
+                "campaign_title": campaign.title,
+                "code": assignment.code,
+                "discount_type": campaign.discount_type,
+                "discount_value": campaign.discount_value,
+                "assigned_at": assignment.assigned_at,
+            })
+
+    # For each store, find applicable promo codes + assigned promos
     for store in product.stores:
         store.promo_codes = [
             p for p in all_promos
             if (p.store is None or p.store == store.store)
             and (len(p.products) == 0 or product_id in [pr.id for pr in p.products])
         ]
+        store.assigned_promos = assigned_promos
     for variant in product.variants:
         for store in variant.stores:
             store.promo_codes = [
@@ -179,6 +230,7 @@ async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db))
                 if (p.store is None or p.store == store.store)
                 and (len(p.products) == 0 or product_id in [pr.id for pr in p.products])
             ]
+            store.assigned_promos = assigned_promos
 
     return product
 

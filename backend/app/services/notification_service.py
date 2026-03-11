@@ -125,7 +125,13 @@ async def send_alarm_notifications(
             display_name = product.short_title or product.title[:38]
             price_str = f"{int(new_price):,}".replace(",", ".")
             title = "🎯 Hedefine ulaştın!"
-            body = f"{display_name} artık {price_str} ₺. Hemen al!"
+
+            # Kampanya kodu varsa mesaja ekle
+            promo_code = getattr(alarm, "_promo_code", None)
+            if promo_code:
+                body = f"{display_name} {price_str} ₺'ye düştü! {promo_code} koduyla ek indirim"
+            else:
+                body = f"{display_name} artık {price_str} ₺. Hemen al!"
 
             # Push
             await _send_push(

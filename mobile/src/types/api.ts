@@ -56,6 +56,15 @@ export interface PromoCodeResponse {
   expires_at: string;
 }
 
+export interface AssignedPromoResponse {
+  campaign_id: string;
+  campaign_title: string;
+  code: string;
+  discount_type: DiscountType;
+  discount_value: number;
+  assigned_at: string;
+}
+
 export interface ProductStoreResponse {
   id: string;
   store: StoreName;
@@ -67,6 +76,7 @@ export interface ProductStoreResponse {
   in_stock: boolean;
   last_checked_at: string | null;
   promo_codes: PromoCodeResponse[];
+  assigned_promos: AssignedPromoResponse[];
 }
 
 export interface ProductResponse {

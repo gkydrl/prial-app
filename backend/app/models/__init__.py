@@ -5,6 +5,7 @@ from app.models.price_history import PriceHistory
 from app.models.alarm import Alarm
 from app.models.notification import Notification
 from app.models.promo_code import PromoCode
+from app.models.campaign import StoreAccount, Campaign, CodePool, UserPromoAssignment
 
 __all__ = [
     "User",
@@ -15,4 +16,8 @@ __all__ = [
     "Alarm",
     "Notification",
     "PromoCode",
+    "StoreAccount",
+    "Campaign",
+    "CodePool",
+    "UserPromoAssignment",
 ]

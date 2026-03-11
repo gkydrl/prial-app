@@ -19,7 +19,7 @@ import { useProduct } from '@/hooks/useProduct';
 import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
-import type { ProductStoreResponse, PromoCodeResponse } from '@/types/api';
+import type { ProductStoreResponse, PromoCodeResponse, AssignedPromoResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD = '#1E293B';
@@ -159,6 +159,80 @@ function PromoLine({ promo, currentPrice }: { promo: PromoCodeResponse; currentP
         paddingHorizontal: 8,
       }}>
         <Text style={{ color: '#EAB308', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+          Kopyala
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+/** Kullanıcıya özel atanmış promo code satırı — yeşil tema, "Sana Özel" badge */
+function AssignedPromoLine({ promo, currentPrice }: { promo: AssignedPromoResponse; currentPrice: number | null }) {
+  const discountedPrice = currentPrice != null
+    ? promo.discount_type === 'percentage'
+      ? currentPrice * (1 - Number(promo.discount_value) / 100)
+      : currentPrice - Number(promo.discount_value)
+    : null;
+
+  const handleCopy = async () => {
+    try {
+      const Clipboard = await import('expo-clipboard');
+      await Clipboard.setStringAsync(promo.code);
+    } catch {
+      // expo-clipboard not installed
+    }
+    showAlert('Kod Kopyalandı!', `${promo.code} panoya kopyalandı.`);
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handleCopy}
+      activeOpacity={0.7}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(34, 197, 94, 0.10)',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(34, 197, 94, 0.30)',
+      }}
+    >
+      <Text style={{ fontSize: 14 }}>🎁</Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {discountedPrice != null && (
+            <Text style={{ color: '#22C55E', fontSize: 15, fontFamily: 'Inter_700Bold' }}>
+              ~{Math.round(discountedPrice).toLocaleString('tr-TR')} ₺
+            </Text>
+          )}
+          <View style={{
+            backgroundColor: 'rgba(34, 197, 94, 0.20)',
+            borderRadius: 6,
+            paddingVertical: 2,
+            paddingHorizontal: 6,
+          }}>
+            <Text style={{ color: '#22C55E', fontSize: 9, fontFamily: 'Inter_700Bold' }}>
+              SANA ÖZEL
+            </Text>
+          </View>
+        </View>
+        <Text style={{ color: '#16A34A', fontSize: 11, fontFamily: 'Inter_500Medium' }}>
+          {promo.code} ile{' '}
+          {promo.discount_type === 'percentage'
+            ? `%${Math.round(Number(promo.discount_value))} indirim`
+            : `${Math.round(Number(promo.discount_value))}₺ indirim`}
+        </Text>
+      </View>
+      <View style={{
+        backgroundColor: 'rgba(34, 197, 94, 0.20)',
+        borderRadius: 8,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+      }}>
+        <Text style={{ color: '#22C55E', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
           Kopyala
         </Text>
       </View>
@@ -385,7 +459,19 @@ export default function ProductDetailScreen() {
               </Text>
             )}
 
-            {/* Promo code'lar */}
+            {/* Kullanıcıya özel atanmış promo kodlar */}
+            {(() => {
+              const allAssigned = stores.flatMap(s => s.assigned_promos ?? []);
+              const uniqueAssigned = allAssigned.filter((p, i, arr) => arr.findIndex(x => x.campaign_id === p.campaign_id) === i);
+              if (uniqueAssigned.length === 0) return null;
+              return (
+                <View style={{ gap: 8 }}>
+                  {uniqueAssigned.map(p => <AssignedPromoLine key={p.campaign_id} promo={p} currentPrice={currentPrice} />)}
+                </View>
+              );
+            })()}
+
+            {/* Genel promo code'lar */}
             {(() => {
               const allPromos = stores.flatMap(s => s.promo_codes ?? []);
               const unique = allPromos.filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i);

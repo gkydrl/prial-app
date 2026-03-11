@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, HttpUrl, Field
 from app.models.product import StoreName
 from app.schemas.promo_code import PromoCodeResponse
+from app.schemas.campaign import AssignedPromoResponse
 
 
 class ProductStoreResponse(BaseModel):
@@ -18,6 +19,7 @@ class ProductStoreResponse(BaseModel):
     in_stock: bool
     last_checked_at: datetime | None
     promo_codes: list[PromoCodeResponse] = []
+    assigned_promos: list[AssignedPromoResponse] = []
 
     model_config = {"from_attributes": True}
 
