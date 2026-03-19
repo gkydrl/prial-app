@@ -13,6 +13,7 @@ import { productsApi } from '@/api/products';
 import { alarmsApi } from '@/api/alarms';
 import { showAlert } from '@/store/alertStore';
 import { useAlarmSheetStore, openAlarmSheet } from '@/store/alarmSheetStore';
+import { useAlarmStore } from '@/store/alarmStore';
 
 const SHEET_BG = '#1E293B';
 const BORDER = '#334155';
@@ -61,6 +62,8 @@ export function GlobalAlarmSheet() {
 
   const discountPercent = hasPrice ? Math.round((1 - sliderValue / currentPrice) * 100) : 0;
 
+  const refreshAlarms = useAlarmStore((s) => s.fetchAlarms);
+
   const handleSubmit = async () => {
     if (!sliderValue || sliderValue <= 0) {
       showAlert('Hata', 'Geçerli bir hedef fiyat seçin');
@@ -72,6 +75,8 @@ export function GlobalAlarmSheet() {
         // Güncelleme modu
         await alarmsApi.update(existingAlarmId!, { target_price: sliderValue, status: 'active' });
         close();
+        // Alarm listesini yeniden yükle
+        refreshAlarms();
         showAlert('Talep Güncellendi 🎉', 'Hedef fiyatınız güncellendi.');
       } else {
         // Yeni talep
@@ -81,6 +86,8 @@ export function GlobalAlarmSheet() {
         }
         await productsApi.add(storeUrl, sliderValue);
         close();
+        // Yeni talep sonrası alarm listesini yeniden yükle
+        refreshAlarms();
         showAlert('Talep Oluşturuldu 🎉', 'Fiyat hedefe ulaşınca sizi bilgilendireceğiz.');
       }
     } catch (e: any) {
@@ -99,6 +106,8 @@ export function GlobalAlarmSheet() {
         }, 300);
         return;
       }
+      // Hata durumunda da sheet'i kapat
+      close();
       showAlert('Hata', typeof detail === 'string' ? detail : 'İşlem tamamlanamadı');
     } finally {
       setLoading(false);
