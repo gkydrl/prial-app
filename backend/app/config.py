@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     crawler_search_concurrency: int = 3   # kaç variant aynı anda aransın
     crawler_results_per_store: int = 5    # site başına kaç arama sonucu kontrol edilsin
 
+    # Product discovery (Serper.dev)
+    serper_api_key: str = ""
+    discovery_price_min: int = 5000       # minimum fiyat (TL)
+    discovery_price_max: int = 100000     # maksimum fiyat (TL)
+    discovery_concurrency: int = 3        # kaç arama aynı anda çalışsın
+
     # CORS
     allowed_origins: str = "http://localhost:3000,http://localhost:8081"
 

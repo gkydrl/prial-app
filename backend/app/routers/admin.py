@@ -338,6 +338,80 @@ async def debug_search(
     return results
 
 
+# ─── Product Discovery Endpoints ─────────────────────────────────────────────
+
+
+@router.post("/discovery/run")
+async def trigger_discovery(
+    mode: str = "all",
+    _: None = Depends(require_admin),
+):
+    """
+    Ürün keşfini manuel tetikler.
+    mode="all"   → Toplu keşif (tüm terimler, ~2500 kredi)
+    mode="daily" → Günlük keşif (kategori başına 2 terim, ~80 kredi)
+    """
+    import asyncio
+    from app.services.product_discovery import discover_all, discover_daily
+
+    async def _safe_discover():
+        try:
+            if mode == "daily":
+                await discover_daily()
+            else:
+                await discover_all()
+        except Exception as e:
+            print(f"[discovery/trigger] HATA: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    asyncio.create_task(_safe_discover())
+    return {"message": f"Keşif başlatıldı (mode={mode}, arka planda çalışıyor)"}
+
+
+@router.get("/discovery/terms")
+async def list_discovery_terms(
+    _: None = Depends(require_admin),
+):
+    """Mevcut arama terimlerini kategorilere göre listeler."""
+    from app.services.discovery_terms import DISCOVERY_TERMS
+
+    total = sum(len(terms) for terms in DISCOVERY_TERMS.values())
+    return {
+        "total_terms": total,
+        "categories": {
+            cat: {"count": len(terms), "terms": terms}
+            for cat, terms in DISCOVERY_TERMS.items()
+        },
+    }
+
+
+@router.get("/discovery/stats")
+async def discovery_stats(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """DB'deki ürün ve store istatistiklerini döner."""
+    from sqlalchemy import func
+
+    product_count = (await db.execute(select(func.count(Product.id)))).scalar()
+    store_count = (await db.execute(select(func.count(ProductStore.id)))).scalar()
+    variant_count = (await db.execute(select(func.count(ProductVariant.id)))).scalar()
+
+    # Store bazında dağılım
+    store_dist = (await db.execute(
+        select(ProductStore.store, func.count(ProductStore.id))
+        .group_by(ProductStore.store)
+    )).all()
+
+    return {
+        "products": product_count,
+        "variants": variant_count,
+        "stores": store_count,
+        "by_store": {str(s.value if hasattr(s, 'value') else s): c for s, c in store_dist},
+    }
+
+
 # ─── Push Notification Test Endpoints ────────────────────────────────────────
 
 

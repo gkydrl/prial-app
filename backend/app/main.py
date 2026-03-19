@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     from app.services.price_tracker import check_due_prices
     from app.services.catalog_crawler import crawl_all_variants
     from app.services.summary_service import send_daily_summaries, send_weekly_summaries
+    from app.services.product_discovery import discover_daily
 
     scheduler.add_job(
         check_due_prices,
@@ -50,6 +51,16 @@ async def lifespan(app: FastAPI):
         hour=10,
         minute=0,
         id="daily_summary",
+        replace_existing=True,
+    )
+
+    # Günlük ürün keşfi — her gün 04:00'da
+    scheduler.add_job(
+        discover_daily,
+        trigger="cron",
+        hour=4,
+        minute=0,
+        id="product_discovery",
         replace_existing=True,
     )
 
