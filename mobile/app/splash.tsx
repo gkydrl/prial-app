@@ -3,15 +3,24 @@ import { View, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, withTiming, useAnimatedStyle, Easing } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { useAuthStore } from '@/store/authStore';
 
 export default function SplashScreen() {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.8);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isVerified = useAuthStore((s) => s.user?.is_verified);
 
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
     scale.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.back(1.2)) });
-    setTimeout(() => router.replace('/(tabs)'), 2200);
+    setTimeout(() => {
+      if (isAuthenticated && !isVerified) {
+        router.replace('/(auth)/verify-email');
+      } else {
+        router.replace('/(tabs)');
+      }
+    }, 2200);
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({

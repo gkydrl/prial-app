@@ -1,4 +1,5 @@
 import hashlib
+import random
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +13,7 @@ from app.models.user import User
 from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest,
+    VerifyEmailRequest, ResendVerificationRequest,
 )
 from app.core.security import (
     hash_password,
@@ -22,6 +24,10 @@ from app.core.security import (
     get_current_user,
 )
 
+
+def _generate_verification_code() -> str:
+    return f"{random.randint(100000, 999999)}"
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -31,18 +37,80 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Bu e-posta adresi zaten kayıtlı")
 
+    code = _generate_verification_code()
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
+        verification_code=code,
+        verification_code_expires=datetime.now(timezone.utc) + timedelta(minutes=10),
     )
     db.add(user)
     await db.flush()
+
+    # Send verification email
+    from app.services.email_service import send_verification_email
+    try:
+        await send_verification_email(user.email, code)
+        print(f"[auth] Doğrulama kodu gönderildi: {user.email}")
+    except Exception as e:
+        print(f"[auth] Doğrulama e-postası gönderilemedi ({user.email}): {e}")
 
     return TokenResponse(
         access_token=create_access_token(user.id),
         refresh_token=create_refresh_token(user.id),
     )
+
+
+@router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_email(
+    payload: VerifyEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """6 haneli doğrulama kodunu kontrol eder ve hesabı doğrular."""
+    if current_user.is_verified:
+        return  # Zaten doğrulanmış
+
+    now = datetime.now(timezone.utc)
+    if (
+        not current_user.verification_code
+        or not current_user.verification_code_expires
+        or current_user.verification_code_expires < now
+    ):
+        raise HTTPException(status_code=400, detail="Doğrulama kodunun süresi dolmuş. Yeni kod gönderin.")
+
+    if current_user.verification_code != payload.code:
+        raise HTTPException(status_code=400, detail="Geçersiz doğrulama kodu")
+
+    current_user.is_verified = True
+    current_user.verification_code = None
+    current_user.verification_code_expires = None
+    db.add(current_user)
+
+
+@router.post("/resend-verification", status_code=status.HTTP_204_NO_CONTENT)
+async def resend_verification(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Yeni doğrulama kodu gönderir."""
+    if current_user.is_verified:
+        return
+
+    code = _generate_verification_code()
+    current_user.verification_code = code
+    current_user.verification_code_expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+    db.add(current_user)
+    await db.flush()
+
+    from app.services.email_service import send_verification_email
+    try:
+        await send_verification_email(current_user.email, code)
+        print(f"[auth] Doğrulama kodu yeniden gönderildi: {current_user.email}")
+    except Exception as e:
+        print(f"[auth] Doğrulama e-postası gönderilemedi ({current_user.email}): {e}")
+        raise HTTPException(status_code=500, detail="E-posta gönderilemedi, lütfen tekrar deneyin")
 
 
 @router.post("/login", response_model=TokenResponse)

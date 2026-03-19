@@ -3,8 +3,10 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function AuthLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isVerified = useAuthStore((s) => s.user?.is_verified);
 
-  if (isAuthenticated) {
+  // Only redirect to tabs if authenticated AND verified
+  if (isAuthenticated && isVerified) {
     return <Redirect href="/(tabs)" />;
   }
 

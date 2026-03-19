@@ -78,6 +78,54 @@ RESET_TEMPLATE = """
 """
 
 
+VERIFICATION_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><style>
+  body {{ font-family: Arial, sans-serif; background: #f5f5f5; }}
+  .container {{ max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; overflow: hidden; }}
+  .header {{ background: #0A1628; color: #fff; padding: 24px; text-align: center; }}
+  .header h1 {{ margin: 0; font-size: 22px; }}
+  .content {{ padding: 32px; color: #333; line-height: 1.6; }}
+  .code-box {{ background: #EFF6FF; border-radius: 8px; padding: 24px; margin: 20px 0; text-align: center; }}
+  .code {{ font-size: 36px; font-weight: bold; color: #1D4ED8; letter-spacing: 8px; }}
+  .note {{ font-size: 12px; color: #888; margin-top: 24px; }}
+  .footer {{ text-align: center; padding: 16px; color: #aaa; font-size: 12px; }}
+</style></head>
+<body>
+<div class="container">
+  <div class="header"><h1>E-posta Doğrulama</h1></div>
+  <div class="content">
+    <p>Merhaba,</p>
+    <p>Prial hesabınızı doğrulamak için aşağıdaki kodu kullanın:</p>
+    <div class="code-box">
+      <div class="code">{code}</div>
+    </div>
+    <p class="note">
+      Bu kod <strong>10 dakika</strong> geçerlidir.<br>
+      Eğer bu hesabı siz oluşturmadıysanız bu e-postayı görmezden gelebilirsiniz.
+    </p>
+  </div>
+  <div class="footer">Prial</div>
+</div>
+</body></html>
+"""
+
+
+async def send_verification_email(to_email: str, code: str) -> None:
+    _client()
+    html = VERIFICATION_TEMPLATE.format(code=code)
+    await asyncio.to_thread(
+        resend.Emails.send,
+        {
+            "from": f"{settings.from_email_name} <{settings.from_email}>",
+            "to": [to_email],
+            "subject": f"Prial - Doğrulama Kodu: {code}",
+            "html": html,
+        },
+    )
+
+
 async def send_alarm_email(
     to_email: str,
     product_title: str,

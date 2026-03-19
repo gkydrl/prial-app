@@ -14,6 +14,12 @@ export const authApi = {
 
   me: () => client.get<UserResponse>(ENDPOINTS.ME),
 
+  verifyEmail: (code: string) =>
+    client.post(ENDPOINTS.VERIFY_EMAIL, { code }),
+
+  resendVerification: () =>
+    client.post(ENDPOINTS.RESEND_VERIFICATION),
+
   forgotPassword: (email: string) =>
     client.post(ENDPOINTS.FORGOT_PASSWORD, { email }),
 

@@ -1,33 +1,17 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { showAlert } from '@/store/alertStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function RegisterScreen() {
-  const { returnProductId, openAlarm } = useLocalSearchParams<{
-    returnProductId?: string;
-    openAlarm?: string;
-  }>();
-
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
-
-  const navigateAfterAuth = () => {
-    if (returnProductId) {
-      router.replace({
-        pathname: '/product/[id]',
-        params: { id: returnProductId, openAlarm: openAlarm ?? '' },
-      });
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
 
   const handleRegister = async () => {
     if (!email || !password) {
@@ -41,7 +25,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email.trim(), password, fullName.trim() || undefined);
-      navigateAfterAuth();
+      router.replace('/(auth)/verify-email');
     } catch (e: any) {
       showAlert('Kayıt Başarısız', e.response?.data?.detail ?? 'Kayıt oluşturulamadı');
     } finally {

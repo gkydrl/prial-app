@@ -1,7 +1,8 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuthStore } from '@/store/authStore';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const ACTIVE = '#FFFFFF';
@@ -70,6 +71,14 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabsLayout() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isVerified = useAuthStore((s) => s.user?.is_verified);
+
+  // Redirect authenticated but unverified users to verification screen
+  if (isAuthenticated && isVerified === false) {
+    return <Redirect href="/(auth)/verify-email" />;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}

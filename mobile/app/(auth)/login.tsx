@@ -3,33 +3,18 @@ import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { showAlert } from '@/store/alertStore';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/authStore';
 
 export default function LoginScreen() {
-  const { returnProductId, openAlarm } = useLocalSearchParams<{
-    returnProductId?: string;
-    openAlarm?: string;
-  }>();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
-
-  const navigateAfterAuth = () => {
-    if (returnProductId) {
-      router.replace({
-        pathname: '/product/[id]',
-        params: { id: returnProductId, openAlarm: openAlarm ?? '' },
-      });
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,7 +24,13 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      navigateAfterAuth();
+      // Check if user is verified after login
+      const user = useAuthStore.getState().user;
+      if (user && !user.is_verified) {
+        router.replace('/(auth)/verify-email');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
       showAlert('Giriş Başarısız', e.response?.data?.detail ?? 'E-posta veya şifre hatalı');
     } finally {
@@ -108,14 +99,7 @@ export default function LoginScreen() {
           {/* Register link */}
           <TouchableOpacity
             style={{ alignItems: 'center' }}
-            onPress={() =>
-              router.push({
-                pathname: '/(auth)/register',
-                params: returnProductId
-                  ? { returnProductId, openAlarm: openAlarm ?? '' }
-                  : {},
-              })
-            }
+            onPress={() => router.push('/(auth)/register')}
           >
             <Text style={{ color: '#6B7280', fontSize: 14 }}>
               Hesabın yok mu?{' '}
