@@ -74,7 +74,7 @@ def _store_from_url(url: str) -> str:
 
 # ─── Serper API ──────────────────────────────────────────────────────────────
 
-async def _search_serper(query: str, num: int = 20) -> list[dict]:
+async def _search_serper(query: str, num: int = 40) -> list[dict]:
     """
     Serper.dev regular search API ile Google'da arama yapar.
     Returns: [{"title": ..., "link": ..., "snippet": ...}, ...]
