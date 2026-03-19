@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { TouchableOpacity, Text, View } from 'react-native';
+import { useState, useMemo } from 'react';
+import { TouchableOpacity, Text, View, Image as RNImage } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { DiscountBadge } from '@/components/ui/DiscountBadge';
 import { useAuthStore } from '@/store/authStore';
 import { openAlarmSheet } from '@/store/alarmSheetStore';
 import { showAlert } from '@/store/alertStore';
-import type { ProductResponse, ProductStoreResponse } from '@/types/api';
+import type { ProductResponse, ProductStoreResponse, StoreName } from '@/types/api';
 import { imageSource } from '@/utils/imageSource';
 
 interface ProductCardProps {
@@ -15,23 +15,67 @@ interface ProductCardProps {
   store?: ProductStoreResponse;
 }
 
+const STORE_LABELS: Record<string, string> = {
+  trendyol: 'Trendyol',
+  hepsiburada: 'Hepsiburada',
+  amazon: 'Amazon',
+  n11: 'N11',
+  ciceksepeti: 'Çiçeksepeti',
+  mediamarkt: 'MediaMarkt',
+  teknosa: 'Teknosa',
+  vatan: 'Vatan',
+  other: 'Diğer',
+};
+
+const STORE_COLORS: Record<string, string> = {
+  trendyol: '#F27A1A',
+  hepsiburada: '#FF6000',
+  amazon: '#FF9900',
+  n11: '#6B21A8',
+  ciceksepeti: '#E11D48',
+  mediamarkt: '#CC0000',
+  teknosa: '#1D4ED8',
+  vatan: '#DC2626',
+  other: '#334155',
+};
+
+const STORE_DOMAINS: Record<string, string> = {
+  trendyol: 'trendyol.com',
+  hepsiburada: 'hepsiburada.com',
+  amazon: 'amazon.com.tr',
+  n11: 'n11.com',
+  ciceksepeti: 'ciceksepeti.com',
+  mediamarkt: 'mediamarkt.com.tr',
+  teknosa: 'teknosa.com',
+  vatan: 'vatanbilgisayar.com',
+};
+
+/** Mağaza başına en düşük fiyatlı store'u döner */
+function getBestPerStore(stores: ProductStoreResponse[]): ProductStoreResponse[] {
+  const map = new Map<string, ProductStoreResponse>();
+  for (const s of stores) {
+    if (!s.in_stock || s.current_price == null) continue;
+    const existing = map.get(s.store);
+    if (!existing || Number(s.current_price) < Number(existing.current_price!)) {
+      map.set(s.store, s);
+    }
+  }
+  // Fiyata göre sırala (en ucuz önce)
+  return Array.from(map.values()).sort(
+    (a, b) => Number(a.current_price!) - Number(b.current_price!)
+  );
+}
+
 export function ProductCard({ product, store, width = 160 }: ProductCardProps & { width?: number }) {
   const [imgError, setImgError] = useState(false);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const activeStore = store ?? product.stores
-    .filter(s => s.in_stock)
-    .reduce<ProductStoreResponse | undefined>((min, s) => {
-      if (!s.current_price) return min;
-      if (!min || !min.current_price) return s;
-      return Number(s.current_price) < Number(min.current_price) ? s : min;
-    }, undefined) ?? product.stores[0];
+
+  const bestPerStore = useMemo(() => getBestPerStore(product.stores), [product.stores]);
+
+  const activeStore = store ?? bestPerStore[0] ?? product.stores[0];
 
   const price = activeStore?.current_price;
-  const originalPrice = activeStore?.original_price;
   const discount = activeStore?.discount_percent;
-
-  const priceStr = price != null ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : '-';
-  const originalStr = originalPrice != null ? originalPrice.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : null;
 
   const handleAlarmPress = () => {
     if (!isAuthenticated) {
@@ -48,13 +92,17 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
     });
   };
 
+  // Birden fazla mağaza varsa chip'leri göster
+  const showStoreChips = bestPerStore.length > 1;
+  const cardHeight = showStoreChips ? 224 : 200;
+
   return (
     <TouchableOpacity
       onPress={() => router.push(`/product/${product.id}`)}
       activeOpacity={0.85}
       style={{
         width,
-        height: 200,
+        height: cardHeight,
         backgroundColor: '#1E293B',
         borderRadius: 8,
         overflow: 'hidden',
@@ -95,7 +143,7 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
       </View>
 
       {/* Yazı alanı */}
-      <View style={{ height: 60, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
+      <View style={{ flex: 1, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
         <Text
           style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 15 }}
           numberOfLines={1}
@@ -103,29 +151,70 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
           {product.title}
         </Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {originalStr && (
-              <Text style={{ color: '#6B7280', fontSize: 11, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' }}>
-                {originalStr}
-              </Text>
-            )}
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-              {priceStr}
-            </Text>
+        {/* Mağaza fiyatları */}
+        {showStoreChips ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+            {bestPerStore.slice(0, 3).map((s) => (
+              <StorePriceChip key={s.store} store={s} />
+            ))}
           </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+              {price != null ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : '-'}
+            </Text>
 
-          {/* Talep sayısı — sağ alt */}
-          {product.alarm_count > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1D4ED820', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
-              <Ionicons name="pricetag-outline" size={11} color="#93C5FD" />
-              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
-                {product.alarm_count.toLocaleString('tr-TR')} Talep
-              </Text>
-            </View>
-          )}
-        </View>
+            {product.alarm_count > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1D4ED820', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
+                <Ionicons name="pricetag-outline" size={11} color="#93C5FD" />
+                <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
+                  {product.alarm_count.toLocaleString('tr-TR')} Talep
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
+  );
+}
+
+/** Mağaza logosu + en düşük fiyat chip'i */
+function StorePriceChip({ store }: { store: ProductStoreResponse }) {
+  const [logoError, setLogoError] = useState(false);
+  const color = STORE_COLORS[store.store] ?? '#334155';
+  const domain = STORE_DOMAINS[store.store] ?? 'example.com';
+  const priceStr = store.current_price != null
+    ? Math.round(Number(store.current_price)).toLocaleString('tr-TR') + '₺'
+    : '-';
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: color + '20',
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        paddingVertical: 3,
+      }}
+    >
+      {!logoError ? (
+        <RNImage
+          source={{ uri: `https://logo.clearbit.com/${domain}` }}
+          style={{ width: 12, height: 12, borderRadius: 2 }}
+          resizeMode="contain"
+          onError={() => setLogoError(true)}
+        />
+      ) : (
+        <View style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: color }}>
+          <Ionicons name="storefront" size={8} color="#FFFFFF" style={{ margin: 2 }} />
+        </View>
+      )}
+      <Text style={{ color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_700Bold' }}>
+        {priceStr}
+      </Text>
+    </View>
   );
 }
