@@ -29,21 +29,39 @@ def _since(period: str) -> datetime:
 
 def _price_before_subquery(since: datetime):
     """
-    Her ürün (product) için 'since' öncesindeki tüm mağazalardaki en düşük fiyatı döner.
-    Mağaza farkı gözetmez — ürünün o dönemdeki en iyi fiyatını bulur.
+    Her ürün için 'since' öncesindeki en son kaydedilen fiyatı döner.
+    Mağaza farkı gözetmez — her mağazanın son fiyatından en düşüğünü alır.
+    Lookback penceresi en az 7 gün: kısa kesintilere dayanıklı.
     """
-    lookback = since - (datetime.now(timezone.utc) - since)
-    if lookback >= since:
-        lookback = since - timedelta(hours=24)
+    period_len = datetime.now(timezone.utc) - since
+    lookback_hours = max(period_len.total_seconds() / 3600 * 3, 24 * 7)
+    lookback = since - timedelta(hours=lookback_hours)
 
+    # Her product_store için since öncesindeki en son kayıt zamanı
+    latest_per_store = (
+        select(
+            PriceHistory.product_store_id,
+            func.max(PriceHistory.recorded_at).label("latest_at"),
+        )
+        .where(PriceHistory.recorded_at < since)
+        .where(PriceHistory.recorded_at >= lookback)
+        .where(PriceHistory.price > 0)
+        .group_by(PriceHistory.product_store_id)
+        .subquery()
+    )
+
+    # O zamandaki fiyatı al ve ürün bazında en düşüğünü bul
     return (
         select(
             ProductStore.product_id,
             func.min(PriceHistory.price).label("price_before"),
         )
         .join(ProductStore, PriceHistory.product_store_id == ProductStore.id)
-        .where(PriceHistory.recorded_at < since)
-        .where(PriceHistory.recorded_at >= lookback)
+        .join(
+            latest_per_store,
+            (PriceHistory.product_store_id == latest_per_store.c.product_store_id)
+            & (PriceHistory.recorded_at == latest_per_store.c.latest_at),
+        )
         .where(PriceHistory.price > 0)
         .where(ProductStore.is_active == True)
         .group_by(ProductStore.product_id)
@@ -70,8 +88,8 @@ def _price_history_rows(db_result):
 
         drop_pct = (price_before - price_now) / price_before * 100
 
-        # Sanity check: %65+ düşüş → muhtemelen hatalı scrape
-        if drop_pct > 65:
+        # Sanity check: %50+ düşüş → muhtemelen hatalı scrape
+        if drop_pct > 50:
             continue
 
         product_id = str(product.id)
@@ -126,7 +144,10 @@ def _current_min_subquery():
 
 
 def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
-    """original_price > current_price olan mağazaları TopDropResponse formatında döndürür."""
+    """original_price > current_price olan mağazaları TopDropResponse formatında döndürür.
+    Bu veriler gerçek fiyat geçmişi değil, mağazanın kendi indirim bilgisi.
+    Bu yüzden daha sıkı filtreleme uygulanır.
+    """
     rows = []
     for s in stores:
         if not s.current_price or not s.original_price:
@@ -136,8 +157,8 @@ def _discount_fallback_rows(stores: list[ProductStore]) -> list[dict]:
         if orig <= cur or cur <= 0:
             continue
         drop_pct = (orig - cur) / orig * 100
-        # Sanity: %65+ düşüş → hatalı veri
-        if drop_pct > 65:
+        # Mağaza indirimlerinde %35+ → güvenilmez veya kalıcı kampanya
+        if drop_pct > 35:
             continue
         # store='other' güvenilmez kaynak
         if s.store.value == "other":

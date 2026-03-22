@@ -12,7 +12,6 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { PrialLoader } from '@/components/ui/PrialLoader';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/constants/api';
@@ -46,7 +45,7 @@ const SIDE_IMAGE_H = 76;
 const fmtPrice = (price: number | null) =>
   price != null ? Math.round(price).toLocaleString('tr-TR') + ' ₺' : '-';
 
-// Slug → icon eşleştirmesi
+// Slug → icon eşleştirmesi (kısmi eşleşme de desteklenir)
 const CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
   'akilli-telefon': 'phone-portrait',
   'telefon': 'phone-portrait',
@@ -54,27 +53,70 @@ const CATEGORY_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name
   'bilgisayar': 'laptop',
   'tablet': 'tablet-portrait',
   'televizyon': 'tv',
+  'tv': 'tv',
   'kulaklik-ses': 'headset',
   'kulaklik': 'headset',
+  'ses': 'headset',
   'akilli-saat': 'watch',
+  'saat': 'watch',
   'fotograf-makinesi': 'camera',
+  'fotograf': 'camera',
   'kamera': 'camera',
   'oyun-gaming': 'game-controller',
   'oyun-konsolu': 'game-controller',
+  'oyun': 'game-controller',
+  'gaming': 'game-controller',
+  'konsol': 'game-controller',
   'bilgisayar-bilesenleri': 'desktop',
+  'bilesen': 'desktop',
   'akilli-ev': 'home',
   'ev-aleti': 'home',
+  'ev': 'home',
   'spor-fitness': 'barbell',
+  'spor': 'barbell',
+  'fitness': 'barbell',
   'mobilya-ofis': 'bed',
+  'mobilya': 'bed',
+  'ofis': 'bed',
   'sneaker': 'footsteps',
+  'ayakkabi': 'footsteps',
   'outdoor-mont': 'rainy',
+  'outdoor': 'rainy',
+  'mont': 'rainy',
   'canta-aksesuar': 'bag',
+  'canta': 'bag',
+  'aksesuar': 'bag',
   'kol-saati': 'time',
   'premium-giyim': 'shirt',
+  'giyim': 'shirt',
   'e-mobilite': 'bicycle',
+  'mobilite': 'bicycle',
+  'scooter': 'bicycle',
   'bebek-cocuk': 'happy',
+  'bebek': 'happy',
+  'cocuk': 'happy',
   'el-aletleri': 'hammer',
+  'alet': 'hammer',
+  'elektrikli-ev': 'flash',
+  'mutfak': 'restaurant',
+  'kisisel-bakim': 'sparkles',
+  'bakim': 'sparkles',
+  'kozmetik': 'sparkles',
+  'saglik': 'medkit',
+  'kitap': 'book',
+  'elektronik': 'hardware-chip',
 };
+
+/** Slug'dan ikon bul — tam eşleşme yoksa parçalı eşleşme dene */
+function getCategoryIcon(slug: string): React.ComponentProps<typeof Ionicons>['name'] {
+  if (CATEGORY_ICONS[slug]) return CATEGORY_ICONS[slug];
+  // Slug parçalarıyla eşleşme dene
+  const parts = slug.split('-');
+  for (const part of parts) {
+    if (CATEGORY_ICONS[part]) return CATEGORY_ICONS[part];
+  }
+  return 'grid-outline';
+}
 
 type CategoryItem = { label: string; slug: string | null; icon: React.ComponentProps<typeof Ionicons>['name'] };
 
@@ -486,7 +528,7 @@ export default function DiscoverScreen() {
           all.push({
             label: cat.name,
             slug: cat.slug,
-            icon: CATEGORY_ICONS[cat.slug] ?? 'pricetag',
+            icon: getCategoryIcon(cat.slug),
           });
         }
         if (all.length > 1) {
@@ -560,28 +602,17 @@ export default function DiscoverScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       <Animated.View style={[{ flex: 1 }, fadeStyle]}>
-      {/* Başlık + Arama */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <LinearGradient
-            colors={['#0D2060', '#1D4ED8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={{ width: 3, height: 40, borderRadius: 2 }}
-          />
-          <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>
-            Keşfet
-          </Text>
-        </View>
+      {/* Arama */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: '#1E293B',
-          borderRadius: 12,
-          paddingHorizontal: 12,
-          gap: 8,
+          borderRadius: 10,
+          paddingHorizontal: 10,
+          gap: 6,
         }}>
-          <Ionicons name="search-outline" size={18} color="#64748B" />
+          <Ionicons name="search-outline" size={16} color="#64748B" />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -590,16 +621,16 @@ export default function DiscoverScreen() {
             style={{
               flex: 1,
               color: '#FFFFFF',
-              fontSize: 14,
+              fontSize: 13,
               fontFamily: 'Inter_400Regular',
-              paddingVertical: 12,
+              paddingVertical: 8,
             }}
             autoCapitalize="none"
             returnKeyType="search"
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#475569" />
+              <Ionicons name="close-circle" size={16} color="#475569" />
             </TouchableOpacity>
           )}
         </View>
@@ -610,7 +641,7 @@ export default function DiscoverScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 4, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 10, paddingVertical: 2, gap: 6 }}
       >
         {categories.map((cat) => {
           const isActive = selectedCategory === cat.slug;
@@ -620,22 +651,39 @@ export default function DiscoverScreen() {
               onPress={() => handleCategoryPress(cat.slug)}
               activeOpacity={0.75}
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: 26,
+                alignItems: 'center',
+                gap: 2,
+                width: 50,
+              }}
+            >
+              <View style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
                 backgroundColor: isActive ? '#1D4ED8' : '#1E293B',
                 justifyContent: 'center',
                 alignItems: 'center',
-              }}
-            >
-              <Ionicons name={cat.icon} size={26} color={isActive ? '#FFFFFF' : '#94A3B8'} />
+              }}>
+                <Ionicons name={cat.icon} size={18} color={isActive ? '#FFFFFF' : '#94A3B8'} />
+              </View>
+              <Text
+                style={{
+                  color: isActive ? '#FFFFFF' : '#64748B',
+                  fontSize: 8,
+                  fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_400Regular',
+                  textAlign: 'center',
+                }}
+                numberOfLines={1}
+              >
+                {cat.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
       {/* Ürün Grid */}
-      <View style={{ flex: 1, marginTop: 16 }}>
+      <View style={{ flex: 1, marginTop: 6 }}>
         {isLoading ? (
           <PrialLoader />
         ) : products.length === 0 ? (
