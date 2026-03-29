@@ -11,12 +11,8 @@ scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Tüm tabloları oluştur (henüz yoksa)
-    from app.database import engine, Base
-    import app.models  # noqa: F401
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Tablolar alembic migration ile oluşturuluyor (start.sh → alembic upgrade head)
+    import app.models  # noqa: F401 — modelleri register et
 
     # Öncelik kuyruğuna göre fiyat takip zamanlayıcısı
     # Her 15 dakikada çalışır; sadece next_check_at'i geçmiş store'ları işler.
