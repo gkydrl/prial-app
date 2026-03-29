@@ -113,7 +113,7 @@ async def _save_price_points(
             select(PriceHistory.id).where(
                 PriceHistory.product_store_id == product_store_id,
                 func.date(PriceHistory.recorded_at) == dp.date,
-                PriceHistory.source == PriceSource.AKAKCE_IMPORT,
+                PriceHistory.source == "akakce_import",
             )
         )
         if existing.scalar_one_or_none():
@@ -124,7 +124,7 @@ async def _save_price_points(
             price=Decimal(str(dp.price)),
             currency="TRY",
             in_stock=True,
-            source=PriceSource.AKAKCE_IMPORT,
+            source="akakce_import",
             recorded_at=datetime(dp.date.year, dp.date.month, dp.date.day, tzinfo=timezone.utc),
         )
         db.add(record)

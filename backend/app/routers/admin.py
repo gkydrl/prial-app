@@ -459,7 +459,7 @@ async def akakce_status(
     # Akakce import data point sayısı
     akakce_points = (await db.execute(
         select(func.count(PriceHistory.id))
-        .where(PriceHistory.source == PriceSource.AKAKCE_IMPORT)
+        .where(PriceHistory.source == "akakce_import")
     )).scalar() or 0
 
     # l1y istatistiği olan ürün sayısı
