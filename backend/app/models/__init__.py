@@ -6,6 +6,7 @@ from app.models.alarm import Alarm
 from app.models.notification import Notification
 from app.models.promo_code import PromoCode
 from app.models.campaign import StoreAccount, Campaign, CodePool, UserPromoAssignment
+from app.models.prediction import PricePrediction, PredictionOutcome, ModelParameters
 
 __all__ = [
     "User",
@@ -20,4 +21,7 @@ __all__ = [
     "Campaign",
     "CodePool",
     "UserPromoAssignment",
+    "PricePrediction",
+    "PredictionOutcome",
+    "ModelParameters",
 ]

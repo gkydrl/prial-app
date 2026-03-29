@@ -1,10 +1,17 @@
 import uuid
+import enum
 from datetime import datetime
 from decimal import Decimal
-from sqlalchemy import DateTime, func, ForeignKey, Numeric, Boolean, String
+from sqlalchemy import DateTime, func, ForeignKey, Numeric, Boolean, String, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
+
+
+class PriceSource(str, enum.Enum):
+    OWN_SCRAPE = "own_scrape"
+    AKAKCE_IMPORT = "akakce_import"
+    CIMRI_IMPORT = "cimri_import"
 
 
 class PriceHistory(Base):
@@ -23,6 +30,11 @@ class PriceHistory(Base):
     original_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="TRY")
     in_stock: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[PriceSource] = mapped_column(
+        Enum(PriceSource, name="price_source_enum"),
+        nullable=False,
+        server_default="own_scrape",
+    )
 
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True

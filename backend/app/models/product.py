@@ -40,6 +40,11 @@ class Product(Base):
     lowest_price_ever: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     alarm_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Akakce integration
+    l1y_lowest_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    l1y_highest_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    akakce_url: Mapped[str | None] = mapped_column(String(1000))
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

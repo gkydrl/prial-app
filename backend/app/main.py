@@ -24,6 +24,9 @@ async def lifespan(app: FastAPI):
     from app.services.catalog_crawler import crawl_all_variants
     from app.services.summary_service import send_daily_summaries, send_weekly_summaries
     from app.services.product_discovery import discover_daily
+    from app.services.akakce.importer import bulk_import as akakce_bulk_import, daily_enrichment as akakce_daily_enrichment
+    from app.services.prediction.runner import run_daily_predictions
+    from app.services.prediction.evaluator import evaluate_predictions
 
     scheduler.add_job(
         check_due_prices,
@@ -72,6 +75,46 @@ async def lifespan(app: FastAPI):
         hour=10,
         minute=0,
         id="weekly_summary",
+        replace_existing=True,
+    )
+
+    # Akakçe toplu import — her gece 02:00 (akakce_url'si olmayan ürünler)
+    scheduler.add_job(
+        lambda: akakce_bulk_import(batch_size=50, only_new=True),
+        trigger="cron",
+        hour=2,
+        minute=0,
+        id="akakce_bulk_import",
+        replace_existing=True,
+    )
+
+    # Akakçe günlük zenginleştirme — her gün 05:00 (mevcut eşleşmeleri güncelle)
+    scheduler.add_job(
+        lambda: akakce_daily_enrichment(batch_size=20),
+        trigger="cron",
+        hour=5,
+        minute=0,
+        id="akakce_daily_enrichment",
+        replace_existing=True,
+    )
+
+    # Günlük AL/BEKLE tahminleri — her gün 06:00
+    scheduler.add_job(
+        run_daily_predictions,
+        trigger="cron",
+        hour=6,
+        minute=0,
+        id="daily_predictions",
+        replace_existing=True,
+    )
+
+    # Tahmin değerlendirmesi — her gün 07:00 (7 gün önceki tahminler)
+    scheduler.add_job(
+        evaluate_predictions,
+        trigger="cron",
+        hour=7,
+        minute=0,
+        id="prediction_evaluation",
         replace_existing=True,
     )
 

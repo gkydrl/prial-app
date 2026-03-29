@@ -412,6 +412,139 @@ async def discovery_stats(
     }
 
 
+# ─── Akakçe Import Endpoints ─────────────────────────────────────────────────
+
+
+@router.post("/akakce/import")
+async def trigger_akakce_import(
+    batch_size: int = 50,
+    only_new: bool = True,
+    _: None = Depends(require_admin),
+):
+    """Akakçe fiyat geçmişi import'unu manuel tetikler."""
+    import asyncio
+    from app.services.akakce.importer import bulk_import
+
+    async def _safe_import():
+        try:
+            await bulk_import(batch_size=batch_size, only_new=only_new)
+        except Exception as e:
+            print(f"[admin/akakce] HATA: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    asyncio.create_task(_safe_import())
+    mode = "sadece yeni" if only_new else "tümü"
+    return {"message": f"Akakçe import başlatıldı ({mode}, batch={batch_size}, arka planda)"}
+
+
+@router.get("/akakce/status")
+async def akakce_status(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Akakçe eşleşme ve veri istatistikleri."""
+    from sqlalchemy import func
+    from app.models.price_history import PriceHistory, PriceSource
+
+    # Eşleşmiş ürün sayısı
+    matched = (await db.execute(
+        select(func.count(Product.id)).where(Product.akakce_url.isnot(None))
+    )).scalar() or 0
+
+    total_products = (await db.execute(
+        select(func.count(Product.id))
+    )).scalar() or 0
+
+    # Akakce import data point sayısı
+    akakce_points = (await db.execute(
+        select(func.count(PriceHistory.id))
+        .where(PriceHistory.source == PriceSource.AKAKCE_IMPORT)
+    )).scalar() or 0
+
+    # l1y istatistiği olan ürün sayısı
+    with_l1y = (await db.execute(
+        select(func.count(Product.id)).where(
+            Product.l1y_lowest_price.isnot(None),
+            Product.l1y_highest_price.isnot(None),
+        )
+    )).scalar() or 0
+
+    return {
+        "total_products": total_products,
+        "akakce_matched": matched,
+        "match_rate": f"%{matched/total_products*100:.1f}" if total_products > 0 else "0%",
+        "akakce_data_points": akakce_points,
+        "products_with_l1y_stats": with_l1y,
+    }
+
+
+# ─── Prediction Endpoints ───────────────────────────────────────────────────
+
+
+@router.get("/predictions/accuracy")
+async def prediction_accuracy(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Model doğruluk istatistikleri."""
+    from app.services.prediction.evaluator import get_accuracy_stats
+    return await get_accuracy_stats(db)
+
+
+@router.get("/predictions/product/{product_id}")
+async def product_prediction(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Tekil ürün için tahmin üret veya mevcut tahmini getir."""
+    from datetime import date
+    from app.models.prediction import PricePrediction
+    from app.services.prediction.runner import predict_for_product
+
+    product = await db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    # Bugünkü tahmin var mı?
+    today = date.today()
+    existing = await db.execute(
+        select(PricePrediction).where(
+            PricePrediction.product_id == product_id,
+            PricePrediction.prediction_date == today,
+        )
+    )
+    prediction = existing.scalar_one_or_none()
+
+    if not prediction:
+        # Yeni tahmin üret
+        prediction = await predict_for_product(product, db)
+        if not prediction:
+            return {
+                "product_id": str(product_id),
+                "product_title": product.title,
+                "status": "insufficient_data",
+                "message": "Yeterli fiyat geçmişi yok",
+            }
+        await db.commit()
+
+    return {
+        "product_id": str(product_id),
+        "product_title": product.title,
+        "prediction_date": str(prediction.prediction_date),
+        "recommendation": prediction.recommendation.value,
+        "confidence": float(prediction.confidence),
+        "current_price": float(prediction.current_price),
+        "predicted_direction": prediction.predicted_direction.value,
+        "model_version": prediction.model_version,
+        "reasoning": prediction.reasoning,
+        "l1y_lowest": float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+        "l1y_highest": float(product.l1y_highest_price) if product.l1y_highest_price else None,
+        "akakce_url": product.akakce_url,
+    }
+
+
 # ─── Push Notification Test Endpoints ────────────────────────────────────────
 
 
