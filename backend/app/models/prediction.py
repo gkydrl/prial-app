@@ -36,14 +36,14 @@ class PricePrediction(Base):
     )
     prediction_date: Mapped[date] = mapped_column(Date(), nullable=False)
     recommendation: Mapped[Recommendation] = mapped_column(
-        Enum(Recommendation, name="recommendation_enum"), nullable=False
+        Enum(Recommendation, name="recommendation_enum", create_type=False), nullable=False
     )
     confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
     reasoning: Mapped[dict | None] = mapped_column(JSONB)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     current_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     predicted_direction: Mapped[PredictedDirection] = mapped_column(
-        Enum(PredictedDirection, name="predicted_direction_enum"), nullable=False
+        Enum(PredictedDirection, name="predicted_direction_enum", create_type=False), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

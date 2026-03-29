@@ -31,7 +31,7 @@ class PriceHistory(Base):
     currency: Mapped[str] = mapped_column(String(3), default="TRY")
     in_stock: Mapped[bool] = mapped_column(Boolean, default=True)
     source: Mapped[PriceSource] = mapped_column(
-        Enum(PriceSource, name="price_source_enum"),
+        Enum(PriceSource, name="price_source_enum", create_type=False),
         nullable=False,
         server_default="own_scrape",
     )
