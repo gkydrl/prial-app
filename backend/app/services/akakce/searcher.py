@@ -35,17 +35,40 @@ async def search_akakce(query: str) -> list[AkakceSearchResult]:
     """
     Akakce'de arama yapar ve sonuclari doner.
     Statik HTML parse — Playwright gerekmez.
+    Direkt erisim 403 alirsa ScraperAPI proxy ile dener.
     """
+    from app.config import settings
+
     encoded = urllib.parse.quote_plus(query)
     search_url = f"https://www.akakce.com/arama/?q={encoded}"
 
-    try:
-        async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=15) as client:
-            resp = await client.get(search_url)
-            resp.raise_for_status()
-            html = resp.text
-    except Exception as e:
-        print(f"[akakce/searcher] HTTP hatası: {e}", flush=True)
+    html = None
+    async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+        # 1. Direkt erisim
+        try:
+            resp = await client.get(search_url, headers=HEADERS)
+            if resp.status_code == 200:
+                html = resp.text
+        except Exception:
+            pass
+
+        # 2. ScraperAPI fallback
+        if html is None and settings.scraper_api_key:
+            try:
+                proxy_url = (
+                    f"http://api.scraperapi.com"
+                    f"?api_key={settings.scraper_api_key}"
+                    f"&url={urllib.parse.quote(search_url, safe='')}"
+                )
+                resp = await client.get(proxy_url, timeout=30)
+                if resp.status_code == 200:
+                    html = resp.text
+                    print(f"[akakce/searcher] ScraperAPI ile alındı", flush=True)
+            except Exception as e:
+                print(f"[akakce/searcher] ScraperAPI hatası: {e}", flush=True)
+
+    if not html:
+        print(f"[akakce/searcher] Sayfa alınamadı: {query}", flush=True)
         return []
 
     results: list[AkakceSearchResult] = []
