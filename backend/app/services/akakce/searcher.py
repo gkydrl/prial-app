@@ -119,6 +119,8 @@ async def search_akakce(query: str) -> list[AkakceSearchResult]:
 async def find_akakce_url(product_title: str, brand: str | None = None) -> str | None:
     """
     Bir Prial urunu icin Akakce'deki en iyi eslesen URL'yi bulur.
+    1. Jaccard >= 0.30 → direkt kabul
+    2. Jaccard düşükse → Claude Haiku ile LLM matching
     """
     query = f"{brand} {product_title}" if brand else product_title
     words = query.split()
@@ -151,11 +153,71 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
             best_score = score
             best_match = r
 
+    # Jaccard yeterli → direkt kabul
     if best_match and best_score >= 0.30:
-        print(f"[akakce/searcher] Eşleşme bulundu (score={best_score:.2f}): {best_match.title}", flush=True)
+        print(f"[akakce/searcher] Eşleşme bulundu (jaccard={best_score:.2f}): {best_match.title}", flush=True)
         return best_match.url
 
-    print(f"[akakce/searcher] Yeterli eşleşme yok (best={best_score:.2f}): {query}", flush=True)
+    # Jaccard düşük → Haiku ile LLM matching dene
+    if results:
+        haiku_match = await _llm_match(catalog_label, results[:8])
+        if haiku_match:
+            print(f"[akakce/searcher] LLM eşleşme bulundu: {haiku_match.title}", flush=True)
+            return haiku_match.url
+
+    print(f"[akakce/searcher] Eşleşme yok (jaccard={best_score:.2f}): {query}", flush=True)
+    return None
+
+
+async def _llm_match(
+    product_label: str,
+    candidates: list[AkakceSearchResult],
+) -> AkakceSearchResult | None:
+    """
+    Claude Haiku ile urun eslestirme.
+    Prial urun adini Akakce sonuclariyla karsilastirir.
+    """
+    from app.config import settings
+
+    if not settings.anthropic_api_key:
+        return None
+
+    try:
+        import anthropic
+
+        candidate_lines = "\n".join(
+            f"{i+1}. {c.title}" for i, c in enumerate(candidates)
+        )
+
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        resp = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=20,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Ürün: {product_label}\n\n"
+                    f"Adaylar:\n{candidate_lines}\n\n"
+                    "Bu ürünle aynı olan aday hangisi? "
+                    "Sadece numarasını yaz (1-{len}). "
+                    "Hiçbiri aynı değilse 0 yaz."
+                ).format(len=len(candidates)),
+            }],
+        )
+
+        answer = resp.content[0].text.strip()
+        # İlk sayıyı çıkar
+        num_match = re.search(r"(\d+)", answer)
+        if not num_match:
+            return None
+
+        idx = int(num_match.group(1))
+        if 1 <= idx <= len(candidates):
+            return candidates[idx - 1]
+
+    except Exception as e:
+        print(f"[akakce/searcher] LLM match hatası: {e}", flush=True)
+
     return None
 
 
