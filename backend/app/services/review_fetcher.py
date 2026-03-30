@@ -146,17 +146,23 @@ async def _fetch_trendyol_review_texts(
     max_reviews: int,
 ) -> list[str]:
     """
-    HTML içindeki gömülü yorum verilerini çeker.
-    Trendyol ürün sayfasında __SEARCH_PLATFORM_STATE__ veya benzeri
-    script tag'lerinde yorum snippet'leri olabilir.
+    Trendyol yorum metinlerini çeker.
+    1) HTML'den contentId çıkar → review API (ScraperAPI proxy)
+    2) Fallback: HTML içindeki gömülü yorum verilerinden parse et
     """
+    # ── Yöntem 1: Review API via ScraperAPI ──
+    content_id = _extract_content_id(html, store_product_id)
+    if content_id:
+        api_reviews = await _fetch_trendyol_review_api(content_id, max_reviews)
+        if api_reviews:
+            return api_reviews
+
+    # ── Yöntem 2: HTML'deki gömülü yorumlar (fallback) ──
     reviews: list[str] = []
 
-    # Gömülü JSON'daki yorum pattern'ları
     # Pattern 1: "comment":"..." şeklinde gömülü yorumlar
     comment_matches = re.findall(r'"comment"\s*:\s*"([^"]{20,300})"', html)
     for c in comment_matches[:max_reviews]:
-        # JSON escape'lerini decode et
         try:
             decoded = json.loads(f'"{c}"')
             reviews.append(decoded.strip())
@@ -174,6 +180,57 @@ async def _fetch_trendyol_review_texts(
                 reviews.append(r.strip())
 
     return reviews
+
+
+def _extract_content_id(html: str, store_product_id: str) -> str | None:
+    """HTML'den Trendyol contentId çıkarır."""
+    # Pattern: "contentId":12345
+    m = re.search(r'"contentId"\s*:\s*(\d+)', html)
+    if m:
+        return m.group(1)
+    # Fallback: store_product_id'yi dene (bazen doğrudan contentId olarak çalışır)
+    if store_product_id and store_product_id.isdigit():
+        return store_product_id
+    return None
+
+
+async def _fetch_trendyol_review_api(
+    content_id: str, max_reviews: int = 50
+) -> list[str]:
+    """
+    Trendyol review API'sini ScraperAPI üzerinden çağırır.
+    public.trendyol.com DNS çözümlenmediği için ScraperAPI proxy gerekli.
+    """
+    size = min(max_reviews, 50)
+    review_api_url = (
+        f"https://public.trendyol.com/discovery-web-socialgw-service"
+        f"/api/review/{content_id}?order=most-recent&size={size}"
+    )
+    proxy_url = scraper_api_url(review_api_url, render=False)
+
+    try:
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.get(proxy_url)
+            if resp.status_code != 200:
+                print(f"  [review_api] HTTP {resp.status_code} for contentId={content_id}")
+                return []
+
+            data = resp.json()
+            result = data.get("result", {})
+            product_reviews = result.get("productReviews", [])
+
+            reviews: list[str] = []
+            for pr in product_reviews:
+                comment = (pr.get("comment") or "").strip()
+                if comment and len(comment) >= 10:
+                    reviews.append(comment)
+
+            print(f"  [review_api] contentId={content_id} → {len(reviews)} yorum")
+            return reviews
+
+    except Exception as e:
+        print(f"  [review_api] Hata: {e}")
+        return []
 
 
 # ─── Hepsiburada ─────────────────────────────────────────────────────────────

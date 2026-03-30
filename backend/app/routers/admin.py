@@ -978,6 +978,97 @@ async def test_review_fetching(
     }
 
 
+# ─── Review Analyze-Test Endpoint ─────────────────────────────────────────────
+
+
+@router.post("/reviews/analyze-test")
+async def test_review_analysis(
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """
+    DB'den ürünlerin Trendyol store kayıtlarını çeker,
+    yorumları ScraperAPI ile çeker, keyword filtre uygular, sonuç döner.
+    """
+    from sqlalchemy.orm import selectinload
+    from app.services.review_fetcher import fetch_trendyol_reviews
+    from app.services.review_analyzer import analyze_reviews
+
+    # Trendyol store kayıtlarını çek (store_product_id ve URL'si olanlar)
+    stmt = (
+        select(ProductStore)
+        .options(selectinload(ProductStore.product))
+        .where(
+            ProductStore.store == "trendyol",
+            ProductStore.store_product_id.isnot(None),
+            ProductStore.url.isnot(None),
+            ProductStore.is_active.is_(True),
+        )
+        .order_by(ProductStore.created_at.desc())
+        .limit(limit * 3)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    # Ürün başına max 1 store seç
+    seen_products: set[str] = set()
+    stores_to_test: list[ProductStore] = []
+    for ps in rows:
+        pid = str(ps.product_id)
+        if pid not in seen_products:
+            seen_products.add(pid)
+            stores_to_test.append(ps)
+        if len(stores_to_test) >= limit:
+            break
+
+    total_fetched = 0
+    total_filtered = 0
+    total_relevant = 0
+    results = []
+
+    for ps in stores_to_test:
+        product_title = ps.product.title if ps.product else "?"
+
+        # Yorumları çek (max 50 — review API'den)
+        review_result = await fetch_trendyol_reviews(
+            store_product_id=ps.store_product_id,
+            product_title=product_title,
+            product_url=ps.url,
+            max_reviews=50,
+        )
+
+        review_texts = review_result.sample_reviews if review_result.status == "ok" else []
+
+        # Keyword filtre uygula
+        analysis = analyze_reviews(
+            reviews=review_texts,
+            product_title=product_title,
+            store="trendyol",
+        )
+
+        total_fetched += analysis.reviews_fetched
+        total_filtered += analysis.filtered_out
+        total_relevant += analysis.relevant
+
+        results.append({
+            "product": product_title,
+            "store": "trendyol",
+            "reviews_fetched": analysis.reviews_fetched,
+            "filtered_out": analysis.filtered_out,
+            "relevant": analysis.relevant,
+            "sample_relevant": analysis.sample_relevant,
+            "sample_filtered": analysis.sample_filtered,
+        })
+
+    return {
+        "products_tested": len(results),
+        "total_reviews_fetched": total_fetched,
+        "keyword_filtered": total_filtered,
+        "product_relevant": total_relevant,
+        "results": results,
+    }
+
+
 # ─── Test Helpers ────────────────────────────────────────────────────────────
 
 

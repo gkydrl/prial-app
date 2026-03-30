@@ -26,6 +26,49 @@ async def random_delay(min_sec: float = 3.0, max_sec: float = 6.0) -> None:
     await asyncio.sleep(random.uniform(min_sec, max_sec))
 
 
+# ── Jenerik / kategori sayfası ürünlerini atla ──
+_JUNK_PATTERNS = [
+    "fiyat", "modelleri", "ekipman", "çeşitleri",
+    "2. el", "yenilenmiş",
+]
+
+
+def _is_junk_product(title: str) -> bool:
+    """Kategori/arama sayfası olan ürünleri filtreler."""
+    t = title.lower()
+    if any(p in t for p in _JUNK_PATTERNS):
+        return True
+    # Çok kısa veya jenerik (ör. "IPS Monitör", "Lg Monitör")
+    words = title.split()
+    if len(words) <= 2 and not any(c.isdigit() for c in title):
+        return True
+    return False
+
+
+# ── Brand title'a gömülü ise ayıkla ──
+_KNOWN_BRANDS = [
+    "Samsung", "Apple", "Sony", "LG", "Xiaomi", "Huawei", "Oppo",
+    "Lenovo", "Dell", "Asus", "Acer", "HP", "MSI", "Monster",
+    "Bosch", "Siemens", "Arçelik", "Beko", "Philips", "Dyson",
+    "Marshall", "JBL", "Sonos", "Canon", "Nikon", "Fujifilm",
+    "Qpart", "Casper", "TCL", "Hisense", "Vestel", "Grundig",
+]
+
+
+def _extract_brand_from_title(title: str) -> tuple[str | None, str]:
+    """
+    'SamsungGalaxy S24...' → ('Samsung', 'Galaxy S24...')
+    Title'ın başında boşluksuz brand varsa ayırır.
+    """
+    for brand in _KNOWN_BRANDS:
+        if title.startswith(brand) and len(title) > len(brand):
+            rest = title[len(brand):]
+            # Brand'dan sonra büyük harf veya rakam geliyorsa gömülü demektir
+            if rest[0].isupper() or rest[0].isdigit():
+                return brand, rest
+    return None, title
+
+
 async def import_product_history(
     product: Product,
     db: AsyncSession,
@@ -35,10 +78,26 @@ async def import_product_history(
     Returns: {"status": "ok"|"no_match"|"no_data"|"error", "data_points": int}
     """
     try:
+        # 0. Jenerik/kategori ürünlerini atla
+        if _is_junk_product(product.title):
+            return {"status": "skipped", "data_points": 0}
+
+        # 0b. Brand title'a gömülüyse ayıkla
+        title = product.title
+        brand = product.brand
+        if not brand:
+            extracted_brand, cleaned_title = _extract_brand_from_title(title)
+            if extracted_brand:
+                brand = extracted_brand
+                title = cleaned_title
+                product.brand = brand
+                product.title = cleaned_title
+                await db.flush()
+
         # 1. akakce_url cache'i var mi?
         akakce_url = product.akakce_url
         if not akakce_url:
-            akakce_url = await find_akakce_url(product.title, product.brand)
+            akakce_url = await find_akakce_url(title, brand)
             if akakce_url:
                 product.akakce_url = akakce_url
                 await db.flush()
@@ -170,7 +229,7 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
     only_new=False: tum urunler (guncelleme)
     Returns: {"total": N, "ok": N, "no_match": N, ...}
     """
-    stats = {"total": 0, "ok": 0, "no_match": 0, "no_data": 0, "error": 0}
+    stats = {"total": 0, "ok": 0, "no_match": 0, "no_data": 0, "skipped": 0, "error": 0}
 
     async with AsyncSessionLocal() as db:
         # Hedef urunleri sec
@@ -186,11 +245,15 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
 
         for i, product in enumerate(products):
             stats["total"] += 1
-            print(f"[akakce/importer] [{i+1}/{len(products)}] {product.brand} {product.title[:40]}", flush=True)
 
             result = await import_product_history(product, db)
             status = result["status"]
             stats[status] = stats.get(status, 0) + 1
+
+            if status == "skipped":
+                print(f"[akakce/importer] [{i+1}/{len(products)}] ATLA: {product.title[:50]}", flush=True)
+            else:
+                print(f"[akakce/importer] [{i+1}/{len(products)}] {product.brand} {product.title[:40]}", flush=True)
 
             if result["data_points"] > 0:
                 print(f"  → {result['data_points']} data point kaydedildi", flush=True)
@@ -198,8 +261,9 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
             # Commit after each product to avoid long transactions
             await db.commit()
 
-            # Rate limiting between products
-            await random_delay(1.0, 2.0)
+            # Rate limiting — skip edilenlerde bekleme yok
+            if status != "skipped":
+                await random_delay(1.0, 2.0)
 
     print(f"[akakce/importer] Tamamlandı: {stats}", flush=True)
     return stats

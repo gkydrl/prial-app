@@ -122,7 +122,14 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
     1. Jaccard >= 0.30 → direkt kabul
     2. Jaccard düşükse → Claude Haiku ile LLM matching
     """
+    # Sorgu oluştur — gereksiz kelimeleri temizle
     query = f"{brand} {product_title}" if brand else product_title
+    # Parantez, tırnak, özel karakterleri temizle
+    query = re.sub(r'["""\'\(\)&;,]', ' ', query)
+    # "Fiyat" ve sonrasını kes (ör. "Galaxy S24 Fiyat &amp; Özellikleri")
+    query = re.split(r'\b[Ff]iyat\b', query)[0].strip()
+    # Tekrar eden boşlukları temizle
+    query = re.sub(r'\s+', ' ', query).strip()
     words = query.split()
     if len(words) > 8:
         query = " ".join(words[:8])
