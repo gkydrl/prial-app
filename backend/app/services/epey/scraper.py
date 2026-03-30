@@ -88,16 +88,27 @@ async def find_epey_url(product_title: str, brand: str | None = None) -> tuple[s
     Prial urunu icin Epey'deki en iyi eslesen URL ve ID'yi bulur.
     Returns: (url, epey_product_id) or (None, None)
     """
+    # Epey autocomplete kisa sorgu istiyor — marka + ilk 4-5 kelime yeterli
     query = f"{brand} {product_title}" if brand else product_title
     words = query.split()
-    if len(words) > 8:
-        query = " ".join(words[:8])
+    if len(words) > 5:
+        query = " ".join(words[:5])
+    # Ozel karakterleri temizle
+    query = re.sub(r"[·,;()\[\]{}\"']", " ", query)
+    query = re.sub(r"\s+", " ", query).strip()
 
     print(f"[epey] Aranıyor: {query}", flush=True)
 
     results = await search_epey(query)
+
+    # Sonuc yoksa daha kisa sorgu dene (sadece marka + model)
+    if not results and brand and len(words) > 3:
+        short_query = " ".join(words[:3])
+        short_query = re.sub(r"[·,;()\[\]{}\"']", " ", short_query).strip()
+        print(f"[epey] Kısa sorgu deneniyor: {short_query}", flush=True)
+        results = await search_epey(short_query)
+
     if not results:
-        print(f"[epey] Sonuç bulunamadı: {query}", flush=True)
         return None, None
 
     # Jaccard match
