@@ -1,14 +1,27 @@
 """
 Akakce'de urun arama ve eslestirme.
 catalog_matcher.py'deki _fuzzy_title_match() ve _normalize() fonksiyonlarini reuse eder.
+
+Akakce arama sonuclari statik HTML'de geliyor (SSR), Playwright gereksiz.
+httpx ile dogrudan cekilir.
 """
 from __future__ import annotations
 
+import re
 import urllib.parse
 from dataclasses import dataclass
 
-from app.services.akakce.browser import get_page, random_delay, wait_for_cloudflare
-from app.services.catalog_matcher import _fuzzy_title_match, _normalize
+import httpx
+
+from app.services.catalog_matcher import _normalize
+
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Referer": "https://www.akakce.com/",
+}
 
 
 @dataclass
@@ -21,64 +34,61 @@ class AkakceSearchResult:
 async def search_akakce(query: str) -> list[AkakceSearchResult]:
     """
     Akakce'de arama yapar ve sonuclari doner.
-    Returns: list of AkakceSearchResult (title, url, price)
+    Statik HTML parse — Playwright gerekmez.
     """
     encoded = urllib.parse.quote_plus(query)
     search_url = f"https://www.akakce.com/arama/?q={encoded}"
 
-    async with get_page() as page:
-        try:
-            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-            passed = await wait_for_cloudflare(page)
-            if not passed:
-                print(f"[akakce/searcher] Cloudflare gecilmedi: {query}", flush=True)
-                return []
+    try:
+        async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=15) as client:
+            resp = await client.get(search_url)
+            resp.raise_for_status()
+            html = resp.text
+    except Exception as e:
+        print(f"[akakce/searcher] HTTP hatası: {e}", flush=True)
+        return []
 
-            # Wait for search results to load
-            await page.wait_for_selector("li.pl_v8, ul.pl_v8 li, div.pl_v8", timeout=10000)
+    results: list[AkakceSearchResult] = []
 
-        except Exception as e:
-            print(f"[akakce/searcher] Sayfa yukleme hatasi: {e}", flush=True)
-            return []
+    # Parse product items from ul.pl_v9 > li[data-pr]
+    # Each li has: data-pr (id), a[title] (name), a[href] (url), span.pt_v9 (price)
+    items = re.findall(
+        r'<li\s+data-pr="(\d+)"[^>]*>.*?'
+        r'<a\s+href="([^"]+)"\s+title="([^"]+)".*?'
+        r'(?:<span\s+class="pt_v9[^"]*"[^>]*>\s*(?:<!--[^>]*-->)?\s*([\d.,]+))?',
+        html,
+        re.DOTALL,
+    )
 
-        results: list[AkakceSearchResult] = []
-
-        # Try multiple selectors — Akakce may use different layouts
-        items = await page.query_selector_all("li.pl_v8")
-        if not items:
-            items = await page.query_selector_all("ul.pl_v8 li")
-        if not items:
-            items = await page.query_selector_all("div.p_w")
-
-        for item in items[:10]:  # Max 10 results
-            try:
-                # Title + URL
-                link_el = await item.query_selector("a[title], a.pl_v8_img, a")
-                if not link_el:
-                    continue
-
-                title = await link_el.get_attribute("title")
-                if not title:
-                    title = (await link_el.inner_text()).strip()
-                href = await link_el.get_attribute("href")
-
-                if not title or not href:
-                    continue
-
-                # Build full URL
-                if href.startswith("/"):
-                    href = f"https://www.akakce.com{href}"
-
-                # Price (optional)
-                price = None
-                price_el = await item.query_selector("span.pt_v8, span.fiyat, span.prc")
-                if price_el:
-                    price_text = (await price_el.inner_text()).strip()
-                    price = _parse_price(price_text)
-
-                results.append(AkakceSearchResult(title=title, url=href, price=price))
-            except Exception:
+    if not items:
+        # Fallback: try broader pattern
+        items = re.findall(
+            r'<li\s+data-pr="(\d+)"[^>]*>(.*?)</li>',
+            html,
+            re.DOTALL,
+        )
+        for product_id, li_html in items[:15]:
+            title_match = re.search(r'title="([^"]{5,})"', li_html)
+            href_match = re.search(r'href="(/[^"]+\.html[^"]*)"', li_html)
+            if not title_match or not href_match:
                 continue
+
+            title = title_match.group(1)
+            href = href_match.group(1)
+            if href.startswith("/"):
+                href = f"https://www.akakce.com{href}"
+
+            price = _extract_price_from_li(li_html)
+            results.append(AkakceSearchResult(title=title, url=href, price=price))
+
+        return results
+
+    for product_id, href, title, price_str in items[:15]:
+        if href.startswith("/"):
+            href = f"https://www.akakce.com{href}"
+
+        price = _parse_price(price_str) if price_str else None
+        results.append(AkakceSearchResult(title=title, url=href, price=price))
 
     return results
 
@@ -86,12 +96,8 @@ async def search_akakce(query: str) -> list[AkakceSearchResult]:
 async def find_akakce_url(product_title: str, brand: str | None = None) -> str | None:
     """
     Bir Prial urunu icin Akakce'deki en iyi eslesen URL'yi bulur.
-    Input: urun adi + brand
-    Returns: Akakce urun sayfasi URL'si veya None
     """
-    # Search query olustur
     query = f"{brand} {product_title}" if brand else product_title
-    # Uzun query'leri kisalt (Akakce arama limiti)
     words = query.split()
     if len(words) > 8:
         query = " ".join(words[:8])
@@ -122,7 +128,6 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
             best_score = score
             best_match = r
 
-    # Minimum threshold: 0.30 (Akakce titles may differ from catalog)
     if best_match and best_score >= 0.30:
         print(f"[akakce/searcher] Eşleşme bulundu (score={best_score:.2f}): {best_match.title}", flush=True)
         return best_match.url
@@ -131,13 +136,22 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
     return None
 
 
+def _extract_price_from_li(li_html: str) -> float | None:
+    """li HTML'inden fiyat cikar."""
+    # Pattern: 79.068,74 TL or similar inside pt_v9
+    match = re.search(r'class="pt_v9[^"]*"[^>]*>[\s\S]*?([\d.]+)[,<]', li_html)
+    if match:
+        return _parse_price(match.group(1))
+    return None
+
+
 def _parse_price(text: str) -> float | None:
-    """'12.345,67 TL' veya '12.345 TL' formatindaki fiyati parse et."""
-    import re
-    text = text.replace("TL", "").replace("₺", "").strip()
-    # Remove thousands separator dots, replace comma with dot for decimal
+    """'12.345' veya '12345' formatindaki fiyati parse et."""
+    if not text:
+        return None
+    text = re.sub(r'[^\d.]', '', text)
+    # Remove thousands separator dots
     text = re.sub(r'\.(?=\d{3})', '', text)
-    text = text.replace(",", ".")
     try:
         return float(text)
     except ValueError:
