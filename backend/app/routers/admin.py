@@ -438,6 +438,30 @@ async def trigger_akakce_import(
     return {"message": f"Akakçe import başlatıldı ({mode}, batch={batch_size}, arka planda)"}
 
 
+@router.post("/akakce/crawl-categories")
+async def trigger_akakce_crawl_categories(
+    max_pages: int = 3,
+    _: None = Depends(require_admin),
+):
+    """Akakçe kategori crawler'ını tetikler — yeni ürünler keşfeder."""
+    import asyncio
+    from app.services.akakce.category_crawler import crawl_all_categories
+
+    async def _safe_crawl():
+        try:
+            result = await crawl_all_categories(max_pages_per_category=max_pages)
+            print(f"[admin/akakce-crawl] Sonuç: {result}", flush=True)
+        except Exception as e:
+            print(f"[admin/akakce-crawl] HATA: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+
+    asyncio.create_task(_safe_crawl())
+    return {
+        "message": f"Akakçe kategori crawler başlatıldı (max_pages={max_pages}, arka planda çalışıyor)"
+    }
+
+
 @router.get("/akakce/status")
 async def akakce_status(
     db: AsyncSession = Depends(get_db),
