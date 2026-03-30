@@ -52,6 +52,9 @@ _KNOWN_BRANDS = [
     "Bosch", "Siemens", "Arçelik", "Beko", "Philips", "Dyson",
     "Marshall", "JBL", "Sonos", "Canon", "Nikon", "Fujifilm",
     "Qpart", "Casper", "TCL", "Hisense", "Vestel", "Grundig",
+    "Seagate", "Sandisk", "Beats", "BenQ", "Bose", "Devialet",
+    "Ecovacs", "Garmin", "GoPro", "KitchenAid", "Roborock",
+    "Robotist", "Sennheiser",
 ]
 
 
