@@ -43,7 +43,6 @@ async def import_product_history(
             # Cache the URL
             product.akakce_url = akakce_url
             await db.flush()
-            await random_delay()
 
         # 2. Fiyat gecmisini cek
         data_points = await extract_price_history(akakce_url)
@@ -175,7 +174,7 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
             await db.commit()
 
             # Rate limiting between products
-            await random_delay(3.0, 6.0)
+            await random_delay(1.0, 2.0)
 
     print(f"[akakce/importer] Tamamlandı: {stats}", flush=True)
     return stats
@@ -206,7 +205,7 @@ async def daily_enrichment(batch_size: int = 20) -> dict:
             status = result["status"]
             stats[status] = stats.get(status, 0) + 1
             await db.commit()
-            await random_delay(3.0, 6.0)
+            await random_delay(1.0, 2.0)
 
     print(f"[akakce/enrichment] Tamamlandı: {stats}", flush=True)
     return stats
