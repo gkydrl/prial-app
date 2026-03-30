@@ -60,20 +60,22 @@ _KNOWN_BRANDS = [
     "Qpart", "Casper", "TCL", "Hisense", "Vestel", "Grundig",
     "Seagate", "Sandisk", "Beats", "BenQ", "Bose", "Devialet",
     "Ecovacs", "Garmin", "GoPro", "KitchenAid", "Roborock",
-    "Robotist", "Sennheiser",
+    "Robotist", "Sennheiser", "DJI", "Honor", "Harman",
+    "Bang", "Bilbor",
 ]
 
 
 def _extract_brand_from_title(title: str) -> tuple[str | None, str]:
     """
     'SamsungGalaxy S24...' → ('Samsung', 'Galaxy S24...')
+    'AppleiPad Pro...' → ('Apple', 'iPad Pro...')
     Title'ın başında boşluksuz brand varsa ayırır.
     """
     for brand in _KNOWN_BRANDS:
         if title.startswith(brand) and len(title) > len(brand):
             rest = title[len(brand):]
-            # Brand'dan sonra büyük harf veya rakam geliyorsa gömülü demektir
-            if rest[0].isupper() or rest[0].isdigit():
+            # Brand'dan sonra harf veya rakam geliyorsa (boşluk değilse) gömülü demektir
+            if rest[0] != " ":
                 return brand, rest
     return None, title
 

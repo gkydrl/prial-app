@@ -123,7 +123,13 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
     2. Jaccard düşükse → Claude Haiku ile LLM matching
     """
     # Sorgu oluştur — gereksiz kelimeleri temizle
-    query = f"{brand} {product_title}" if brand else product_title
+    if brand and product_title.upper().startswith(brand.upper()):
+        # Title zaten brand ile başlıyorsa tekrarlama (SAMSUNG SAMSUNG Galaxy → Samsung Galaxy)
+        query = product_title
+    elif brand:
+        query = f"{brand} {product_title}"
+    else:
+        query = product_title
     # Parantez, tırnak, özel karakterleri temizle
     query = re.sub(r'["""\'\(\)&;,]', ' ', query)
     # "Fiyat" ve sonrasını kes (ör. "Galaxy S24 Fiyat &amp; Özellikleri")
