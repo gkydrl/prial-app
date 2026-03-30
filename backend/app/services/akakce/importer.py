@@ -1,6 +1,7 @@
 """
-Akakce import orchestrator.
-Her Prial urunu icin Akakce'de arama, fiyat gecmisi cekme, DB'ye kayit.
+Price history import orchestrator.
+Her Prial urunu icin Akakce'de arama, bulunamazsa Epey'de arama,
+fiyat gecmisi cekme, DB'ye kayit.
 """
 from __future__ import annotations
 
@@ -38,26 +39,49 @@ async def import_product_history(
         akakce_url = product.akakce_url
         if not akakce_url:
             akakce_url = await find_akakce_url(product.title, product.brand)
+            if akakce_url:
+                product.akakce_url = akakce_url
+                await db.flush()
+
+        # 2. Akakce'den fiyat gecmisini cek
+        data_points = []
+        source = "akakce_import"
+        if akakce_url:
+            data_points = await extract_price_history(akakce_url)
+
+        # 3. Akakce'de bulunamadiysa Epey'de dene
+        if not data_points:
+            from app.services.epey.scraper import find_epey_url, extract_price_history as epey_extract
+
+            epey_url, epey_id = await find_epey_url(product.title, product.brand)
+            if epey_url:
+                epey_points = await epey_extract(epey_url, epey_id)
+                if epey_points:
+                    # Convert EpeyPricePoint to PriceDataPoint
+                    data_points = [
+                        PriceDataPoint(date=p.date, price=p.price)
+                        for p in epey_points
+                    ]
+                    source = "akakce_import"  # Reuse existing source enum
+                    if not akakce_url:
+                        # Epey URL'sini akakce_url alanina kaydet (genel "karsilastirma URL" olarak)
+                        product.akakce_url = epey_url
+                        await db.flush()
+
+        if not data_points:
             if not akakce_url:
                 return {"status": "no_match", "data_points": 0}
-            # Cache the URL
-            product.akakce_url = akakce_url
-            await db.flush()
-
-        # 2. Fiyat gecmisini cek
-        data_points = await extract_price_history(akakce_url)
-        if not data_points:
             return {"status": "no_data", "data_points": 0}
 
-        # 3. Product'a ait bir store bul (kayit icin product_store_id gerekli)
+        # 4. Product'a ait bir store bul (kayit icin product_store_id gerekli)
         store = await _get_or_create_akakce_store(product, db)
         if not store:
             return {"status": "no_store", "data_points": 0}
 
-        # 4. Price history kaydet
-        saved = await _save_price_points(store.id, data_points, db)
+        # 5. Price history kaydet
+        saved = await _save_price_points(store.id, data_points, db, source=source)
 
-        # 5. l1y istatistiklerini guncelle
+        # 6. l1y istatistiklerini guncelle
         prices = [dp.price for dp in data_points]
         product.l1y_lowest_price = Decimal(str(min(prices)))
         product.l1y_highest_price = Decimal(str(max(prices)))
@@ -66,7 +90,7 @@ async def import_product_history(
         return {"status": "ok", "data_points": saved}
 
     except Exception as e:
-        print(f"[akakce/importer] Hata ({product.title[:50]}): {e}", flush=True)
+        print(f"[importer] Hata ({product.title[:50]}): {e}", flush=True)
         return {"status": "error", "data_points": 0, "error": str(e)}
 
 
@@ -109,6 +133,7 @@ async def _save_price_points(
     product_store_id: uuid.UUID,
     data_points: list[PriceDataPoint],
     db: AsyncSession,
+    source: str = "akakce_import",
 ) -> int:
     """Price data point'lerini price_history'ye kaydet. Returns: kayit sayisi."""
     saved = 0
@@ -118,7 +143,7 @@ async def _save_price_points(
             select(PriceHistory.id).where(
                 PriceHistory.product_store_id == product_store_id,
                 func.date(PriceHistory.recorded_at) == dp.date,
-                PriceHistory.source == "akakce_import",
+                PriceHistory.source == source,
             )
         )
         if existing.scalar_one_or_none():
@@ -129,7 +154,7 @@ async def _save_price_points(
             price=Decimal(str(dp.price)),
             currency="TRY",
             in_stock=True,
-            source="akakce_import",
+            source=source,
             recorded_at=datetime(dp.date.year, dp.date.month, dp.date.day, tzinfo=timezone.utc),
         )
         db.add(record)
