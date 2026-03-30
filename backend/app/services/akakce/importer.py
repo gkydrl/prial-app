@@ -4,6 +4,8 @@ Her Prial urunu icin Akakce'de arama, fiyat gecmisi cekme, DB'ye kayit.
 """
 from __future__ import annotations
 
+import asyncio
+import random
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -14,9 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.models.product import Product, ProductStore
 from app.models.price_history import PriceHistory, PriceSource
-from app.services.akakce.browser import random_delay, close_browser
 from app.services.akakce.searcher import find_akakce_url
 from app.services.akakce.chart_extractor import extract_price_history, PriceDataPoint
+
+
+async def random_delay(min_sec: float = 3.0, max_sec: float = 6.0) -> None:
+    """Rate limiting icin rastgele bekleme."""
+    await asyncio.sleep(random.uniform(min_sec, max_sec))
 
 
 async def import_product_history(
@@ -171,9 +177,6 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
             # Rate limiting between products
             await random_delay(3.0, 6.0)
 
-    # Cleanup
-    await close_browser()
-
     print(f"[akakce/importer] Tamamlandı: {stats}", flush=True)
     return stats
 
@@ -205,6 +208,5 @@ async def daily_enrichment(batch_size: int = 20) -> dict:
             await db.commit()
             await random_delay(3.0, 6.0)
 
-    await close_browser()
     print(f"[akakce/enrichment] Tamamlandı: {stats}", flush=True)
     return stats

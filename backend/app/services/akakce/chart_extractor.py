@@ -1,18 +1,29 @@
 """
 Akakce urun sayfasindan fiyat grafigi verisini ceker.
+httpx + ScraperAPI (render=true) kullanir — Playwright'a gerek yok.
+
 Uc yaklasim sirayla denenir:
-1. Network intercept — XHR isteklerini yakala
-2. DOM/Script parse — Inline JS'den chart data cek
-3. SVG parse — SVG elementlerinden data point'leri cikar
+1. Inline JS parse — Highcharts data pattern'leri
+2. Regex timestamp/price cifleri
+3. Akakce chart API endpoint'i (varsa)
 """
 from __future__ import annotations
 
 import json
 import re
+import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, date
 
-from app.services.akakce.browser import get_page, random_delay, wait_for_cloudflare
+import httpx
+
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Referer": "https://www.akakce.com/",
+}
 
 
 @dataclass
@@ -21,98 +32,281 @@ class PriceDataPoint:
     price: float
 
 
+async def _fetch_page(url: str) -> str | None:
+    """Sayfa HTML'ini cek: direkt → ScraperAPI render fallback."""
+    from app.config import settings
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+        # 1. Direkt erisim
+        try:
+            resp = await client.get(url, headers=HEADERS)
+            if resp.status_code == 200 and len(resp.text) > 1000:
+                return resp.text
+        except Exception:
+            pass
+
+        # 2. ScraperAPI with render=true (JS render — chart data icin sart)
+        if settings.scraper_api_key:
+            try:
+                proxy_url = (
+                    f"http://api.scraperapi.com"
+                    f"?api_key={settings.scraper_api_key}"
+                    f"&url={urllib.parse.quote(url, safe='')}"
+                    f"&render=true"
+                    f"&country_code=tr"
+                )
+                resp = await client.get(proxy_url, timeout=60)
+                if resp.status_code == 200 and len(resp.text) > 1000:
+                    print(f"[akakce/chart] ScraperAPI render ile alındı", flush=True)
+                    return resp.text
+            except Exception as e:
+                print(f"[akakce/chart] ScraperAPI hatası: {e}", flush=True)
+
+        # 3. ScraperAPI without render (daha hizli, belki inline data vardir)
+        if settings.scraper_api_key:
+            try:
+                proxy_url = (
+                    f"http://api.scraperapi.com"
+                    f"?api_key={settings.scraper_api_key}"
+                    f"&url={urllib.parse.quote(url, safe='')}"
+                )
+                resp = await client.get(proxy_url, timeout=30)
+                if resp.status_code == 200 and len(resp.text) > 1000:
+                    print(f"[akakce/chart] ScraperAPI (no-render) ile alındı", flush=True)
+                    return resp.text
+            except Exception as e:
+                print(f"[akakce/chart] ScraperAPI (no-render) hatası: {e}", flush=True)
+
+    return None
+
+
 async def extract_price_history(akakce_url: str) -> list[PriceDataPoint]:
     """
     Akakce urun sayfasindan fiyat gecmisini ceker.
-    Uc yaklasimi sirayla dener.
     Returns: list of PriceDataPoint (date, price) — kronolojik sira
     """
-    data_points: list[PriceDataPoint] = []
+    html = await _fetch_page(akakce_url)
+    if not html:
+        print(f"[akakce/chart] Sayfa alınamadı: {akakce_url}", flush=True)
+        return []
 
-    async with get_page() as page:
-        # Network intercept setup — XHR responses'lari yakala
-        intercepted_data: list[dict] = []
+    # Debug: log page size and key indicators
+    has_chart = any(kw in html.lower() for kw in ["highcharts", "chart", "grafik", "fiyat geçmişi"])
+    print(f"[akakce/chart] HTML alındı ({len(html)} bytes, chart indicators: {has_chart})", flush=True)
 
-        async def handle_response(response):
-            url = response.url.lower()
-            keywords = ["chart", "price", "fiyat", "grafik", "history", "graph"]
-            if any(kw in url for kw in keywords):
+    # --- Approach 1: Highcharts inline data ---
+    data_points = _parse_highcharts_data(html)
+    if data_points:
+        print(f"[akakce/chart] Highcharts data: {len(data_points)} data point", flush=True)
+        return sorted(data_points, key=lambda dp: dp.date)
+
+    # --- Approach 2: Generic inline script data ---
+    data_points = _parse_inline_scripts(html)
+    if data_points:
+        print(f"[akakce/chart] Inline script: {len(data_points)} data point", flush=True)
+        return sorted(data_points, key=lambda dp: dp.date)
+
+    # --- Approach 3: Regex timestamp/price pairs ---
+    data_points = _extract_from_text(html)
+    if data_points:
+        print(f"[akakce/chart] Regex extract: {len(data_points)} data point", flush=True)
+        return sorted(data_points, key=lambda dp: dp.date)
+
+    # --- Approach 4: Try fetching chart API directly ---
+    data_points = await _try_chart_api(akakce_url, html)
+    if data_points:
+        print(f"[akakce/chart] Chart API: {len(data_points)} data point", flush=True)
+        return sorted(data_points, key=lambda dp: dp.date)
+
+    print(f"[akakce/chart] Veri bulunamadı: {akakce_url}", flush=True)
+
+    # Debug: dump a snippet of script tags for investigation
+    scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
+    chart_scripts = [s[:500] for s in scripts if any(kw in s.lower() for kw in ["chart", "data", "series", "fiyat", "price", "highchart"])]
+    if chart_scripts:
+        print(f"[akakce/chart] DEBUG — Chart-related script snippets found: {len(chart_scripts)}", flush=True)
+        for i, snippet in enumerate(chart_scripts[:3]):
+            print(f"[akakce/chart] DEBUG script[{i}]: {snippet[:300]}...", flush=True)
+
+    return []
+
+
+def _parse_highcharts_data(html: str) -> list[PriceDataPoint]:
+    """Highcharts konfigurasyonundan fiyat datasini cikar."""
+    results: list[PriceDataPoint] = []
+
+    # Pattern 1: Highcharts series data: [[timestamp, price], ...]
+    # Common in Akakce: new Highcharts.Chart({...series:[{data:[[ts,price],...]}]...})
+    patterns = [
+        # data: [[1234567890000, 1234.56], ...]
+        r'data\s*:\s*(\[\s*\[\s*\d{10,13}\s*,\s*[\d.]+\s*\](?:\s*,\s*\[\s*\d{10,13}\s*,\s*[\d.]+\s*\])*\s*\])',
+        # series data in various formats
+        r'series\s*:\s*\[\s*\{[^}]*data\s*:\s*(\[\s*\[\s*\d{10,13}[\s\S]*?\]\s*\])',
+        # pointStart + pointInterval pattern
+        r'data\s*:\s*(\[[\d.,\s]+\])\s*,\s*pointStart',
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, html)
+        for match in matches:
+            try:
+                data = json.loads(match)
+                for item in data:
+                    point = _try_parse_point(item)
+                    if point:
+                        results.append(point)
+            except json.JSONDecodeError:
+                continue
+
+    # Pattern 2: Separated arrays — categories (dates) and data (prices)
+    if not results:
+        cat_match = re.search(
+            r'categories\s*:\s*(\[(?:"[^"]*"(?:\s*,\s*"[^"]*")*)\])',
+            html,
+        )
+        data_match = re.search(
+            r'data\s*:\s*(\[[\d.,\s]+\])',
+            html,
+        )
+        if cat_match and data_match:
+            try:
+                categories = json.loads(cat_match.group(1))
+                prices = json.loads(data_match.group(1))
+                for cat, price in zip(categories, prices):
+                    dt = _parse_date_label(cat)
+                    if dt and isinstance(price, (int, float)):
+                        results.append(PriceDataPoint(date=dt, price=float(price)))
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+    return results
+
+
+def _parse_inline_scripts(html: str) -> list[PriceDataPoint]:
+    """Script tag'lerinden chart data'sini cikar."""
+    results: list[PriceDataPoint] = []
+
+    scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
+
+    for script_text in scripts:
+        # Skip external scripts and very short ones
+        if len(script_text) < 50:
+            continue
+
+        # Look for chart-related keywords
+        lower = script_text.lower()
+        if not any(kw in lower for kw in ["chart", "series", "data", "fiyat", "price", "highchart"]):
+            continue
+
+        # Try to extract data arrays
+        # Pattern: data: [[timestamp, price], ...]
+        data_matches = re.findall(
+            r'data\s*:\s*(\[\[[\d,\s.]+\](?:,\s*\[[\d,\s.]+\])*\])',
+            script_text,
+        )
+        for dm in data_matches:
+            try:
+                data = json.loads(dm)
+                for item in data:
+                    point = _try_parse_point(item)
+                    if point:
+                        results.append(point)
+            except json.JSONDecodeError:
+                pass
+
+        # Try timestamp/price pairs via regex
+        if not results:
+            points = _extract_from_text(script_text)
+            results.extend(points)
+
+    return results
+
+
+async def _try_chart_api(akakce_url: str, html: str) -> list[PriceDataPoint]:
+    """Akakce'nin chart API endpoint'ini bulmaya calis."""
+    from app.config import settings
+
+    results: list[PriceDataPoint] = []
+
+    # Extract product ID from URL or page
+    product_id = None
+
+    # From URL: ...fiyati,123456789.html
+    id_match = re.search(r',(\d+)\.html', akakce_url)
+    if id_match:
+        product_id = id_match.group(1)
+
+    # From page: data-pr="123456" or similar
+    if not product_id:
+        id_match = re.search(r'data-pr["\s=]+["\']?(\d+)', html)
+        if id_match:
+            product_id = id_match.group(1)
+
+    if not product_id:
+        return []
+
+    # Try common Akakce chart API patterns
+    api_urls = [
+        f"https://www.akakce.com/chart/{product_id}",
+        f"https://www.akakce.com/api/chart/{product_id}",
+        f"https://www.akakce.com/grafik/{product_id}",
+        f"https://www.akakce.com/ph/{product_id}.json",
+        f"https://www.akakce.com/p/{product_id}/chart",
+    ]
+
+    # Also look for API endpoints in the HTML
+    api_matches = re.findall(r'["\'](/(?:api|chart|grafik|ph|price)[^"\']*)["\']', html)
+    for api_path in api_matches:
+        full_url = f"https://www.akakce.com{api_path}"
+        if full_url not in api_urls:
+            api_urls.insert(0, full_url)
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+        for api_url in api_urls[:5]:
+            try:
+                # Direct
+                resp = await client.get(api_url, headers=HEADERS)
+                if resp.status_code == 200:
+                    points = _parse_api_response(resp.text)
+                    if points:
+                        return points
+            except Exception:
+                pass
+
+            # ScraperAPI fallback for API endpoints
+            if settings.scraper_api_key:
                 try:
-                    body = await response.text()
-                    intercepted_data.append({"url": response.url, "body": body})
+                    proxy_url = (
+                        f"http://api.scraperapi.com"
+                        f"?api_key={settings.scraper_api_key}"
+                        f"&url={urllib.parse.quote(api_url, safe='')}"
+                    )
+                    resp = await client.get(proxy_url, timeout=20)
+                    if resp.status_code == 200:
+                        points = _parse_api_response(resp.text)
+                        if points:
+                            return points
                 except Exception:
                     pass
 
-        page.on("response", handle_response)
-
-        try:
-            await page.goto(akakce_url, wait_until="domcontentloaded", timeout=30000)
-            passed = await wait_for_cloudflare(page)
-            if not passed:
-                return []
-
-            # Wait for page to fully load (chart may load lazily)
-            await page.wait_for_timeout(3000)
-
-            # Try clicking "Fiyat Gecmisi" tab/button if it exists
-            for selector in [
-                "text=Fiyat Geçmişi",
-                "text=fiyat geçmişi",
-                "a:has-text('Fiyat')",
-                "[data-tab='chart']",
-                ".price-history-tab",
-            ]:
-                try:
-                    el = await page.query_selector(selector)
-                    if el:
-                        await el.click()
-                        await page.wait_for_timeout(2000)
-                        break
-                except Exception:
-                    continue
-
-        except Exception as e:
-            print(f"[akakce/chart] Sayfa yükleme hatası: {e}", flush=True)
-            return []
-
-        # --- Approach 1: Network intercept ---
-        data_points = _parse_intercepted_data(intercepted_data)
-        if data_points:
-            print(f"[akakce/chart] Network intercept: {len(data_points)} data point", flush=True)
-            return sorted(data_points, key=lambda dp: dp.date)
-
-        # --- Approach 2: Inline JS/DOM parse ---
-        data_points = await _parse_inline_scripts(page)
-        if data_points:
-            print(f"[akakce/chart] Inline script: {len(data_points)} data point", flush=True)
-            return sorted(data_points, key=lambda dp: dp.date)
-
-        # --- Approach 3: SVG parse ---
-        data_points = await _parse_svg_chart(page)
-        if data_points:
-            print(f"[akakce/chart] SVG parse: {len(data_points)} data point", flush=True)
-            return sorted(data_points, key=lambda dp: dp.date)
-
-        print(f"[akakce/chart] Veri bulunamadı: {akakce_url}", flush=True)
-        return []
+    return results
 
 
-def _parse_intercepted_data(intercepted: list[dict]) -> list[PriceDataPoint]:
-    """Network intercept ile yakalanan response'lardan fiyat datasini parse et."""
+def _parse_api_response(text: str) -> list[PriceDataPoint]:
+    """API response'undan fiyat data point'lerini parse et."""
     results: list[PriceDataPoint] = []
 
-    for item in intercepted:
-        body = item["body"]
-        try:
-            data = json.loads(body)
-            points = _extract_from_json(data)
-            if points:
-                results.extend(points)
-        except json.JSONDecodeError:
-            # Try regex extraction from non-JSON responses
-            points = _extract_from_text(body)
-            results.extend(points)
+    # Try JSON parse
+    try:
+        data = json.loads(text)
+        results = _extract_from_json(data)
+        if results:
+            return results
+    except json.JSONDecodeError:
+        pass
 
+    # Try regex extraction
+    results = _extract_from_text(text)
     return results
 
 
@@ -129,7 +323,7 @@ def _extract_from_json(data: dict | list) -> list[PriceDataPoint]:
 
     if isinstance(data, dict):
         # Highcharts format: {series: [{data: [[timestamp, price], ...]}]}
-        for key in ["data", "series", "prices", "priceHistory", "fiyatlar"]:
+        for key in ["data", "series", "prices", "priceHistory", "fiyatlar", "chart", "points"]:
             if key in data:
                 val = data[key]
                 if isinstance(val, list):
@@ -145,6 +339,15 @@ def _extract_from_json(data: dict | list) -> list[PriceDataPoint]:
                             point = _try_parse_point(item)
                             if point:
                                 results.append(point)
+                if results:
+                    return results
+
+        # Recurse into nested dicts
+        for key, val in data.items():
+            if isinstance(val, (dict, list)):
+                nested = _extract_from_json(val)
+                if nested:
+                    return nested
 
     return results
 
@@ -176,12 +379,7 @@ def _try_parse_point(item) -> PriceDataPoint | None:
                             raw = raw / 1000
                         dt = datetime.fromtimestamp(raw).date()
                     elif isinstance(raw, str):
-                        for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
-                            try:
-                                dt = datetime.strptime(raw, fmt).date()
-                                break
-                            except ValueError:
-                                continue
+                        dt = _parse_date_label(raw)
                     break
             if price and dt:
                 return PriceDataPoint(date=dt, price=price)
@@ -210,200 +408,14 @@ def _extract_from_text(text: str) -> list[PriceDataPoint]:
     return results
 
 
-async def _parse_inline_scripts(page) -> list[PriceDataPoint]:
-    """Sayfadaki script tag'lerinden chart data'sini cikar."""
-    results: list[PriceDataPoint] = []
-
-    try:
-        scripts = await page.evaluate("""
-            () => {
-                const scripts = document.querySelectorAll('script');
-                const texts = [];
-                for (const s of scripts) {
-                    const text = s.textContent || '';
-                    if (text.includes('chart') || text.includes('Chart') ||
-                        text.includes('series') || text.includes('data') ||
-                        text.includes('fiyat') || text.includes('price')) {
-                        texts.push(text);
-                    }
-                }
-                return texts;
-            }
-        """)
-
-        for script_text in scripts:
-            # Try to find Highcharts/Chart.js data patterns
-            # Pattern 1: data: [[timestamp, price], ...]
-            data_match = re.search(r'data\s*:\s*(\[\[[\d,\s.]+\](?:,\s*\[[\d,\s.]+\])*\])', script_text)
-            if data_match:
-                try:
-                    data = json.loads(data_match.group(1))
-                    for item in data:
-                        point = _try_parse_point(item)
-                        if point:
-                            results.append(point)
-                except Exception:
-                    pass
-
-            # Pattern 2: categories/labels as dates + data as prices
-            if not results:
-                points = _extract_from_text(script_text)
-                results.extend(points)
-
-    except Exception as e:
-        print(f"[akakce/chart] Inline script parse hatasi: {e}", flush=True)
-
-    return results
-
-
-async def _parse_svg_chart(page) -> list[PriceDataPoint]:
-    """
-    SVG chart elementlerinden data point'leri cikar.
-    Highcharts SVG path veya circle elementlerini parse eder.
-    """
-    results: list[PriceDataPoint] = []
-
-    try:
-        # Get SVG chart bounds and data points
-        svg_data = await page.evaluate("""
-            () => {
-                const svg = document.querySelector('svg.highcharts-root, svg[class*="chart"]');
-                if (!svg) return null;
-
-                const rect = svg.getBoundingClientRect();
-
-                // Try to find data point markers (circles)
-                const circles = svg.querySelectorAll('circle[class*="point"], circle.highcharts-point');
-                const points = [];
-                for (const c of circles) {
-                    points.push({
-                        cx: parseFloat(c.getAttribute('cx')),
-                        cy: parseFloat(c.getAttribute('cy')),
-                    });
-                }
-
-                // Get axis labels for date/price mapping
-                const xLabels = [];
-                const yLabels = [];
-                svg.querySelectorAll('.highcharts-xaxis-labels text, .highcharts-axis-labels text').forEach(t => {
-                    xLabels.push({text: t.textContent, x: parseFloat(t.getAttribute('x'))});
-                });
-                svg.querySelectorAll('.highcharts-yaxis-labels text').forEach(t => {
-                    yLabels.push({text: t.textContent, y: parseFloat(t.getAttribute('y'))});
-                });
-
-                return {
-                    width: rect.width,
-                    height: rect.height,
-                    points: points,
-                    xLabels: xLabels,
-                    yLabels: yLabels,
-                };
-            }
-        """)
-
-        if not svg_data or not svg_data.get("points"):
-            return []
-
-        # Parse axis labels to build coordinate mapping
-        x_mapping = _build_date_mapping(svg_data.get("xLabels", []), svg_data["width"])
-        y_mapping = _build_price_mapping(svg_data.get("yLabels", []), svg_data["height"])
-
-        if not x_mapping or not y_mapping:
-            return []
-
-        for point in svg_data["points"]:
-            cx, cy = point["cx"], point["cy"]
-            dt = _interpolate_date(cx, x_mapping)
-            price = _interpolate_price(cy, y_mapping)
-            if dt and price:
-                results.append(PriceDataPoint(date=dt, price=price))
-
-    except Exception as e:
-        print(f"[akakce/chart] SVG parse hatasi: {e}", flush=True)
-
-    return results
-
-
-def _build_date_mapping(labels: list[dict], width: float) -> list[tuple[float, date]]:
-    """X axis label'larindan position -> date mapping olustur."""
-    mapping = []
-    for label in labels:
-        text = label.get("text", "").strip()
-        x = label.get("x", 0)
-        # Common date formats in Turkish charts
-        for fmt in ("%b %Y", "%m/%Y", "%d.%m.%Y", "%b '%y"):
-            try:
-                dt = datetime.strptime(text, fmt).date()
-                mapping.append((x, dt))
-                break
-            except ValueError:
-                continue
-    return sorted(mapping, key=lambda m: m[0])
-
-
-def _build_price_mapping(labels: list[dict], height: float) -> list[tuple[float, float]]:
-    """Y axis label'larindan position -> price mapping olustur."""
-    mapping = []
-    for label in labels:
-        text = label.get("text", "").strip()
-        y = label.get("y", 0)
-        price = _parse_axis_price(text)
-        if price is not None:
-            mapping.append((y, price))
-    return sorted(mapping, key=lambda m: m[0])
-
-
-def _parse_axis_price(text: str) -> float | None:
-    """Axis label'daki fiyati parse et: '12.345', '12K', '12.345 TL' vb."""
-    text = text.replace("TL", "").replace("₺", "").replace(" ", "").strip()
-    text = re.sub(r'\.(?=\d{3})', '', text)  # Remove thousands separator
-    text = text.replace(",", ".")
-    if text.upper().endswith("K"):
+def _parse_date_label(text: str) -> date | None:
+    """Tarih label'ini parse et."""
+    if not text:
+        return None
+    text = text.strip()
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%b %Y", "%m/%Y", "%b '%y"):
         try:
-            return float(text[:-1]) * 1000
+            return datetime.strptime(text, fmt).date()
         except ValueError:
-            return None
-    try:
-        return float(text)
-    except ValueError:
-        return None
-
-
-def _interpolate_date(x: float, mapping: list[tuple[float, date]]) -> date | None:
-    """X koordinatindan tarihi interpole et."""
-    if not mapping or len(mapping) < 2:
-        return None
-    # Clamp to bounds
-    if x <= mapping[0][0]:
-        return mapping[0][1]
-    if x >= mapping[-1][0]:
-        return mapping[-1][1]
-    # Linear interpolation
-    for i in range(len(mapping) - 1):
-        x0, d0 = mapping[i]
-        x1, d1 = mapping[i + 1]
-        if x0 <= x <= x1:
-            ratio = (x - x0) / (x1 - x0) if x1 != x0 else 0
-            days_diff = (d1 - d0).days
-            interpolated_days = int(days_diff * ratio)
-            from datetime import timedelta
-            return d0 + timedelta(days=interpolated_days)
-    return None
-
-
-def _interpolate_price(y: float, mapping: list[tuple[float, float]]) -> float | None:
-    """Y koordinatindan fiyati interpole et. (SVG'de y yukaridan asagi artar)"""
-    if not mapping or len(mapping) < 2:
-        return None
-    if y <= mapping[0][0]:
-        return mapping[0][1]
-    if y >= mapping[-1][0]:
-        return mapping[-1][1]
-    for i in range(len(mapping) - 1):
-        y0, p0 = mapping[i]
-        y1, p1 = mapping[i + 1]
-        if y0 <= y <= y1:
-            ratio = (y - y0) / (y1 - y0) if y1 != y0 else 0
-            return p0 + (p1 - p0) * ratio
+            continue
     return None
