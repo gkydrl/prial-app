@@ -942,6 +942,7 @@ async def test_review_fetching(
             result = await fetch_trendyol_reviews(
                 store_product_id=ps.store_product_id,
                 product_title=product_title,
+                product_url=ps.url,
             )
         elif store_name == "hepsiburada":
             result = await fetch_hepsiburada_reviews(

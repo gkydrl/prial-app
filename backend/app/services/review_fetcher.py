@@ -1,17 +1,20 @@
 """
 Mağaza yorumlarını çeken servis.
-Trendyol: Public API (contentId üzerinden review endpoint)
-Hepsiburada: User content API (sku üzerinden)
+Trendyol: Ürün sayfası HTML'inden rating + yorum sayfasından review text
+Hepsiburada: User content API (ScraperAPI fallback)
+
+Not: public.trendyol.com DNS çözümlenemiyor (Railway dahil).
+     Trendyol scraper da HTML fallback kullanıyor.
 """
 import re
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 import httpx
 from app.services.scraper.base import scraper_api_url
 
-# Trendyol ile aynı header pattern
 _TRENDYOL_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
     "Referer": "https://www.trendyol.com/",
     "Origin": "https://www.trendyol.com",
@@ -35,19 +38,25 @@ class ReviewResult:
     status: str  # "ok" | "error"
     review_count: int = 0
     rating: float | None = None
-    sample_reviews: list[str] | None = None
+    sample_reviews: list[str] = field(default_factory=list)
     error: str | None = None
+
+
+# ─── Trendyol ────────────────────────────────────────────────────────────────
 
 
 async def fetch_trendyol_reviews(
     store_product_id: str,
     product_title: str,
+    product_url: str = "",
     max_reviews: int = 5,
 ) -> ReviewResult:
     """
-    Trendyol'dan yorum çeker.
-    1) Product API'den contentId al
-    2) Review API'den yorumları çek
+    Trendyol'dan review bilgisi çeker.
+
+    Strateji (public.trendyol.com DNS çözümlenmediği için):
+    1) Ürün sayfası HTML'inden ratingScore JSON'u parse et (count + avg)
+    2) Yorum sayfası URL'sinden (/yorumlar) review text'leri çek (ScraperAPI)
     """
     base = ReviewResult(
         product_title=product_title,
@@ -57,69 +66,117 @@ async def fetch_trendyol_reviews(
     )
 
     try:
-        # Adım 1: Product API'den contentId al
-        product_api = (
-            f"https://public.trendyol.com/discovery-web-productgw-service/api/"
-            f"renderingserviceproductpage/pdp/{store_product_id}?channelId=1&gender=na"
+        html = await _fetch_trendyol_html(product_url, store_product_id)
+        if not html:
+            base.error = "HTML alınamadı"
+            return base
+
+        # ratingScore JSON'u parse et
+        rating_match = re.search(
+            r'"ratingScore"\s*:\s*\{[^}]*"averageRating"\s*:\s*([\d.]+)[^}]*"totalCount"\s*:\s*(\d+)',
+            html,
         )
-        async with httpx.AsyncClient(timeout=15, headers=_TRENDYOL_HEADERS) as client:
-            resp = await client.get(product_api)
-            if resp.status_code != 200:
-                base.error = f"Product API {resp.status_code}"
+        if not rating_match:
+            # Alternatif sıra
+            rating_match = re.search(
+                r'"ratingScore"\s*:\s*\{[^}]*"totalCount"\s*:\s*(\d+)[^}]*"averageRating"\s*:\s*([\d.]+)',
+                html,
+            )
+            if rating_match:
+                total_count = int(rating_match.group(1))
+                avg_rating = float(rating_match.group(2))
+            else:
+                base.error = "ratingScore bulunamadı"
                 return base
-
-            data = resp.json()
-            product = data.get("result", {}).get("product", {})
-            content_id = product.get("contentId")
-            rating_score = product.get("ratingScore", {})
-
-            if not content_id:
-                base.error = "contentId bulunamadı"
-                return base
-
-        # Adım 2: Review API'den yorumları çek
-        review_url = (
-            f"https://public-mdc.trendyol.com/discovery-web-socialgw-service/api/"
-            f"review/{content_id}?order=most-recent&size={max_reviews}"
-        )
-        async with httpx.AsyncClient(timeout=15, headers=_TRENDYOL_HEADERS) as client:
-            resp = await client.get(review_url)
-            if resp.status_code != 200:
-                base.error = f"Review API {resp.status_code}"
-                return base
-
-            review_data = resp.json()
-
-        # Parse
-        result = review_data.get("result", {})
-        total_count = (
-            result.get("totalReviewCount")
-            or result.get("productReviewsCount")
-            or result.get("totalCount")
-            or 0
-        )
-
-        avg_rating = (
-            rating_score.get("averageRating")
-            or result.get("ratingScore", {}).get("averageRating")
-        )
-
-        reviews_list = result.get("productReviews", [])
-        sample_texts = []
-        for r in reviews_list[:max_reviews]:
-            comment = r.get("comment", "").strip()
-            if comment:
-                sample_texts.append(comment[:300])
+        else:
+            avg_rating = float(rating_match.group(1))
+            total_count = int(rating_match.group(2))
 
         base.status = "ok"
         base.review_count = total_count
-        base.rating = round(float(avg_rating), 2) if avg_rating else None
-        base.sample_reviews = sample_texts
+        base.rating = round(avg_rating, 2)
+
+        # Yorum text'lerini çekmeye çalış (bonus — başarısız olsa da rating döner)
+        if total_count > 0:
+            reviews = await _fetch_trendyol_review_texts(
+                html, product_url, store_product_id, max_reviews
+            )
+            if reviews:
+                base.sample_reviews = reviews
+
         return base
 
     except Exception as e:
         base.error = str(e)
         return base
+
+
+async def _fetch_trendyol_html(product_url: str, store_product_id: str) -> str | None:
+    """Trendyol ürün sayfası HTML'ini çeker. Direkt dener, yoksa ScraperAPI."""
+    # URL yoksa oluşturamayız — store_product_id ile bir şey yapamayız
+    if not product_url:
+        return None
+
+    # 1) Direkt dene
+    try:
+        async with httpx.AsyncClient(timeout=15, headers=_TRENDYOL_HEADERS) as client:
+            resp = await client.get(product_url)
+            if resp.status_code == 200 and len(resp.text) > 10000:
+                return resp.text
+    except Exception:
+        pass
+
+    # 2) ScraperAPI fallback
+    try:
+        proxy_url = scraper_api_url(product_url, render=False)
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.get(proxy_url)
+            if resp.status_code == 200:
+                return resp.text
+    except Exception:
+        pass
+
+    return None
+
+
+async def _fetch_trendyol_review_texts(
+    html: str,
+    product_url: str,
+    store_product_id: str,
+    max_reviews: int,
+) -> list[str]:
+    """
+    HTML içindeki gömülü yorum verilerini çeker.
+    Trendyol ürün sayfasında __SEARCH_PLATFORM_STATE__ veya benzeri
+    script tag'lerinde yorum snippet'leri olabilir.
+    """
+    reviews: list[str] = []
+
+    # Gömülü JSON'daki yorum pattern'ları
+    # Pattern 1: "comment":"..." şeklinde gömülü yorumlar
+    comment_matches = re.findall(r'"comment"\s*:\s*"([^"]{20,300})"', html)
+    for c in comment_matches[:max_reviews]:
+        # JSON escape'lerini decode et
+        try:
+            decoded = json.loads(f'"{c}"')
+            reviews.append(decoded.strip())
+        except Exception:
+            reviews.append(c.strip())
+
+    # Pattern 2: "reviewText":"..." formatı
+    if not reviews:
+        review_matches = re.findall(r'"reviewText"\s*:\s*"([^"]{20,300})"', html)
+        for r in review_matches[:max_reviews]:
+            try:
+                decoded = json.loads(f'"{r}"')
+                reviews.append(decoded.strip())
+            except Exception:
+                reviews.append(r.strip())
+
+    return reviews
+
+
+# ─── Hepsiburada ─────────────────────────────────────────────────────────────
 
 
 async def fetch_hepsiburada_reviews(
@@ -130,7 +187,8 @@ async def fetch_hepsiburada_reviews(
 ) -> ReviewResult:
     """
     Hepsiburada'dan yorum çeker.
-    User content API endpoint'i üzerinden.
+    1) Direkt review API
+    2) ScraperAPI fallback
     """
     base = ReviewResult(
         product_title=product_title,
@@ -139,34 +197,43 @@ async def fetch_hepsiburada_reviews(
         status="error",
     )
 
-    # store_product_id pm-XXXXX formatında — "pm-" prefix'ini kaldır
+    # store_product_id formatları: "pm-XXXXX" veya "HBCV000..."
     sku = store_product_id
     if sku.startswith("pm-"):
         sku = sku[3:]
 
     try:
-        # Yöntem 1: Direkt API dene
         review_url = (
             f"https://user-content-gw-hermes.hepsiburada.com/queryapi/v2/ApprovedUserContents"
             f"?skuList={sku}&from=0&size={max_reviews}"
         )
-        async with httpx.AsyncClient(timeout=15, headers=_HEPSIBURADA_HEADERS) as client:
-            resp = await client.get(review_url)
 
-            if resp.status_code == 200:
-                data = resp.json()
-                return _parse_hepsiburada_reviews(data, base, max_reviews)
+        # Yöntem 1: Direkt API dene
+        try:
+            async with httpx.AsyncClient(timeout=15, headers=_HEPSIBURADA_HEADERS) as client:
+                resp = await client.get(review_url)
+                if resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                        return _parse_hepsiburada_reviews(data, base, max_reviews)
+                    except Exception:
+                        pass  # JSON parse hatası — fallback'e geç
+        except Exception:
+            pass
 
         # Yöntem 2: ScraperAPI fallback
         proxy_url = scraper_api_url(review_url, render=False)
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=45) as client:
             resp = await client.get(proxy_url)
             if resp.status_code == 200:
-                data = resp.json()
-                return _parse_hepsiburada_reviews(data, base, max_reviews)
+                try:
+                    data = resp.json()
+                    return _parse_hepsiburada_reviews(data, base, max_reviews)
+                except Exception:
+                    pass
 
-        base.error = f"Her iki yöntem de başarısız (son status: {resp.status_code})"
-        return base
+        # Yöntem 3: Ürün sayfası HTML'inden review bilgisi çek
+        return await _fetch_hepsiburada_from_html(product_url, base, max_reviews)
 
     except Exception as e:
         base.error = str(e)
@@ -177,8 +244,7 @@ def _parse_hepsiburada_reviews(
     data: dict, base: ReviewResult, max_reviews: int
 ) -> ReviewResult:
     """Hepsiburada review API response'unu parse eder."""
-    # Response yapısı: {"data": {"approvedUserContent": {"contents": [...], "total": N}}}
-    # veya doğrudan {"contents": [...], "total": N}
+    # Response yapısı değişkenlik gösterebilir
     contents_wrapper = data.get("data", {}).get("approvedUserContent", data)
     contents = contents_wrapper.get("contents", [])
     total = contents_wrapper.get("total", len(contents))
@@ -186,7 +252,11 @@ def _parse_hepsiburada_reviews(
     sample_texts = []
     ratings = []
     for item in contents[:max_reviews]:
-        comment = item.get("content", "") or item.get("review", "") or item.get("comment", "")
+        comment = (
+            item.get("content", "")
+            or item.get("review", "")
+            or item.get("comment", "")
+        )
         comment = comment.strip()
         if comment:
             sample_texts.append(comment[:300])
@@ -201,3 +271,42 @@ def _parse_hepsiburada_reviews(
     base.rating = avg_rating
     base.sample_reviews = sample_texts
     return base
+
+
+async def _fetch_hepsiburada_from_html(
+    product_url: str, base: ReviewResult, max_reviews: int
+) -> ReviewResult:
+    """Hepsiburada ürün sayfası HTML'inden review bilgisi çeker (ScraperAPI)."""
+    if not product_url:
+        base.error = "URL yok, HTML fallback yapılamadı"
+        return base
+
+    try:
+        proxy_url = scraper_api_url(product_url, render=False)
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.get(proxy_url)
+            if resp.status_code != 200:
+                base.error = f"HTML fallback {resp.status_code}"
+                return base
+
+        html = resp.text
+
+        # Rating bilgisi: sayfadaki JSON'dan
+        rating_match = re.search(r'"ratingScore"\s*:\s*([\d.]+)', html)
+        count_match = re.search(r'"reviewCount"\s*:\s*(\d+)', html)
+
+        if rating_match:
+            base.rating = round(float(rating_match.group(1)), 2)
+        if count_match:
+            base.review_count = int(count_match.group(1))
+
+        if base.review_count > 0 or base.rating:
+            base.status = "ok"
+        else:
+            base.error = "HTML'de review bilgisi bulunamadı"
+
+        return base
+
+    except Exception as e:
+        base.error = f"HTML fallback hatası: {e}"
+        return base
