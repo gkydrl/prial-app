@@ -35,18 +35,49 @@ from app.services.catalog_matcher import _normalize
 # ── Kategori mapping: Akakce URL path → Prial DB category slug ──
 
 AKAKCE_CATEGORIES = [
-    ("/cep-telefonu/akilli.html", "akilli-telefon"),
-    ("/bilgisayar/dizustu.html", "laptop"),
-    ("/tv/televizyon.html", "televizyon"),
-    ("/bilgisayar/monitor.html", "monitor"),
+    # ── Telefon & Tablet ──
+    ("/cep-telefonu/akilli.html", "telefon"),
     ("/bilgisayar/tablet.html", "tablet"),
-    ("/telefon-aksesuarlari/kulaklik.html", "kulaklik-ses"),
-    ("/giyilebilir-teknoloji/akilli-saat.html", "akilli-saat"),
-    ("/bilgisayar/ekran-karti.html", "bilgisayar-bilesenleri"),
-    ("/oyun/oyun-konsolu.html", "oyun-konsolu"),
-    ("/ses-sistemleri/bluetooth-hoparlor.html", "hoparlor"),
-    ("/foto-kamera/fotograf-makinesi.html", "fotograf-makinesi"),
-    ("/elektrikli-ev-aletleri/robot-supurge.html", "ev-aleti"),
+    # ── Bilgisayar ──
+    ("/bilgisayar/dizustu.html", "bilgisayar"),
+    ("/monitor.html", "monitor"),
+    ("/ekran-karti.html", "bilgisayar"),
+    ("/yazici.html", "bilgisayar"),
+    ("/projeksiyon-cihazi.html", "bilgisayar"),
+    # ── TV & Ses ──
+    ("/televizyon.html", "televizyon"),
+    ("/soundbar.html", "hoparlor"),
+    ("/hoparlor.html", "hoparlor"),
+    # ── Kulaklik ──
+    ("/telefon-aksesuarlari/kulaklik.html", "kulaklik"),
+    # ── Akilli Saat & Giyilebilir ──
+    ("/akilli-saat.html", "akilli-saat"),
+    ("/akilli-bileklik.html", "akilli-saat"),
+    # ── Oyun ──
+    ("/oyun-konsolu.html", "oyun-konsolu"),
+    ("/oyun-kolu.html", "oyun-konsolu"),
+    # ── Kamera ──
+    ("/fotograf-makinesi.html", "kamera"),
+    ("/aksiyon-kamera.html", "kamera"),
+    ("/drone.html", "kamera"),
+    # ── Ev Aleti ──
+    ("/elektrikli-supurge.html", "ev-aleti"),
+    ("/robot-supurge.html", "ev-aleti"),
+    ("/klima.html", "ev-aleti"),
+    # ── Beyaz Esya ──
+    ("/buzdolabi.html", "beyaz-esya"),
+    ("/camasir-makinesi.html", "beyaz-esya"),
+    ("/bulasik-makinesi.html", "beyaz-esya"),
+    ("/camasir-kurutma-makinesi.html", "beyaz-esya"),
+    ("/firin.html", "beyaz-esya"),
+    # ── Kisisel Bakim ──
+    ("/tiras-makinesi.html", "kisisel-bakim"),
+    ("/sac-kurutma-makinesi.html", "kisisel-bakim"),
+    ("/sac-duzlestirici.html", "kisisel-bakim"),
+    # ── Depolama & Ag ──
+    ("/harici-disk.html", "depolama"),
+    ("/usb-flash-bellek.html", "depolama"),
+    ("/ag-cihazi.html", "ag-cihazi"),
 ]
 
 _CRAWL_CONCURRENCY = 5  # Kategori icinde 5 urun paralel
