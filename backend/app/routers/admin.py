@@ -545,6 +545,52 @@ async def product_prediction(
     }
 
 
+# ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
+
+
+@router.get("/exchange-rates/latest")
+async def exchange_rates_latest(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Son USD/TRY, EUR/TRY kurlarını döner."""
+    from app.services.exchange_rate import get_latest_rates
+    rates = await get_latest_rates(db)
+    if not rates:
+        raise HTTPException(status_code=404, detail="Henüz kur verisi yok")
+    return rates
+
+
+@router.get("/exchange-rates/trend")
+async def exchange_rates_trend(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Son N gün kur trendi."""
+    from app.services.exchange_rate import get_rate_trend
+    return await get_rate_trend(db, days=days)
+
+
+# ─── Competitor Comparison Endpoints ─────────────────────────────────────────
+
+
+@router.get("/compare/product/{product_id}")
+async def compare_product(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Ürünün kategorisindeki fiyat pozisyonunu ve rakiplerini döner."""
+    from app.services.competitor_compare import get_category_comparison
+    result = await get_category_comparison(product_id, db)
+    if "error" in result:
+        if result["error"] == "product_not_found":
+            raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+        return result
+    return result
+
+
 # ─── Push Notification Test Endpoints ────────────────────────────────────────
 
 
@@ -840,6 +886,95 @@ async def delete_promo_code(
     if not promo:
         raise HTTPException(status_code=404, detail="Promo code bulunamadı")
     await db.delete(promo)
+
+
+# ─── Review Test Endpoint ─────────────────────────────────────────────────────
+
+
+@router.post("/reviews/test")
+async def test_review_fetching(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """
+    DB'den ürünlerin Trendyol + Hepsiburada store kayıtlarını çeker,
+    her biri için yorum çekmeyi dener. Test amaçlı — DB'ye kayıt yapmaz.
+    """
+    from sqlalchemy.orm import selectinload
+    from app.services.review_fetcher import fetch_trendyol_reviews, fetch_hepsiburada_reviews
+
+    # store_product_id'si olan Trendyol ve Hepsiburada store kayıtlarını çek
+    stmt = (
+        select(ProductStore)
+        .options(selectinload(ProductStore.product))
+        .where(
+            ProductStore.store.in_(["trendyol", "hepsiburada"]),
+            ProductStore.store_product_id.isnot(None),
+            ProductStore.is_active.is_(True),
+        )
+        .order_by(ProductStore.created_at.desc())
+        .limit(limit * 3)  # Her ürün birden fazla store'da olabilir, fazladan çek
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    # Ürün başına max 1 Trendyol + 1 Hepsiburada store seç
+    seen_products: dict[str, set[str]] = {}  # product_id -> {store_names}
+    stores_to_test: list[ProductStore] = []
+    for ps in rows:
+        pid = str(ps.product_id)
+        store_name = ps.store.value if hasattr(ps.store, "value") else str(ps.store)
+        if pid not in seen_products:
+            seen_products[pid] = set()
+        if store_name not in seen_products[pid]:
+            seen_products[pid].add(store_name)
+            stores_to_test.append(ps)
+        if len(stores_to_test) >= limit * 2:  # Yeterli store topladık
+            break
+
+    results = []
+    success_count = 0
+    for ps in stores_to_test:
+        product_title = ps.product.title if ps.product else "?"
+        store_name = ps.store.value if hasattr(ps.store, "value") else str(ps.store)
+
+        if store_name == "trendyol":
+            result = await fetch_trendyol_reviews(
+                store_product_id=ps.store_product_id,
+                product_title=product_title,
+            )
+        elif store_name == "hepsiburada":
+            result = await fetch_hepsiburada_reviews(
+                store_product_id=ps.store_product_id,
+                product_title=product_title,
+                product_url=ps.url,
+            )
+        else:
+            continue
+
+        entry = {
+            "product": product_title,
+            "store": store_name,
+            "store_product_id": ps.store_product_id,
+            "status": result.status,
+        }
+        if result.status == "ok":
+            success_count += 1
+            entry["review_count"] = result.review_count
+            entry["rating"] = result.rating
+            if result.sample_reviews:
+                entry["sample_review"] = result.sample_reviews[0][:200]
+        else:
+            entry["error"] = result.error
+
+        results.append(entry)
+
+    return {
+        "total_stores_tested": len(results),
+        "success": success_count,
+        "failed": len(results) - success_count,
+        "results": results,
+    }
 
 
 # ─── Test Helpers ────────────────────────────────────────────────────────────
