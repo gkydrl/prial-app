@@ -2,6 +2,8 @@
 Price history import orchestrator.
 Her Prial urunu icin Akakce'de arama, bulunamazsa Epey'de arama,
 fiyat gecmisi cekme, DB'ye kayit.
+
+Concurrent: 5 ürün aynı anda işlenir (ScraperAPI rate limit'e dikkat).
 """
 from __future__ import annotations
 
@@ -19,6 +21,10 @@ from app.models.product import Product, ProductStore
 from app.models.price_history import PriceHistory, PriceSource
 from app.services.akakce.searcher import find_akakce_url
 from app.services.akakce.chart_extractor import extract_price_history, PriceDataPoint
+
+
+# ── Concurrency ──
+_IMPORT_CONCURRENCY = 5  # Aynı anda kaç ürün işlensin
 
 
 async def random_delay(min_sec: float = 3.0, max_sec: float = 6.0) -> None:
@@ -140,8 +146,8 @@ async def import_product_history(
         if not store:
             return {"status": "no_store", "data_points": 0}
 
-        # 5. Price history kaydet
-        saved = await _save_price_points(store.id, data_points, db, source=source)
+        # 5. Price history kaydet (batch insert — duplicate'leri toplu kontrol)
+        saved = await _save_price_points_batch(store.id, data_points, db, source=source)
 
         # 6. l1y istatistiklerini guncelle
         prices = [dp.price for dp in data_points]
@@ -191,24 +197,31 @@ async def _get_or_create_akakce_store(
     return None
 
 
-async def _save_price_points(
+async def _save_price_points_batch(
     product_store_id: uuid.UUID,
     data_points: list[PriceDataPoint],
     db: AsyncSession,
     source: str = "akakce_import",
 ) -> int:
-    """Price data point'lerini price_history'ye kaydet. Returns: kayit sayisi."""
+    """
+    Price data point'lerini toplu kaydet.
+    Önce mevcut tarihleri tek sorguda çek, sonra sadece yenileri ekle.
+    """
+    if not data_points:
+        return 0
+
+    # Mevcut tarihleri tek sorguda al
+    existing_dates_result = await db.execute(
+        select(func.date(PriceHistory.recorded_at)).where(
+            PriceHistory.product_store_id == product_store_id,
+            PriceHistory.source == source,
+        )
+    )
+    existing_dates = {row[0] for row in existing_dates_result.fetchall()}
+
     saved = 0
     for dp in data_points:
-        # Ayni tarihte ayni store icin kayit var mi kontrol et
-        existing = await db.execute(
-            select(PriceHistory.id).where(
-                PriceHistory.product_store_id == product_store_id,
-                func.date(PriceHistory.recorded_at) == dp.date,
-                PriceHistory.source == source,
-            )
-        )
-        if existing.scalar_one_or_none():
+        if dp.date in existing_dates:
             continue
 
         record = PriceHistory(
@@ -227,12 +240,11 @@ async def _save_price_points(
 
 async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
     """
-    Toplu Akakce import. Scheduler veya admin endpoint'inden cagrilir.
-    only_new=True: sadece akakce_url'si olmayan urunler
-    only_new=False: tum urunler (guncelleme)
-    Returns: {"total": N, "ok": N, "no_match": N, ...}
+    Toplu Akakce import — concurrent.
+    5 ürün aynı anda işlenir (ScraperAPI rate limit'e uygun).
     """
     stats = {"total": 0, "ok": 0, "no_match": 0, "no_data": 0, "skipped": 0, "error": 0}
+    semaphore = asyncio.Semaphore(_IMPORT_CONCURRENCY)
 
     async with AsyncSessionLocal() as db:
         # Hedef urunleri sec
@@ -244,29 +256,44 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
         result = await db.execute(query)
         products = result.scalars().all()
 
-        print(f"[akakce/importer] {len(products)} ürün işlenecek (batch={batch_size})", flush=True)
+    total = len(products)
+    print(f"[akakce/importer] {total} ürün işlenecek (batch={batch_size}, concurrency={_IMPORT_CONCURRENCY})", flush=True)
 
-        for i, product in enumerate(products):
-            stats["total"] += 1
+    processed = 0
 
-            result = await import_product_history(product, db)
-            status = result["status"]
-            stats[status] = stats.get(status, 0) + 1
+    async def _process_one(product: Product, idx: int):
+        nonlocal processed
+        async with semaphore:
+            async with AsyncSessionLocal() as db:
+                # Re-attach product to this session
+                db_product = await db.get(Product, product.id)
+                if not db_product:
+                    return
 
-            if status == "skipped":
-                print(f"[akakce/importer] [{i+1}/{len(products)}] ATLA: {product.title[:50]}", flush=True)
-            else:
-                print(f"[akakce/importer] [{i+1}/{len(products)}] {product.brand} {product.title[:40]}", flush=True)
+                res = await import_product_history(db_product, db)
+                status = res["status"]
 
-            if result["data_points"] > 0:
-                print(f"  → {result['data_points']} data point kaydedildi", flush=True)
+                processed += 1
+                if status == "skipped":
+                    print(f"[akakce/importer] [{processed}/{total}] ATLA: {db_product.title[:50]}", flush=True)
+                else:
+                    print(f"[akakce/importer] [{processed}/{total}] {db_product.brand} {db_product.title[:40]} → {status}", flush=True)
 
-            # Commit after each product to avoid long transactions
-            await db.commit()
+                if res["data_points"] > 0:
+                    print(f"  → {res['data_points']} data point kaydedildi", flush=True)
 
-            # Rate limiting — skip edilenlerde bekleme yok
-            if status != "skipped":
-                await random_delay(1.0, 2.0)
+                await db.commit()
+
+                stats["total"] += 1
+                stats[status] = stats.get(status, 0) + 1
+
+                # Rate limiting — skip edilenlerde bekleme yok
+                if status != "skipped":
+                    await random_delay(0.5, 1.5)
+
+    # Tüm ürünleri concurrent olarak işle
+    tasks = [_process_one(p, i) for i, p in enumerate(products)]
+    await asyncio.gather(*tasks, return_exceptions=True)
 
     print(f"[akakce/importer] Tamamlandı: {stats}", flush=True)
     return stats
