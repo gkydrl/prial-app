@@ -520,6 +520,63 @@ async def akakce_status(
 # ─── Prediction Endpoints ───────────────────────────────────────────────────
 
 
+@router.get("/predictions/distribution")
+async def prediction_distribution(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Bugünkü ve en son tahminlerin AL/BEKLE/GUCLU_BEKLE dağılımı."""
+    from datetime import date
+    from sqlalchemy import func, case
+    from app.models.prediction import PricePrediction, Recommendation
+
+    today = date.today()
+
+    # Bugünkü tahminler
+    today_result = await db.execute(
+        select(
+            PricePrediction.recommendation,
+            func.count(PricePrediction.id),
+        )
+        .where(PricePrediction.prediction_date == today)
+        .group_by(PricePrediction.recommendation)
+    )
+    today_dist = {r.value: c for r, c in today_result.all()}
+
+    # Tüm zamanların en son tarihi
+    latest_date_result = await db.execute(
+        select(func.max(PricePrediction.prediction_date))
+    )
+    latest_date = latest_date_result.scalar_one_or_none()
+
+    latest_dist = {}
+    if latest_date:
+        latest_result = await db.execute(
+            select(
+                PricePrediction.recommendation,
+                func.count(PricePrediction.id),
+            )
+            .where(PricePrediction.prediction_date == latest_date)
+            .group_by(PricePrediction.recommendation)
+        )
+        latest_dist = {r.value: c for r, c in latest_result.all()}
+
+    # Toplam unique ürün sayısı (en az 1 tahmini olan)
+    total_predicted = (await db.execute(
+        select(func.count(func.distinct(PricePrediction.product_id)))
+    )).scalar() or 0
+
+    return {
+        "today": str(today),
+        "today_predictions": today_dist,
+        "today_total": sum(today_dist.values()),
+        "latest_prediction_date": str(latest_date) if latest_date else None,
+        "latest_predictions": latest_dist,
+        "latest_total": sum(latest_dist.values()),
+        "total_unique_products_with_prediction": total_predicted,
+    }
+
+
 @router.get("/predictions/accuracy")
 async def prediction_accuracy(
     db: AsyncSession = Depends(get_db),
