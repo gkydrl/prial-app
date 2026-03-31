@@ -199,6 +199,36 @@ async def list_products(
     return products
 
 
+@router.get("/by-id-short/{short_id}", response_model=ProductResponse)
+async def get_product_by_short_id(
+    short_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Short ID (ilk 8 hex karakter) ile ürün getir — SEO-friendly URL'ler için."""
+    if len(short_id) < 8:
+        raise HTTPException(status_code=400, detail="Short ID en az 8 karakter olmalı")
+
+    # Short ID'den UUID prefix oluştur (8 hex → UUID format: xxxxxxxx-...)
+    sid = short_id[:8].lower()
+    # Tüm ürünleri getirmek yerine text cast ile filtrele
+    from sqlalchemy import text
+    result = await db.execute(
+        select(Product)
+        .options(
+            selectinload(Product.variants).selectinload(ProductVariant.stores),
+            selectinload(Product.stores),
+        )
+        .where(text(f"CAST(id AS TEXT) LIKE :prefix"))
+        .params(prefix=f"{sid}%")
+    )
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    await attach_predictions([product], db)
+    return product
+
+
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(
     product_id: uuid.UUID,
