@@ -35,7 +35,11 @@ async def backfill_reasoning_texts() -> dict:
                 (PricePrediction.product_id == subq.c.product_id)
                 & (PricePrediction.prediction_date == subq.c.max_date),
             )
-            .where(PricePrediction.reasoning_text.is_(None))
+            .where(
+                # null veya eski format (JSON olmayan) olanları güncelle
+                (PricePrediction.reasoning_text.is_(None))
+                | (~PricePrediction.reasoning_text.startswith("{"))
+            )
         )
         predictions = result.scalars().all()
         stats["total"] = len(predictions)
