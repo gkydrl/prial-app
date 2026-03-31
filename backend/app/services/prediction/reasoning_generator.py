@@ -1,13 +1,17 @@
 """
 Prediction sonucu için insan-dostu Türkçe açıklama üretir.
-Template-based: hızlı, ücretsiz, ürüne özel fiyat verileriyle zenginleştirilmiş.
+Claude Haiku kullanır — doğal, ürüne özel açıklamalar.
+Fallback: template-based metin (Claude fail olursa).
 
 Çıktı formatı: JSON string → {"summary": "...", "pros": ["...", ...], "cons": ["...", ...]}
+Maliyet: ~$0.42/gün (500 ürün), ~$12.60/ay
 """
 import json
+import anthropic
+from app.config import settings
 
 
-def _build_reasoning(
+def _template_reasoning(
     recommendation: str,
     current_price: float,
     l1y_lowest: float | None,
@@ -16,118 +20,64 @@ def _build_reasoning(
     confidence: float,
     reasoning: dict,
 ) -> dict:
-    """Analiz verilerine dayalı yapılandırılmış reasoning üret."""
+    """Claude başarısız olursa veri-bazlı template metin üret."""
     price_str = f"{current_price:,.0f} TL"
     pros: list[str] = []
     cons: list[str] = []
 
-    # --- Fiyat pozisyonu ---
-    if l1y_lowest and l1y_highest:
-        range_pct = ((current_price - l1y_lowest) / (l1y_highest - l1y_lowest) * 100) if l1y_highest != l1y_lowest else 50
+    # Fiyat pozisyonu
+    if l1y_lowest and l1y_highest and l1y_highest != l1y_lowest:
+        range_pct = (current_price - l1y_lowest) / (l1y_highest - l1y_lowest) * 100
         if range_pct <= 15:
             pros.append(f"Fiyat ({price_str}) son 1 yılın en düşüğüne çok yakın")
         elif range_pct <= 40:
             pros.append(f"Fiyat ({price_str}) son 1 yıl ortalamasının altında")
         elif range_pct >= 80:
             cons.append(f"Fiyat ({price_str}) son 1 yılın en yükseğine yakın")
-        else:
-            cons.append(f"Fiyat ({price_str}) orta seviyede, daha düşebilir")
 
-    # --- Trend ---
+    # Trend
     trend_info = reasoning.get("trend", {})
     trend_30d = trend_info.get("trend_30d")
-    trend_7d = trend_info.get("trend_7d")
     if trend_30d is not None:
         if trend_30d < -5:
             pros.append(f"Son 30 günde %{abs(trend_30d):.0f} düşüş yaşandı")
         elif trend_30d > 5:
             cons.append(f"Son 30 günde %{trend_30d:.0f} artış yaşandı")
-    if trend_7d is not None:
-        if trend_7d < -3:
-            pros.append("Son 1 haftada fiyat düşüşü devam ediyor")
-        elif trend_7d > 3:
-            cons.append("Son 1 haftada fiyat yükselişte")
 
-    # --- Predicted direction ---
+    # Direction
     if predicted_direction == "DOWN":
-        cons.append("AI modeli yakın zamanda daha fazla düşüş bekliyor")
+        cons.append("Yakın zamanda daha fazla düşüş bekleniyor")
     elif predicted_direction == "UP":
         pros.append("Fiyatın yükselmesi bekleniyor, şimdi almak mantıklı")
-    else:
-        pros.append("Fiyat stabil seyrediyor")
 
-    # --- Near historical low ---
-    near_low = reasoning.get("near_historical_low", {})
-    if near_low.get("score", 0) >= 0.8:
-        pros.append("Tarihi en düşük fiyata çok yakın — nadir fırsat")
-    elif near_low.get("score", 0) == 0:
-        cons.append("Tarihi düşük fiyattan uzak")
-
-    # --- Upcoming event ---
-    event_info = reasoning.get("upcoming_event", {})
-    events = event_info.get("events", [])
+    # Events
+    events = reasoning.get("upcoming_event", {}).get("events", [])
     if events:
         cons.append(f"Yaklaşan {events[0]} indirimi fiyatı düşürebilir")
     else:
-        if event_info.get("score", 0.5) >= 0.5:
-            pros.append("3 hafta içinde büyük indirim dönemi beklenmiyor")
+        pros.append("Yakın dönemde büyük indirim beklenmiyor")
 
-    # --- Volatility ---
-    vol_info = reasoning.get("volatility", {})
-    vol_score = vol_info.get("score", 0.5)
-    if vol_score >= 0.7:
-        pros.append("Fiyat dalgalanması düşük, stabil seyir")
-    elif vol_score <= 0.3:
-        cons.append("Fiyat sık dalgalanıyor, düşüş fırsatı olabilir")
+    # Near low
+    if reasoning.get("near_historical_low", {}).get("score", 0) >= 0.8:
+        pros.append("Tarihi en düşük fiyata çok yakın")
 
-    # --- Drop frequency ---
-    drop_info = reasoning.get("drop_frequency", {})
-    drop_val = drop_info.get("value")
-    if drop_val is not None:
-        if drop_val >= 8:
-            cons.append(f"Yılda {drop_val} kez ciddi fiyat düşüşü yaşanıyor")
-        elif drop_val <= 2:
-            pros.append("Fiyat nadiren düşüyor, mevcut fiyat iyi bir fırsat")
+    # Filler
+    fillers_pro = ["Birden fazla mağazada karşılaştırma imkanı", "Stokta mevcut ve hemen teslim"]
+    fillers_con = ["İndirim dönemlerinde daha ucuza bulunabilir", "Fiyat dalgalanmaları olası"]
+    for f in fillers_pro:
+        if len(pros) >= 3: break
+        pros.append(f)
+    for f in fillers_con:
+        if len(cons) >= 3: break
+        cons.append(f)
 
-    # --- l1y_lowest hedef ---
-    if l1y_lowest and current_price > l1y_lowest * 1.15:
-        target = f"{l1y_lowest:,.0f} TL"
-        cons.append(f"Hedef fiyat: {target} (son 1 yıl en düşük)")
-
-    # --- Summary ---
     conf_pct = int(confidence * 100)
     if recommendation == "AL":
-        summary = f"AI analizi %{conf_pct} güvenle almayı öneriyor. Mevcut fiyat ({price_str}) uygun seviyede."
+        summary = f"Mevcut fiyat ({price_str}) uygun seviyede. Almak için iyi bir zaman."
     elif recommendation == "GUCLU_BEKLE":
-        summary = f"AI analizi %{conf_pct} güvenle beklemeyi öneriyor. Fiyat ({price_str}) yüksek görünüyor."
+        summary = f"Fiyat ({price_str}) yüksek. Beklemenizi öneriyoruz."
     else:
-        summary = f"AI analizi %{conf_pct} güvenle beklemeyi öneriyor. Daha iyi fiyatlar gelebilir."
-
-    # Ensure exactly 3 pros and 3 cons — deduplicate first
-    pros = list(dict.fromkeys(pros))  # remove duplicates preserving order
-    cons = list(dict.fromkeys(cons))
-
-    # Fill to 3 with generic but relevant items
-    generic_pros = [
-        "Birden fazla mağazada karşılaştırma imkanı",
-        "Stokta mevcut, hemen teslim edilebilir",
-        "Fiyat takibi ile uygun zamanı yakalayabilirsiniz",
-    ]
-    generic_cons = [
-        "İndirim dönemlerinde daha ucuza bulunabilir",
-        "Fiyat dalgalanmaları olası",
-        "Alternatif ürünler daha uygun fiyatlı olabilir",
-    ]
-    for gp in generic_pros:
-        if len(pros) >= 3:
-            break
-        if gp not in pros:
-            pros.append(gp)
-    for gc in generic_cons:
-        if len(cons) >= 3:
-            break
-        if gc not in cons:
-            cons.append(gc)
+        summary = f"Daha iyi fiyatlar gelebilir. Beklemek avantajlı olabilir."
 
     return {"summary": summary, "pros": pros[:3], "cons": cons[:3]}
 
@@ -143,16 +93,67 @@ async def generate_reasoning_text(
     predicted_direction: str,
 ) -> str:
     """
-    Ürüne özel yapılandırılmış reasoning JSON string döner.
-    Template-based: hızlı, ücretsiz, ürün verilerine dayalı.
+    Claude Haiku ile yapılandırılmış 3 pro + 3 con üret.
+    JSON string döner. Fail olursa template fallback.
     """
-    result = _build_reasoning(
-        recommendation=recommendation,
-        current_price=current_price,
-        l1y_lowest=l1y_lowest,
-        l1y_highest=l1y_highest,
-        predicted_direction=predicted_direction,
-        confidence=confidence,
-        reasoning=reasoning,
+    if not settings.anthropic_api_key:
+        return json.dumps(
+            _template_reasoning(recommendation, current_price, l1y_lowest, l1y_highest, predicted_direction, confidence, reasoning),
+            ensure_ascii=False,
+        )
+
+    # Reasoning dict'ten faktörleri çıkar
+    factors = []
+    for key in ["percentile", "trend", "near_historical_low", "upcoming_event", "seasonal", "volatility", "drop_frequency"]:
+        if key in reasoning and "note" in reasoning[key]:
+            factors.append(reasoning[key]["note"])
+
+    factors_text = "\n".join(f"- {f}" for f in factors) if factors else "Detay yok"
+
+    prompt = (
+        f"Sen Prial alışveriş asistanısın. Aşağıdaki ürün analizi için JSON formatında 3 olumlu ve 3 olumsuz madde yaz.\n\n"
+        f"Ürün: {product_title}\n"
+        f"Tavsiye: {recommendation}\n"
+        f"Güven: %{confidence * 100:.0f}\n"
+        f"Mevcut fiyat: {current_price:,.0f} TL\n"
+        f"Son 1 yıl en düşük: {f'{l1y_lowest:,.0f} TL' if l1y_lowest else 'Bilinmiyor'}\n"
+        f"Son 1 yıl en yüksek: {f'{l1y_highest:,.0f} TL' if l1y_highest else 'Bilinmiyor'}\n"
+        f"Fiyat yönü: {predicted_direction}\n"
+        f"Analiz faktörleri:\n{factors_text}\n\n"
+        f"Kurallar:\n"
+        f'- JSON döndür: {{"summary": "1 cümle", "pros": ["...", "...", "..."], "cons": ["...", "...", "..."]}}\n'
+        f"- pros: 3 madde — bu ürünü şimdi almak için nedenler (fiyat avantajı, trend, stok vb.)\n"
+        f"- cons: 3 madde — beklemek/almamak için nedenler (yüksek fiyat, indirim beklentisi vb.)\n"
+        f"- summary: 1 kısa cümle genel değerlendirme\n"
+        f"- Her madde max 12 kelime, sade Türkçe\n"
+        f"- Fiyat yazarken TL kullan\n"
+        f"- SADECE JSON döndür"
     )
-    return json.dumps(result, ensure_ascii=False)
+
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = message.content[0].text.strip()
+        parsed = json.loads(result)
+
+        output = {
+            "summary": str(parsed.get("summary", "")),
+            "pros": [str(p) for p in parsed.get("pros", [])][:3],
+            "cons": [str(c) for c in parsed.get("cons", [])][:3],
+        }
+        while len(output["pros"]) < 3:
+            output["pros"].append("Stokta mevcut")
+        while len(output["cons"]) < 3:
+            output["cons"].append("Fiyat dalgalanması olası")
+
+        return json.dumps(output, ensure_ascii=False)
+    except Exception as e:
+        print(f"[reasoning_generator] Claude hatası ({product_title[:30]}): {e}", flush=True)
+        return json.dumps(
+            _template_reasoning(recommendation, current_price, l1y_lowest, l1y_highest, predicted_direction, confidence, reasoning),
+            ensure_ascii=False,
+        )
