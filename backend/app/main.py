@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     from app.services.akakce.importer import bulk_import as akakce_bulk_import, daily_enrichment as akakce_daily_enrichment
     from app.services.prediction.runner import run_daily_predictions
     from app.services.prediction.evaluator import evaluate_predictions
+    from app.services.exchange_rate import fetch_and_store_rates
 
     scheduler.add_job(
         check_due_prices,
@@ -111,6 +112,15 @@ async def lifespan(app: FastAPI):
         hour=7,
         minute=0,
         id="prediction_evaluation",
+        replace_existing=True,
+    )
+
+    # Döviz kuru güncelleme — her saat başı
+    scheduler.add_job(
+        fetch_and_store_rates,
+        trigger="interval",
+        hours=1,
+        id="exchange_rate_update",
         replace_existing=True,
     )
 

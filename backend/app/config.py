@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     discovery_concurrency: int = 3        # kaç arama aynı anda çalışsın
 
     # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:8081"
+    allowed_origins: str = "http://localhost:3000,http://localhost:8081,https://prial.io,https://www.prial.io"
 
     @property
     def allowed_origins_list(self) -> list[str]:

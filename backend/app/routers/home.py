@@ -9,7 +9,9 @@ from app.models.product import Product, ProductStore
 from app.models.price_history import PriceHistory
 from app.models.alarm import Alarm, AlarmStatus
 from app.models.user import User
+from app.models.prediction import PricePrediction, Recommendation
 from app.schemas.product import ProductResponse, ProductStoreResponse
+from app.services.prediction.batch_loader import attach_predictions
 
 router = APIRouter(prefix="/home", tags=["home"])
 
@@ -357,7 +359,67 @@ async def most_alarmed(
             .order_by(desc(Product.alarm_count), desc(Product.created_at))
             .limit(limit)
         )
-    return result.scalars().all()
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products
+
+
+@router.get("/ai-picks", response_model=list[ProductResponse])
+async def ai_picks(
+    limit: int = Query(default=10, le=30),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bugünkü AL tavsiyeleri, confidence DESC sıralı."""
+    from datetime import date as date_cls
+
+    today = date_cls.today()
+    result = await db.execute(
+        select(Product)
+        .join(
+            PricePrediction,
+            (PricePrediction.product_id == Product.id)
+            & (PricePrediction.prediction_date == today)
+            & (PricePrediction.recommendation == Recommendation.AL),
+        )
+        .options(
+            selectinload(Product.stores),
+            selectinload(Product.variants),
+        )
+        .order_by(desc(PricePrediction.confidence))
+        .limit(limit)
+    )
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products
+
+
+@router.get("/ai-wait-picks", response_model=list[ProductResponse])
+async def ai_wait_picks(
+    limit: int = Query(default=10, le=30),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bugunku BEKLE/GUCLU_BEKLE tavsiyeleri — fiyati dusecek urunler."""
+    from datetime import date as date_cls
+
+    today = date_cls.today()
+    result = await db.execute(
+        select(Product)
+        .join(
+            PricePrediction,
+            (PricePrediction.product_id == Product.id)
+            & (PricePrediction.prediction_date == today)
+            & (PricePrediction.recommendation.in_([Recommendation.BEKLE, Recommendation.GUCLU_BEKLE])),
+        )
+        .options(
+            selectinload(Product.stores),
+            selectinload(Product.variants),
+        )
+        .order_by(desc(PricePrediction.confidence))
+        .limit(limit)
+    )
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products
 
 
 @router.get("/stats")

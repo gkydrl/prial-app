@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,6 +11,8 @@ from app.models.product import Product, ProductStore, ProductVariant
 from app.models.alarm import Alarm, AlarmStatus
 from app.models.price_history import PriceHistory
 from app.models.category import Category
+from app.models.prediction import PricePrediction
+from app.services.prediction.batch_loader import attach_predictions
 from app.schemas.product import (
     ProductResponse, ProductAddRequest, PriceHistoryPoint,
     ProductPreviewRequest, ProductPreviewResponse,
@@ -43,6 +46,35 @@ async def _optional_user(
         return user if user and user.is_active else None
     except Exception:
         return None
+
+
+@router.get("/{product_id}/prediction")
+async def get_product_prediction(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Bugünkü AI tahminini döner. Auth gerektirmez."""
+    result = await db.execute(
+        select(PricePrediction)
+        .where(
+            PricePrediction.product_id == product_id,
+            PricePrediction.prediction_date == date.today(),
+        )
+        .order_by(PricePrediction.created_at.desc())
+        .limit(1)
+    )
+    pred = result.scalar_one_or_none()
+    if not pred:
+        return {"status": "no_prediction"}
+
+    return {
+        "status": "ok",
+        "recommendation": pred.recommendation.value,
+        "confidence": float(pred.confidence),
+        "reasoning_text": pred.reasoning_text,
+        "predicted_direction": pred.predicted_direction.value,
+        "current_price": float(pred.current_price),
+    }
 
 
 @router.post("/preview", response_model=ProductPreviewResponse)
@@ -158,7 +190,9 @@ async def list_products(
     result = await db.execute(
         query.order_by(Product.alarm_count.desc(), Product.created_at.desc()).limit(limit)
     )
-    return result.scalars().all()
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
@@ -214,6 +248,9 @@ async def get_product(
                 "discount_value": campaign.discount_value,
                 "assigned_at": assignment.assigned_at,
             })
+
+    # Attach today's prediction
+    await attach_predictions([product], db)
 
     # For each store, find applicable promo codes + assigned promos
     for store in product.stores:

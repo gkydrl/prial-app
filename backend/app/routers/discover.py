@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.product import Product, ProductStore, ProductVariant
 from app.models.category import Category
 from app.schemas.product import CategoryResponse, ProductResponse
+from app.services.prediction.batch_loader import attach_predictions
 
 router = APIRouter(prefix="/discover", tags=["discover"])
 
@@ -85,7 +86,9 @@ async def get_all_products(
 
     offset = (page - 1) * page_size
     result = await db.execute(query.offset(offset).limit(page_size))
-    return result.scalars().all()
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products
 
 
 @router.get("/categories", response_model=list[CategoryResponse])
@@ -160,7 +163,9 @@ async def get_category_products(
 
     offset = (page - 1) * page_size
     result = await db.execute(query.offset(offset).limit(page_size))
-    return result.scalars().all()
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products
 
 
 @router.get("/search", response_model=list[ProductResponse])
@@ -182,4 +187,6 @@ async def search_products(
     )
     offset = (page - 1) * page_size
     result = await db.execute(query.offset(offset).limit(page_size))
-    return result.scalars().all()
+    products = result.scalars().all()
+    await attach_predictions(products, db)
+    return products

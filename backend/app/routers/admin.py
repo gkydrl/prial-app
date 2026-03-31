@@ -569,6 +569,16 @@ async def product_prediction(
     }
 
 
+@router.post("/predictions/run-all")
+async def run_all_predictions(
+    _: None = Depends(require_admin),
+):
+    """Tüm ürünler için günlük tahminleri çalıştır."""
+    from app.services.prediction.runner import run_daily_predictions
+    stats = await run_daily_predictions()
+    return stats
+
+
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
 
 

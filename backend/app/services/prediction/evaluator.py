@@ -191,11 +191,12 @@ async def _update_model_weights(error_types: dict, db: AsyncSession) -> None:
         weights["seasonal"] = weights.get("seasonal", 0.10) - adjustment / 2
         weights["volatility"] = weights.get("volatility", 0.15) - adjustment / 2
 
-    # premature_buy: AL dedik ama fiyat dustu → percentile/drop_freq agirligini artir
+    # premature_buy: AL dedik ama fiyat dustu → percentile/drop_freq/event agirligini artir
     if error_types.get("premature_buy", 0) > 0:
-        weights["percentile"] = weights.get("percentile", 0.30) + adjustment
-        weights["drop_frequency"] = weights.get("drop_frequency", 0.15) + adjustment / 2
-        weights["trend"] = weights.get("trend", 0.20) - adjustment
+        weights["percentile"] = weights.get("percentile", 0.25) + adjustment
+        weights["drop_frequency"] = weights.get("drop_frequency", 0.12) + adjustment / 2
+        weights["upcoming_event"] = weights.get("upcoming_event", 0.15) + adjustment / 2
+        weights["trend"] = weights.get("trend", 0.18) - adjustment
         weights["near_historical_low"] = weights.get("near_historical_low", 0.10) - adjustment / 2
 
     # Normalize weights to sum = 1.0

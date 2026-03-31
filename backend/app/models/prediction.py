@@ -3,7 +3,7 @@ import enum
 from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy import (
-    String, DateTime, Date, func, ForeignKey, Numeric, Boolean, Integer, Enum,
+    String, Text, DateTime, Date, func, ForeignKey, Numeric, Boolean, Integer, Enum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -46,6 +46,7 @@ class PricePrediction(Base):
     )
     confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
     reasoning: Mapped[dict | None] = mapped_column(JSONB)
+    reasoning_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     current_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     predicted_direction: Mapped[PredictedDirection] = mapped_column(

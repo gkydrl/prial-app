@@ -7,6 +7,7 @@ from app.models.notification import Notification
 from app.models.promo_code import PromoCode
 from app.models.campaign import StoreAccount, Campaign, CodePool, UserPromoAssignment
 from app.models.prediction import PricePrediction, PredictionOutcome, ModelParameters
+from app.models.exchange_rate import ExchangeRate
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "PricePrediction",
     "PredictionOutcome",
     "ModelParameters",
+    "ExchangeRate",
 ]

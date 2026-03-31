@@ -25,6 +25,9 @@ class PriceFeatures:
     drop_frequency: int | None    # yilda kac kez >5% dusus
     seasonal_score: float | None  # mevcut ay vs yillik ort. farki
     near_historical_low: bool
+    # Ozel gun bazli skor (-1.0 = guclu BEKLE, 0.0 = etki yok)
+    event_score: float
+    event_details: list[dict]
 
 
 @dataclass
@@ -38,6 +41,7 @@ def compute_features(
     price_history: list[PricePoint],
     l1y_min: float | None = None,
     l1y_max: float | None = None,
+    category_slug: str | None = None,
 ) -> PriceFeatures:
     """
     Fiyat gecmisi ve mevcut fiyattan tum feature'lari hesapla.
@@ -85,6 +89,13 @@ def compute_features(
     if l1y_min is not None and l1y_min > 0:
         near_low = current_price <= l1y_min * 1.05
 
+    # Ozel gun skoru (2-3 hafta ilerisi)
+    from app.services.prediction.special_days import compute_event_score
+    event_score, event_details = compute_event_score(
+        days_ahead=21,
+        category_slug=category_slug,
+    )
+
     return PriceFeatures(
         current_price=current_price,
         avg_30d=avg_30d,
@@ -98,6 +109,8 @@ def compute_features(
         drop_frequency=drop_frequency,
         seasonal_score=seasonal_score,
         near_historical_low=near_low,
+        event_score=event_score,
+        event_details=event_details,
     )
 
 

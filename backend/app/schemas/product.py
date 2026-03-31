@@ -39,11 +39,19 @@ class ProductVariantResponse(BaseModel):
 class ProductResponse(BaseModel):
     id: uuid.UUID
     title: str
+    short_title: str | None = None
     brand: str | None
     description: str | None
     image_url: str | None
     lowest_price_ever: Decimal | None
+    l1y_lowest_price: Decimal | None = None
+    l1y_highest_price: Decimal | None = None
+    akakce_url: str | None = None
     alarm_count: int
+    recommendation: str | None = None
+    reasoning_text: str | None = None
+    predicted_direction: str | None = None
+    prediction_confidence: float | None = None
     variants: list[ProductVariantResponse]
     stores: list[ProductStoreResponse]
     created_at: datetime

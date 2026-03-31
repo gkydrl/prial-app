@@ -10,12 +10,15 @@ from decimal import Decimal
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.orm import selectinload
+
 from app.database import AsyncSessionLocal
 from app.models.product import Product, ProductStore
 from app.models.price_history import PriceHistory
 from app.models.prediction import PricePrediction
 from app.services.prediction.analyzer import compute_features, PricePoint
 from app.services.prediction.predictor import predict_and_save
+from app.services.prediction.reasoning_generator import generate_reasoning_text
 
 
 async def run_daily_predictions() -> dict:
@@ -29,6 +32,7 @@ async def run_daily_predictions() -> dict:
         # Aktif fiyati olan urunleri getir
         result = await db.execute(
             select(Product)
+            .options(selectinload(Product.category))
             .where(
                 Product.id.in_(
                     select(ProductStore.product_id)
@@ -124,12 +128,16 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
         for row in history_rows
     ]
 
+    # Kategori slug (ozel gun filtresi icin)
+    cat_name = product.category.name if product.category else None
+
     # Feature hesapla
     features = compute_features(
         current_price=float(current_price),
         price_history=price_history,
         l1y_min=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
         l1y_max=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+        category_slug=cat_name,
     )
 
     # Tahmin uret ve kaydet
@@ -139,5 +147,21 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
         features=features,
         db=db,
     )
+
+    # İnsan-dostu açıklama üret
+    try:
+        reasoning_text = await generate_reasoning_text(
+            product_title=product.title,
+            recommendation=prediction.recommendation.value,
+            confidence=float(prediction.confidence),
+            current_price=float(current_price),
+            reasoning=prediction.reasoning or {},
+            l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+            l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+            predicted_direction=prediction.predicted_direction.value,
+        )
+        prediction.reasoning_text = reasoning_text
+    except Exception as e:
+        print(f"[prediction/runner] Reasoning text hatası ({product.title[:40]}): {e}", flush=True)
 
     return prediction

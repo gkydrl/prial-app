@@ -19,12 +19,13 @@ from app.services.prediction.analyzer import PriceFeatures
 
 # Default weights (self-learning ile guncellenir)
 DEFAULT_WEIGHTS = {
-    "percentile": 0.30,
-    "trend": 0.20,
-    "volatility": 0.15,
-    "drop_frequency": 0.15,
-    "seasonal": 0.10,
+    "percentile": 0.25,
+    "trend": 0.18,
+    "volatility": 0.12,
+    "drop_frequency": 0.12,
+    "seasonal": 0.08,
     "near_historical_low": 0.10,
+    "upcoming_event": 0.15,
 }
 
 DEFAULT_VERSION = "v1.0"
@@ -147,6 +148,26 @@ def predict(features: PriceFeatures, weights: dict) -> PredictionResult:
         reasoning["near_historical_low"] = {
             "score": 0.0,
             "note": "Tarihi düşükten uzak",
+        }
+
+    # 7. Upcoming event (yaklasan ozel gun/indirim donemi)
+    if features.event_score < 0:
+        # Negatif event_score = yaklasan indirim = BEKLE sinyali → dusuk buy score
+        ev_score = 1.0 + features.event_score  # -1.0 → 0.0, 0.0 → 1.0
+        scores["upcoming_event"] = max(0.0, ev_score)
+        event_names = [e["name"] for e in features.event_details[:3]]
+        reasoning["upcoming_event"] = {
+            "event_score": features.event_score,
+            "score": round(max(0.0, ev_score), 3),
+            "events": event_names,
+            "note": f"Yaklaşan etkinlik: {', '.join(event_names)}" if event_names else "Yaklaşan etkinlik var",
+        }
+    else:
+        scores["upcoming_event"] = 0.5  # Neutral — no upcoming events
+        reasoning["upcoming_event"] = {
+            "event_score": 0.0,
+            "score": 0.5,
+            "note": "3 hafta içinde özel gün yok",
         }
 
     # Weighted total score
