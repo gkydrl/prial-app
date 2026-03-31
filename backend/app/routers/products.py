@@ -427,5 +427,5 @@ async def get_price_history(
     if store_id:
         query = query.where(PriceHistory.product_store_id == store_id)
 
-    result = await db.execute(query.limit(90))  # Son 90 kayıt
+    result = await db.execute(query.limit(365))  # Son 1 yıl
     return result.scalars().all()
