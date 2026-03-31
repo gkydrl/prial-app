@@ -29,18 +29,14 @@ async def run_daily_predictions() -> dict:
     stats = {"total": 0, "predicted": 0, "skipped": 0, "errors": 0}
 
     async with AsyncSessionLocal() as db:
-        # Aktif fiyati olan urunleri getir
+        # Store'u olan tüm ürünleri getir (current_price olmasına gerek yok,
+        # fiyat geçmişinden alınabilir)
         result = await db.execute(
             select(Product)
             .options(selectinload(Product.category))
             .where(
                 Product.id.in_(
-                    select(ProductStore.product_id)
-                    .where(
-                        ProductStore.is_active == True,  # noqa: E712
-                        ProductStore.current_price.isnot(None),
-                    )
-                    .distinct()
+                    select(ProductStore.product_id).distinct()
                 )
             )
         )
@@ -83,7 +79,34 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
     if existing.scalar_one_or_none():
         return None
 
-    # Mevcut en dusuk fiyati bul
+    # product_store_id'leri bul
+    store_ids_result = await db.execute(
+        select(ProductStore.id).where(ProductStore.product_id == product.id)
+    )
+    store_ids = [row[0] for row in store_ids_result.all()]
+
+    if not store_ids:
+        return None
+
+    # Fiyat gecmisini getir (son 1 yil)
+    one_year_ago = today - timedelta(days=365)
+
+    history_result = await db.execute(
+        select(PriceHistory.recorded_at, PriceHistory.price)
+        .where(
+            PriceHistory.product_store_id.in_(store_ids),
+            PriceHistory.recorded_at >= one_year_ago,
+            PriceHistory.price > 0,
+        )
+        .order_by(PriceHistory.recorded_at.asc())
+    )
+    history_rows = history_result.all()
+
+    # Minimum 5 data point gerekli
+    if len(history_rows) < 5:
+        return None
+
+    # Mevcut en dusuk fiyati bul (store'dan veya fiyat gecmisinin son kaydından)
     price_result = await db.execute(
         select(func.min(ProductStore.current_price))
         .where(
@@ -94,33 +117,11 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
         )
     )
     current_price = price_result.scalar_one_or_none()
+
+    # Fallback: fiyat geçmişinin son kaydı
     if not current_price:
-        return None
-
-    # Fiyat gecmisini getir (son 1 yil)
-    one_year_ago = today - timedelta(days=365)
-
-    # product_store_id'leri bul
-    store_ids_result = await db.execute(
-        select(ProductStore.id).where(ProductStore.product_id == product.id)
-    )
-    store_ids = [row[0] for row in store_ids_result.all()]
-
-    if not store_ids:
-        return None
-
-    history_result = await db.execute(
-        select(PriceHistory.recorded_at, PriceHistory.price)
-        .where(
-            PriceHistory.product_store_id.in_(store_ids),
-            PriceHistory.recorded_at >= one_year_ago,
-        )
-        .order_by(PriceHistory.recorded_at.asc())
-    )
-    history_rows = history_result.all()
-
-    # Minimum 5 data point gerekli
-    if len(history_rows) < 5:
+        current_price = history_rows[-1].price
+    if not current_price:
         return None
 
     price_history = [
