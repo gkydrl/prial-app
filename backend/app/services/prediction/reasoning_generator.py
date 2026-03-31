@@ -91,6 +91,10 @@ async def generate_reasoning_text(
     l1y_lowest: float | None,
     l1y_highest: float | None,
     predicted_direction: str,
+    review_summary: dict | None = None,
+    shipping_info: list[dict] | None = None,
+    daily_lowest_price: float | None = None,
+    daily_lowest_store: str | None = None,
 ) -> str:
     """
     Claude Haiku ile yapılandırılmış 3 pro + 3 con üret.
@@ -110,6 +114,38 @@ async def generate_reasoning_text(
 
     factors_text = "\n".join(f"- {f}" for f in factors) if factors else "Detay yok"
 
+    # Build review section
+    review_section = ""
+    if review_summary:
+        review_lines = []
+        for store_key in ("trendyol", "hepsiburada"):
+            store_data = review_summary.get(store_key)
+            if store_data and isinstance(store_data, dict):
+                rating = store_data.get("rating")
+                count = store_data.get("count", 0)
+                samples = store_data.get("samples", [])
+                sample_text = ", ".join(f'"{s[:60]}"' for s in samples[:2]) if samples else "—"
+                if rating:
+                    review_lines.append(f"- {store_key.capitalize()}: {rating}/5 ({count} yorum) — {sample_text}")
+        if review_lines:
+            review_section = "\n\nKullanıcı Yorumları:\n" + "\n".join(review_lines)
+
+    # Build shipping section
+    shipping_section = ""
+    if shipping_info:
+        ship_lines = []
+        for info in shipping_info:
+            store = info.get("store", "?")
+            text = info.get("text") or f"{info.get('days', '?')} iş günü"
+            ship_lines.append(f"- {store}: {text}")
+        if ship_lines:
+            shipping_section = "\n\nKargo Süreleri:\n" + "\n".join(ship_lines)
+
+    # Build daily lowest section
+    daily_section = ""
+    if daily_lowest_price and daily_lowest_store:
+        daily_section = f"\nBugünkü en düşük fiyat: {daily_lowest_price:,.0f} TL ({daily_lowest_store})"
+
     prompt = (
         f"Sen Prial alışveriş asistanısın. Aşağıdaki ürün analizi için JSON formatında 3 olumlu ve 3 olumsuz madde yaz.\n\n"
         f"Ürün: {product_title}\n"
@@ -119,14 +155,18 @@ async def generate_reasoning_text(
         f"Son 1 yıl en düşük: {f'{l1y_lowest:,.0f} TL' if l1y_lowest else 'Bilinmiyor'}\n"
         f"Son 1 yıl en yüksek: {f'{l1y_highest:,.0f} TL' if l1y_highest else 'Bilinmiyor'}\n"
         f"Fiyat yönü: {predicted_direction}\n"
-        f"Analiz faktörleri:\n{factors_text}\n\n"
+        f"Analiz faktörleri:\n{factors_text}"
+        f"{review_section}"
+        f"{shipping_section}"
+        f"{daily_section}\n\n"
         f"Kurallar:\n"
         f'- JSON döndür: {{"summary": "1 cümle", "pros": ["...", "...", "..."], "cons": ["...", "...", "..."]}}\n'
-        f"- pros: 3 madde — bu ürünü şimdi almak için nedenler (fiyat avantajı, trend, stok vb.)\n"
-        f"- cons: 3 madde — beklemek/almamak için nedenler (yüksek fiyat, indirim beklentisi vb.)\n"
+        f"- pros: 3 madde — bu ürünü şimdi almak için nedenler (fiyat avantajı, trend, stok, yorum kalitesi, hızlı kargo vb.)\n"
+        f"- cons: 3 madde — beklemek/almamak için nedenler (yüksek fiyat, indirim beklentisi, olumsuz yorumlar, yavaş kargo vb.)\n"
         f"- summary: 1 kısa cümle genel değerlendirme\n"
         f"- Her madde max 12 kelime, sade Türkçe\n"
         f"- Fiyat yazarken TL kullan\n"
+        f"- Yorum ve kargo bilgisi varsa bunları da değerlendir\n"
         f"- SADECE JSON döndür"
     )
 

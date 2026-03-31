@@ -323,7 +323,7 @@ async def bulk_import(batch_size: int = 50, only_new: bool = True) -> dict:
 async def daily_enrichment(batch_size: int = 20) -> dict:
     """
     Mevcut akakce eslesmeleri guncelle — yeni fiyat verileri cek.
-    Scheduler'dan her gun 05:00'da cagrilir.
+    Eski versiyon (kuçuk batch). daily_enrichment_full() ile değiştirildi.
     """
     stats = {"total": 0, "ok": 0, "no_data": 0, "error": 0}
 
@@ -349,3 +349,172 @@ async def daily_enrichment(batch_size: int = 20) -> dict:
 
     print(f"[akakce/enrichment] Tamamlandı: {stats}", flush=True)
     return stats
+
+
+async def daily_enrichment_full() -> dict:
+    """
+    TÜM ürünler için günlük zenginleştirme:
+    1. Akakce chart'tan fiyat geçmişi güncelle (eksik günleri doldur)
+    2. Akakce'den ilk 2 farklı marketplace linkini bul → scrape et (fiyat + kargo + taksit)
+    3. ProductStore kayıtlarını güncelle
+    4. daily_lowest_price güncelle
+    5. l1y istatistiklerini güncelle
+
+    Concurrency: 10, delay: 0.5s arası.
+    """
+    from app.services.akakce.store_parser import parse_store_listings, resolve_redirect
+    from app.services.scraper.dispatcher import scrape_url, get_scraper
+    from app.services.scraper.universal_scraper import UniversalScraper
+    from app.models.product import StoreName
+
+    stats = {
+        "total": 0, "ok": 0, "no_data": 0, "error": 0, "skipped": 0,
+        "stores_scraped": 0, "stores_created": 0, "stores_updated": 0,
+    }
+    semaphore = asyncio.Semaphore(10)
+
+    # 1. Tüm akakce_url'si olan ürünleri çek
+    async with AsyncSessionLocal() as db:
+        query = select(Product).where(Product.akakce_url.isnot(None))
+        result = await db.execute(query)
+        products = result.scalars().all()
+
+    total = len(products)
+    print(f"[akakce/enrichment_full] {total} ürün işlenecek (concurrency=10)", flush=True)
+
+    processed = 0
+
+    async def _process_one(product: Product):
+        nonlocal processed
+        async with semaphore:
+            async with AsyncSessionLocal() as db:
+                try:
+                    db_product = await db.get(Product, product.id)
+                    if not db_product or not db_product.akakce_url:
+                        stats["skipped"] += 1
+                        return
+
+                    # a) Fiyat geçmişi güncelle
+                    hist_result = await import_product_history(db_product, db)
+                    hist_status = hist_result["status"]
+                    stats[hist_status] = stats.get(hist_status, 0) + 1
+                    stats["total"] += 1
+
+                    # b) Akakce store listing'lerini parse et (ilk 2 unique marketplace)
+                    store_listings = await parse_store_listings(db_product.akakce_url, max_unique_stores=2)
+
+                    daily_lowest_price = None
+                    daily_lowest_store = None
+
+                    for listing in store_listings:
+                        try:
+                            # Sadece bilinen marketplace'leri scrape et
+                            if listing.store_enum and listing.store_enum not in (StoreName.OTHER,):
+                                # Redirect URL'den gerçek mağaza URL'sini çöz
+                                final_url = await resolve_redirect(listing.redirect_url)
+                                if not final_url:
+                                    # Scrape edemiyorsak Akakce'deki fiyatı kullan
+                                    _update_daily_lowest(listing, daily_lowest_price, daily_lowest_store)
+                                    continue
+
+                                # Scraper var mı kontrol et
+                                scraper = get_scraper(final_url)
+                                if isinstance(scraper, UniversalScraper):
+                                    # Universal scraper ile scrape etme, sadece Akakce fiyatını kaydet
+                                    pass
+                                else:
+                                    try:
+                                        scraped = await scrape_url(final_url)
+                                        stats["stores_scraped"] += 1
+
+                                        # ProductStore güncelle veya oluştur
+                                        await _upsert_product_store(
+                                            db, db_product, listing, scraped, final_url
+                                        )
+                                    except Exception as e:
+                                        print(f"[akakce/enrichment_full] Scrape hatası ({final_url[:60]}): {e}", flush=True)
+
+                            # daily_lowest tracking
+                            if daily_lowest_price is None or listing.price < daily_lowest_price:
+                                daily_lowest_price = listing.price
+                                daily_lowest_store = listing.store_name.upper() if listing.store_enum else listing.store_name
+
+                        except Exception as e:
+                            print(f"[akakce/enrichment_full] Store listing hatası: {e}", flush=True)
+
+                    # c) daily_lowest_price güncelle
+                    if daily_lowest_price:
+                        db_product.daily_lowest_price = Decimal(str(daily_lowest_price))
+                        db_product.daily_lowest_store = daily_lowest_store
+
+                    await db.commit()
+
+                except Exception as e:
+                    print(f"[akakce/enrichment_full] Hata ({product.title[:50]}): {e}", flush=True)
+                    stats["error"] = stats.get("error", 0) + 1
+
+                finally:
+                    processed += 1
+                    if processed % 100 == 0:
+                        print(f"[akakce/enrichment_full] İlerleme: {processed}/{total} — {stats}", flush=True)
+
+            # Rate limiting
+            await random_delay(0.3, 0.7)
+
+    # Tüm ürünleri concurrent olarak işle
+    tasks = [_process_one(p) for p in products]
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    print(f"[akakce/enrichment_full] Tamamlandı: {stats}", flush=True)
+    return stats
+
+
+async def _upsert_product_store(
+    db: AsyncSession,
+    product: Product,
+    listing,
+    scraped,
+    final_url: str,
+) -> None:
+    """ProductStore kaydını güncelle veya oluştur."""
+    from app.models.product import StoreName
+
+    # Mevcut store'u URL ile bul
+    result = await db.execute(
+        select(ProductStore).where(
+            ProductStore.product_id == product.id,
+            ProductStore.url == final_url,
+        )
+    )
+    store = result.scalar_one_or_none()
+
+    if store:
+        # Güncelle
+        store.current_price = scraped.current_price
+        store.original_price = scraped.original_price
+        store.discount_percent = scraped.discount_percent
+        store.in_stock = scraped.in_stock
+        store.estimated_delivery_days = scraped.estimated_delivery_days
+        store.delivery_text = scraped.delivery_text
+        store.installment_text = scraped.installment_text
+    else:
+        # Yeni oluştur
+        store_enum = listing.store_enum or StoreName.OTHER
+        store = ProductStore(
+            product_id=product.id,
+            store=store_enum,
+            url=final_url,
+            current_price=scraped.current_price,
+            original_price=scraped.original_price,
+            discount_percent=scraped.discount_percent,
+            in_stock=scraped.in_stock,
+            store_product_id=scraped.store_product_id,
+            estimated_delivery_days=scraped.estimated_delivery_days,
+            delivery_text=scraped.delivery_text,
+            installment_text=scraped.installment_text,
+            check_priority=3,
+            is_active=True,
+        )
+        db.add(store)
+
+    await db.flush()

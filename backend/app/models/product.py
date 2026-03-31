@@ -45,6 +45,11 @@ class Product(Base):
     l1y_highest_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     akakce_url: Mapped[str | None] = mapped_column(String(1000))
 
+    # Review & daily enrichment
+    review_summary: Mapped[dict | None] = mapped_column(JSONB)
+    daily_lowest_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    daily_lowest_store: Mapped[str | None] = mapped_column(String(50))
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -125,6 +130,11 @@ class ProductStore(Base):
     check_priority: Mapped[int] = mapped_column(Integer, default=3, index=True)
     # 1=HIGH (active alarms), 2=MEDIUM (has alarm history), 3=LOW (no alarms)
     next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    # Delivery & installment info
+    estimated_delivery_days: Mapped[int | None] = mapped_column(Integer)
+    delivery_text: Mapped[str | None] = mapped_column(String(200))
+    installment_text: Mapped[str | None] = mapped_column(String(200))
 
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

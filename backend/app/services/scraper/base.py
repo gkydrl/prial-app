@@ -28,6 +28,9 @@ class ScrapedProduct:
     store_product_id: str | None = None
     in_stock: bool = True
     category: str | None = None
+    estimated_delivery_days: int | None = None
+    delivery_text: str | None = None
+    installment_text: str | None = None
 
     @property
     def discount_percent(self) -> int | None:

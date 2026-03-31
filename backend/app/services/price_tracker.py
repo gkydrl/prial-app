@@ -130,6 +130,14 @@ async def check_product_price(product_store_id) -> None:
             store.discount_percent = scraped.discount_percent
             store.in_stock = scraped.in_stock
 
+        # Always update delivery & installment info (even if price didn't change)
+        if scraped.estimated_delivery_days is not None:
+            store.estimated_delivery_days = scraped.estimated_delivery_days
+        if scraped.delivery_text:
+            store.delivery_text = scraped.delivery_text
+        if scraped.installment_text:
+            store.installment_text = scraped.installment_text
+
             history = PriceHistory(
                 product_store_id=store.id,
                 price=new_price,

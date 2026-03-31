@@ -67,6 +67,11 @@ class HepsiburadaScraper(BaseScraper):
 
         in_stock = bool(soup.select_one("[data-test-id='add-to-cart-button']"))
 
+        # Delivery info
+        delivery_text, estimated_days = self._extract_delivery(html)
+        # Installment info
+        installment_text = self._extract_installment(html)
+
         return ScrapedProduct(
             title=title,
             url=url,
@@ -76,6 +81,9 @@ class HepsiburadaScraper(BaseScraper):
             image_url=image_url,
             store_product_id=self._extract_product_id(url),
             in_stock=in_stock,
+            estimated_delivery_days=estimated_days,
+            delivery_text=delivery_text,
+            installment_text=installment_text,
         )
 
     def _parse_price(self, text: str) -> Decimal:
@@ -90,6 +98,36 @@ class HepsiburadaScraper(BaseScraper):
             return Decimal(cleaned) if cleaned else Decimal("0")
         except Exception:
             return Decimal("0")
+
+    def _extract_delivery(self, html: str) -> tuple[str | None, int | None]:
+        """HTML'deki kargo bilgisini parse et."""
+        for pattern in [
+            r'"deliveryDate"\s*:\s*"([^"]{3,100})"',
+            r'"estimatedDeliveryDate"\s*:\s*"([^"]{3,100})"',
+            r'"deliveryInfo"\s*:\s*"([^"]{3,100})"',
+            r'"shippingInfo"\s*:\s*\{[^}]*"text"\s*:\s*"([^"]{3,100})"',
+        ]:
+            m = re.search(pattern, html)
+            if m:
+                text = m.group(1)
+                days = None
+                dm = re.search(r"(\d+)", text)
+                if dm:
+                    days = int(dm.group(1))
+                if "yarın" in text.lower():
+                    days = 1
+                return text[:200], days
+        return None, None
+
+    def _extract_installment(self, html: str) -> str | None:
+        """HTML'deki taksit bilgisini parse et."""
+        m = re.search(r'"installmentCount"\s*:\s*(\d+)', html)
+        if m and int(m.group(1)) > 1:
+            return f"{m.group(1)} aya varan taksit"
+        m = re.search(r'"maxInstallmentCount"\s*:\s*(\d+)', html)
+        if m and int(m.group(1)) > 1:
+            return f"{m.group(1)} aya varan taksit"
+        return None
 
     def _extract_product_id(self, url: str) -> str | None:
         m = re.search(r"-(pm-[^?/]+)", url) or re.search(r"-p-([A-Z][A-Z0-9]{7,})", url)

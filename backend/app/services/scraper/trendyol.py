@@ -89,6 +89,12 @@ class TrendyolScraper(BaseScraper):
             img = images[0]
             image_url = f"https://cdn.dsmcdn.com{img}" if img.startswith("/") else img
 
+        # Delivery info
+        delivery_text, estimated_days = self._extract_delivery_from_api(result)
+
+        # Installment info
+        installment_text = self._extract_installment_from_api(result)
+
         return ScrapedProduct(
             title=product.get("name", "").strip(),
             url=url,
@@ -99,6 +105,9 @@ class TrendyolScraper(BaseScraper):
             image_url=image_url,
             store_product_id=product_id,
             in_stock=product.get("inStock", True),
+            estimated_delivery_days=estimated_days,
+            delivery_text=delivery_text,
+            installment_text=installment_text,
         )
 
     async def _scrape_html_with_fallback(self, url: str) -> ScrapedProduct:
@@ -166,6 +175,10 @@ class TrendyolScraper(BaseScraper):
 
         store_product_id = self._extract_product_id(url)
 
+        # Delivery & installment from HTML
+        delivery_text, estimated_days = self._extract_delivery_from_html(html)
+        installment_text = self._extract_installment_from_html(html)
+
         return ScrapedProduct(
             title=title,
             url=url,
@@ -176,7 +189,91 @@ class TrendyolScraper(BaseScraper):
             image_url=image_url,
             store_product_id=store_product_id,
             in_stock=in_stock,
+            estimated_delivery_days=estimated_days,
+            delivery_text=delivery_text,
+            installment_text=installment_text,
         )
+
+    def _extract_delivery_from_api(self, result: dict) -> tuple[str | None, int | None]:
+        """API JSON'dan kargo bilgisi çıkar."""
+        try:
+            campaign = result.get("product", {}).get("campaign", {})
+            delivery = result.get("product", {}).get("deliveryInformation", {})
+
+            text = delivery.get("deliveryDate") or delivery.get("estimatedDelivery") or ""
+            if not text:
+                # Alternative path
+                for key in ("deliveryInfo", "shippingInfo"):
+                    info = result.get("product", {}).get(key, {})
+                    if isinstance(info, dict):
+                        text = info.get("text", "") or info.get("deliveryDate", "")
+                        if text:
+                            break
+
+            if not text:
+                return None, None
+
+            # Extract days from common patterns
+            days = None
+            m = re.search(r"(\d+)", text)
+            if m:
+                days = int(m.group(1))
+            if "yarın" in text.lower():
+                days = 1
+
+            return text[:200], days
+        except Exception:
+            return None, None
+
+    def _extract_installment_from_api(self, result: dict) -> str | None:
+        """API JSON'dan taksit bilgisi çıkar."""
+        try:
+            product = result.get("product", {})
+            installment = product.get("installmentTable") or product.get("installment", {})
+            if isinstance(installment, list) and installment:
+                max_count = max(
+                    (item.get("installmentCount", 0) for item in installment if isinstance(item, dict)),
+                    default=0,
+                )
+                if max_count > 1:
+                    return f"{max_count} aya varan taksit"
+            elif isinstance(installment, dict):
+                count = installment.get("maxInstallmentCount") or installment.get("installmentCount")
+                if count and int(count) > 1:
+                    return f"{count} aya varan taksit"
+        except Exception:
+            pass
+        return None
+
+    def _extract_delivery_from_html(self, html: str) -> tuple[str | None, int | None]:
+        """HTML içindeki kargo bilgisini parse et."""
+        # JSON embedded patterns
+        for pattern in [
+            r'"deliveryDate"\s*:\s*"([^"]{3,100})"',
+            r'"estimatedDelivery"\s*:\s*"([^"]{3,100})"',
+            r'"deliveryInfo"\s*:\s*\{[^}]*"text"\s*:\s*"([^"]{3,100})"',
+        ]:
+            m = re.search(pattern, html)
+            if m:
+                text = m.group(1)
+                days = None
+                dm = re.search(r"(\d+)", text)
+                if dm:
+                    days = int(dm.group(1))
+                if "yarın" in text.lower():
+                    days = 1
+                return text[:200], days
+        return None, None
+
+    def _extract_installment_from_html(self, html: str) -> str | None:
+        """HTML içindeki taksit bilgisini parse et."""
+        m = re.search(r'"maxInstallmentCount"\s*:\s*(\d+)', html)
+        if m and int(m.group(1)) > 1:
+            return f"{m.group(1)} aya varan taksit"
+        m = re.search(r'"installmentCount"\s*:\s*(\d+)', html)
+        if m and int(m.group(1)) > 1:
+            return f"{m.group(1)} aya varan taksit"
+        return None
 
     def _extract_product_id(self, url: str) -> str | None:
         match = re.search(r"-p-(\d+)", url)

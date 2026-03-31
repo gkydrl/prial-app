@@ -20,7 +20,8 @@ async def lifespan(app: FastAPI):
     from app.services.catalog_crawler import crawl_all_variants
     from app.services.summary_service import send_daily_summaries, send_weekly_summaries
     from app.services.product_discovery import discover_daily
-    from app.services.akakce.importer import bulk_import as akakce_bulk_import, daily_enrichment as akakce_daily_enrichment
+    from app.services.akakce.importer import bulk_import as akakce_bulk_import, daily_enrichment_full as akakce_daily_enrichment_full
+    from app.services.review_enrichment import enrich_reviews_daily
     from app.services.prediction.runner import run_daily_predictions
     from app.services.prediction.evaluator import evaluate_predictions
     from app.services.exchange_rate import fetch_and_store_rates
@@ -85,13 +86,23 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # Akakçe günlük zenginleştirme — her gün 05:00 (mevcut eşleşmeleri güncelle)
+    # Akakçe FULL günlük zenginleştirme — her gece 03:00 (TÜM ürünler, ~90dk)
     scheduler.add_job(
-        lambda: akakce_daily_enrichment(batch_size=20),
+        akakce_daily_enrichment_full,
+        trigger="cron",
+        hour=3,
+        minute=0,
+        id="akakce_daily_enrichment_full",
+        replace_existing=True,
+    )
+
+    # Review enrichment — her gün 05:00 (500 ürün/gün)
+    scheduler.add_job(
+        lambda: enrich_reviews_daily(batch_size=500),
         trigger="cron",
         hour=5,
         minute=0,
-        id="akakce_daily_enrichment",
+        id="review_enrichment",
         replace_existing=True,
     )
 

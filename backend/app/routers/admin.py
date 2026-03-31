@@ -1463,3 +1463,97 @@ async def _get_test_user(db: AsyncSession, email: str) -> User:
     if not user.firebase_token:
         raise HTTPException(status_code=400, detail="Kullanıcının push token'ı yok")
     return user
+
+
+# ─── Enrichment Full ────────────────────────────────────────────────────────
+
+
+@router.post("/akakce/enrichment-full", dependencies=[Depends(require_admin)])
+async def trigger_enrichment_full(
+    background_tasks: BackgroundTasks,
+    full: bool = False,
+    product_id: uuid.UUID | None = None,
+):
+    """
+    Akakce full enrichment pipeline'ını tetikler.
+    - full=true: TÜM ürünler (~90dk)
+    - product_id: tek bir ürün testi
+    - default: tek ürün random testi
+    """
+    from app.services.akakce.importer import daily_enrichment_full, import_product_history
+    from app.services.akakce.store_parser import parse_store_listings
+    from app.database import AsyncSessionLocal
+
+    if product_id:
+        # Tek ürün testi
+        async with AsyncSessionLocal() as db:
+            product = await db.get(Product, product_id)
+            if not product:
+                raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+            if not product.akakce_url:
+                raise HTTPException(status_code=400, detail="Ürünün akakce_url'si yok")
+
+            # Store listings test
+            listings = await parse_store_listings(product.akakce_url)
+            hist_result = await import_product_history(product, db)
+            await db.commit()
+
+            return {
+                "product": product.title,
+                "akakce_url": product.akakce_url,
+                "history_result": hist_result,
+                "store_listings": [
+                    {
+                        "store": l.store_name,
+                        "price": l.price,
+                        "redirect_url": l.redirect_url,
+                    }
+                    for l in listings
+                ],
+            }
+
+    if full:
+        background_tasks.add_task(daily_enrichment_full)
+        return {"status": "started", "message": "Full enrichment arka planda başlatıldı (~90dk)"}
+
+    # Default: random tek ürün testi
+    from sqlalchemy import func as sqla_func
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Product)
+            .where(Product.akakce_url.isnot(None))
+            .order_by(sqla_func.random())
+            .limit(1)
+        )
+        product = result.scalar_one_or_none()
+        if not product:
+            return {"status": "no_products", "message": "akakce_url'si olan ürün yok"}
+
+        listings = await parse_store_listings(product.akakce_url)
+        hist_result = await import_product_history(product, db)
+        await db.commit()
+
+        return {
+            "product": product.title,
+            "akakce_url": product.akakce_url,
+            "history_result": hist_result,
+            "store_listings": [
+                {
+                    "store": l.store_name,
+                    "price": l.price,
+                    "redirect_url": l.redirect_url,
+                }
+                for l in listings
+            ],
+        }
+
+
+@router.post("/reviews/enrich", dependencies=[Depends(require_admin)])
+async def trigger_review_enrichment(
+    background_tasks: BackgroundTasks,
+    batch_size: int = 500,
+):
+    """Review enrichment pipeline'ını arka planda başlatır."""
+    from app.services.review_enrichment import enrich_reviews_daily
+    background_tasks.add_task(enrich_reviews_daily, batch_size)
+    return {"status": "started", "batch_size": batch_size}

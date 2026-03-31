@@ -159,6 +159,22 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
         db=db,
     )
 
+    # Shipping info for reasoning
+    shipping_info = []
+    stores_result = await db.execute(
+        select(ProductStore).where(
+            ProductStore.product_id == product.id,
+            ProductStore.is_active == True,  # noqa: E712
+        )
+    )
+    for st in stores_result.scalars().all():
+        if st.delivery_text or st.estimated_delivery_days:
+            shipping_info.append({
+                "store": st.store.value.capitalize(),
+                "days": st.estimated_delivery_days,
+                "text": st.delivery_text,
+            })
+
     # İnsan-dostu açıklama üret
     try:
         reasoning_text = await generate_reasoning_text(
@@ -170,6 +186,10 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
             l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
             l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
             predicted_direction=prediction.predicted_direction.value,
+            review_summary=product.review_summary,
+            shipping_info=shipping_info if shipping_info else None,
+            daily_lowest_price=float(product.daily_lowest_price) if product.daily_lowest_price else None,
+            daily_lowest_store=product.daily_lowest_store,
         )
         prediction.reasoning_text = reasoning_text
     except Exception as e:
