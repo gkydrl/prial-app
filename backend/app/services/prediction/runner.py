@@ -44,19 +44,29 @@ async def run_daily_predictions() -> dict:
 
         print(f"[prediction/runner] {len(products)} ürün için tahmin üretilecek", flush=True)
 
-        for product in products:
-            stats["total"] += 1
-            try:
-                predicted = await predict_for_product(product, db)
+    # Her ürün için ayrı session — uzun transaction'ı önle
+    for i, product in enumerate(products):
+        stats["total"] += 1
+        try:
+            async with AsyncSessionLocal() as db:
+                db_product = await db.get(Product, product.id, options=[selectinload(Product.category)])
+                if not db_product:
+                    stats["skipped"] += 1
+                    continue
+                predicted = await predict_for_product(db_product, db)
                 if predicted:
                     stats["predicted"] += 1
+                    await db.commit()
                 else:
                     stats["skipped"] += 1
-            except Exception as e:
-                stats["errors"] += 1
+        except Exception as e:
+            stats["errors"] += 1
+            if stats["errors"] <= 10:  # İlk 10 hatayı logla
                 print(f"[prediction/runner] Hata ({product.title[:40]}): {e}", flush=True)
 
-        await db.commit()
+        # Her 100 üründe progress logla
+        if (i + 1) % 100 == 0:
+            print(f"[prediction/runner] İlerleme: {i+1}/{len(products)} — {stats}", flush=True)
 
     print(f"[prediction/runner] Tamamlandı: {stats}", flush=True)
     return stats
