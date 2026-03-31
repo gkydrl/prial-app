@@ -580,6 +580,17 @@ async def run_all_predictions(
     return {"status": "started", "message": "Tahminler arka planda çalışıyor"}
 
 
+@router.post("/predictions/backfill-reasoning")
+async def backfill_reasoning(
+    _: None = Depends(require_admin),
+):
+    """reasoning_text null olan bugünkü tahminler için açıklama üret."""
+    import asyncio
+    from app.services.prediction.reasoning_backfill import backfill_reasoning_texts
+    asyncio.create_task(backfill_reasoning_texts())
+    return {"status": "started", "message": "Reasoning backfill arka planda çalışıyor"}
+
+
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
 
 
