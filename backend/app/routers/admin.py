@@ -338,6 +338,20 @@ async def debug_search(
     return results
 
 
+# ─── Auto Categorize Endpoints ───────────────────────────────────────────────
+
+
+@router.post("/categorize")
+async def auto_categorize(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Kategorisiz ürünlere başlığa göre otomatik kategori ata."""
+    from app.services.auto_categorizer import auto_categorize_products
+    stats = await auto_categorize_products(db)
+    return stats
+
+
 # ─── Product Discovery Endpoints ─────────────────────────────────────────────
 
 
