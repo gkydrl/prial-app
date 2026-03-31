@@ -760,6 +760,33 @@ async def cleanup_price_data(
     return {"status": "started", "message": "Fiyat verisi temizliği arka planda çalışıyor"}
 
 
+@router.post("/price-data/cleanup-product/{product_id}")
+async def cleanup_product_price_data(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Tek ürün için fiyat verisi temizliği — senkron, debug amaçlı."""
+    from app.services.price_data_cleanup import _clean_product_outliers, _recalculate_l1y
+
+    product = await db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    outliers = await _clean_product_outliers(product, db)
+    l1y_status = await _recalculate_l1y(product, db)
+    await db.commit()
+
+    return {
+        "product_id": str(product_id),
+        "title": product.title,
+        "outliers_removed": outliers,
+        "l1y_status": l1y_status,
+        "l1y_lowest": float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+        "l1y_highest": float(product.l1y_highest_price) if product.l1y_highest_price else None,
+    }
+
+
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
 
 
