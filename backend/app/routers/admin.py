@@ -651,6 +651,39 @@ async def test_reasoning(
     }
 
 
+@router.get("/predictions/test-claude")
+async def test_claude(
+    _: None = Depends(require_admin),
+):
+    """Claude Haiku API bağlantısını test et."""
+    import anthropic
+    from app.config import settings
+
+    if not settings.anthropic_api_key:
+        return {"status": "error", "message": "ANTHROPIC_API_KEY not set"}
+
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=50,
+            messages=[{"role": "user", "content": "Say 'hello' in Turkish"}],
+        )
+        return {
+            "status": "ok",
+            "response": message.content[0].text,
+            "model": message.model,
+            "key_prefix": settings.anthropic_api_key[:8] + "...",
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error_type": type(e).__name__,
+            "message": str(e),
+            "key_prefix": settings.anthropic_api_key[:8] + "...",
+        }
+
+
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
 
 
