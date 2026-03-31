@@ -573,10 +573,11 @@ async def product_prediction(
 async def run_all_predictions(
     _: None = Depends(require_admin),
 ):
-    """Tüm ürünler için günlük tahminleri çalıştır."""
+    """Tüm ürünler için günlük tahminleri arka planda çalıştır."""
+    import asyncio
     from app.services.prediction.runner import run_daily_predictions
-    stats = await run_daily_predictions()
-    return stats
+    asyncio.create_task(run_daily_predictions())
+    return {"status": "started", "message": "Tahminler arka planda çalışıyor"}
 
 
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
