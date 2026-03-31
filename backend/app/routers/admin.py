@@ -628,18 +628,52 @@ async def test_reasoning(
     )
     current_price = price_result.scalar_one_or_none() or pred.current_price
 
-    reasoning_text = await generate_reasoning_text(
-        product_title=product.title,
-        recommendation=pred.recommendation.value,
-        confidence=float(pred.confidence),
-        current_price=float(current_price),
-        reasoning=pred.reasoning or {},
-        l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
-        l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
-        predicted_direction=pred.predicted_direction.value,
-    )
+    # Claude'u doğrudan test et
+    import anthropic as _anthropic
+    import json as _json
+    from app.config import settings as _settings
 
-    # Kaydet
+    claude_error = None
+    claude_raw = None
+    try:
+        client = _anthropic.AsyncAnthropic(api_key=_settings.anthropic_api_key)
+        factors = []
+        for key in ["percentile", "trend", "near_historical_low", "upcoming_event", "seasonal"]:
+            r = (pred.reasoning or {}).get(key, {})
+            if "note" in r:
+                factors.append(r["note"])
+        factors_text = "\n".join(f"- {f}" for f in factors) if factors else "Detay yok"
+
+        prompt = (
+            f"Sen Prial alışveriş asistanısın. JSON formatında 3 olumlu ve 3 olumsuz madde yaz.\n\n"
+            f"Ürün: {product.title}\nTavsiye: {pred.recommendation.value}\n"
+            f"Fiyat: {float(current_price):,.0f} TL\nFaktörler:\n{factors_text}\n\n"
+            f'JSON döndür: {{"summary": "1 cümle", "pros": ["...", "...", "..."], "cons": ["...", "...", "..."]}}\n'
+            f"SADECE JSON döndür."
+        )
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        claude_raw = message.content[0].text.strip()
+        parsed = _json.loads(claude_raw)
+        reasoning_text = _json.dumps(parsed, ensure_ascii=False)
+    except Exception as e:
+        claude_error = f"{type(e).__name__}: {e}"
+        # Fallback
+        from app.services.prediction.reasoning_generator import generate_reasoning_text
+        reasoning_text = await generate_reasoning_text(
+            product_title=product.title,
+            recommendation=pred.recommendation.value,
+            confidence=float(pred.confidence),
+            current_price=float(current_price),
+            reasoning=pred.reasoning or {},
+            l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+            l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+            predicted_direction=pred.predicted_direction.value,
+        )
+
     pred.reasoning_text = reasoning_text
     await db.commit()
 
@@ -648,6 +682,8 @@ async def test_reasoning(
         "prediction_date": str(pred.prediction_date),
         "recommendation": pred.recommendation.value,
         "reasoning_text": reasoning_text,
+        "claude_raw": claude_raw,
+        "claude_error": claude_error,
     }
 
 

@@ -132,12 +132,14 @@ async def generate_reasoning_text(
 
     try:
         client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        print(f"[reasoning_generator] Claude çağrısı: {product_title[:40]}...", flush=True)
         message = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=400,
             messages=[{"role": "user", "content": prompt}],
         )
         result = message.content[0].text.strip()
+        print(f"[reasoning_generator] Claude yanıt: {result[:100]}...", flush=True)
         parsed = json.loads(result)
 
         output = {
@@ -151,8 +153,16 @@ async def generate_reasoning_text(
             output["cons"].append("Fiyat dalgalanması olası")
 
         return json.dumps(output, ensure_ascii=False)
+    except json.JSONDecodeError as e:
+        print(f"[reasoning_generator] JSON parse hatası ({product_title[:30]}): {e}\nRaw: {result[:300] if 'result' in dir() else 'N/A'}", flush=True)
+        return json.dumps(
+            _template_reasoning(recommendation, current_price, l1y_lowest, l1y_highest, predicted_direction, confidence, reasoning),
+            ensure_ascii=False,
+        )
     except Exception as e:
-        print(f"[reasoning_generator] Claude hatası ({product_title[:30]}): {e}", flush=True)
+        import traceback
+        print(f"[reasoning_generator] Claude hatası ({product_title[:30]}): {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc()
         return json.dumps(
             _template_reasoning(recommendation, current_price, l1y_lowest, l1y_highest, predicted_direction, confidence, reasoning),
             ensure_ascii=False,
