@@ -38,10 +38,13 @@ export function PredictionCard({ product, bestStore }: Props) {
   const [sliderOpen, setSliderOpen] = useState(false);
 
   const bestPrice = bestStore?.current_price ?? 0;
-  const sliderMin = Math.round(bestPrice * 0.5);
+  // Slider min: l1y_lowest varsa ve mantıklıysa onu kullan, yoksa %70
+  const l1yLowest = product.l1y_lowest_price ? Number(product.l1y_lowest_price) : null;
+  const l1yValid = l1yLowest && l1yLowest >= bestPrice * 0.3; // saçma düşük değerleri filtrele
+  const sliderMin = l1yValid ? Math.round(l1yLowest) : Math.round(bestPrice * 0.7);
   const sliderMax = Math.round(bestPrice);
-  const defaultTarget = product.l1y_lowest_price
-    ? Math.round(Number(product.l1y_lowest_price))
+  const defaultTarget = l1yValid
+    ? Math.round(l1yLowest)
     : Math.round(bestPrice * 0.85);
   const [targetPrice, setTargetPrice] = useState(
     Math.max(sliderMin, Math.min(sliderMax, defaultTarget))
@@ -116,7 +119,7 @@ export function PredictionCard({ product, bestStore }: Props) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-success text-white font-semibold py-2.5 px-5 rounded-xl hover:bg-success/90 transition-colors text-sm"
               >
-                Magazaya Git
+                Mağazaya Git
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -131,25 +134,25 @@ export function PredictionCard({ product, bestStore }: Props) {
             {!sliderOpen ? (
               <button
                 onClick={() => setSliderOpen(true)}
-                className="w-full inline-flex items-center justify-center gap-2 bg-[#D97706] text-white font-semibold py-3 px-5 rounded-xl hover:bg-[#B45309] transition-colors text-sm"
+                className="w-full inline-flex items-center justify-center gap-1.5 bg-[#D97706] text-white font-semibold py-2 px-4 rounded-lg hover:bg-[#B45309] transition-colors text-xs"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                 </svg>
                 Fiyat Belirle
               </button>
             ) : (
-              <div className="p-4 bg-white/80 rounded-xl border border-gray-100 space-y-4">
-                {/* Selected price — large */}
+              <div className="p-3 bg-white/80 rounded-lg border border-gray-100 space-y-2.5">
+                {/* Selected price */}
                 <div className="text-center">
-                  <p className="text-xs text-gray-500 mb-1">Hedef fiyat</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-[11px] text-gray-500">Hedef fiyat</p>
+                  <p className="text-xl font-bold text-gray-900">
                     {formatPrice(targetPrice)}
                   </p>
                 </div>
 
                 {/* Slider */}
-                <div className="px-1">
+                <div>
                   <input
                     type="range"
                     min={sliderMin}
@@ -157,9 +160,9 @@ export function PredictionCard({ product, bestStore }: Props) {
                     step={Math.max(1, Math.round((sliderMax - sliderMin) / 100))}
                     value={targetPrice}
                     onChange={(e) => setTargetPrice(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#D97706]"
+                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#D97706]"
                   />
-                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <div className="flex justify-between text-[11px] text-gray-400 mt-0.5">
                     <span>{formatPrice(sliderMin)}</span>
                     <span>{formatPrice(sliderMax)}</span>
                   </div>
@@ -168,9 +171,9 @@ export function PredictionCard({ product, bestStore }: Props) {
                 {/* Kampanya Talep Et */}
                 <a
                   href={`prial://product/${product.id}?action=alarm&target=${targetPrice}`}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-[#D97706] text-white font-semibold py-3 px-5 rounded-xl hover:bg-[#B45309] transition-colors text-sm"
+                  className="w-full inline-flex items-center justify-center gap-1.5 bg-[#D97706] text-white font-semibold py-2 px-4 rounded-lg hover:bg-[#B45309] transition-colors text-xs"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                   </svg>
                   Kampanya Talep Et
@@ -178,8 +181,8 @@ export function PredictionCard({ product, bestStore }: Props) {
 
                 {/* Social proof */}
                 {campaignRequestCount > 0 && (
-                  <p className="text-xs text-gray-500 text-center">
-                    {campaignRequestCount} kisi bu urun icin kampanya talep etti
+                  <p className="text-[11px] text-gray-500 text-center">
+                    {campaignRequestCount} kişi bu ürün için kampanya talep etti
                   </p>
                 )}
               </div>
@@ -190,7 +193,7 @@ export function PredictionCard({ product, bestStore }: Props) {
         {/* Social proof for AL */}
         {isAl && campaignRequestCount > 0 && (
           <p className="text-xs text-gray-500 text-center mt-3">
-            {campaignRequestCount} kisi bu urunu takip ediyor
+            {campaignRequestCount} kişi bu ürünü takip ediyor
           </p>
         )}
       </div>
@@ -206,13 +209,13 @@ function SeasonalContext() {
   // Hardcoded for now — sonraki fazda dinamik
   const now = new Date();
   const events = [
-    { name: "23 Nisan Indirimleri", date: new Date(now.getFullYear(), 3, 23) },
-    { name: "Yaz Indirimleri", date: new Date(now.getFullYear(), 5, 21) },
-    { name: "Kurban Bayrami Indirimleri", date: new Date(now.getFullYear(), 5, 6) },
-    { name: "Ekim Indirimleri", date: new Date(now.getFullYear(), 9, 29) },
-    { name: "11.11 Indirimleri", date: new Date(now.getFullYear(), 10, 11) },
+    { name: "23 Nisan İndirimleri", date: new Date(now.getFullYear(), 3, 23) },
+    { name: "Yaz İndirimleri", date: new Date(now.getFullYear(), 5, 21) },
+    { name: "Kurban Bayramı İndirimleri", date: new Date(now.getFullYear(), 5, 6) },
+    { name: "Ekim İndirimleri", date: new Date(now.getFullYear(), 9, 29) },
+    { name: "11.11 İndirimleri", date: new Date(now.getFullYear(), 10, 11) },
     { name: "Black Friday", date: new Date(now.getFullYear(), 10, 28) },
-    { name: "Yilbasi Indirimleri", date: new Date(now.getFullYear(), 11, 25) },
+    { name: "Yılbaşı İndirimleri", date: new Date(now.getFullYear(), 11, 25) },
   ];
 
   // En yakın gelecek event'i bul
@@ -234,7 +237,7 @@ function SeasonalContext() {
     <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 px-1">
       <span>🗓</span>
       <span>
-        Bu urun {upcoming.name} doneminde tarihi olarak indirime giriyor. {upcoming.daysLeft} gun kaldi.
+        Bu ürün {upcoming.name} döneminde tarihi olarak indirime giriyor. {upcoming.daysLeft} gün kaldı.
       </span>
     </div>
   );

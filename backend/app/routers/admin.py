@@ -740,6 +740,26 @@ async def test_claude(
         }
 
 
+# ─── Price Data Cleanup ──────────────────────────────────────────────────────
+
+
+@router.post("/price-data/cleanup")
+async def cleanup_price_data(
+    _: None = Depends(require_admin),
+):
+    """
+    Hatalı fiyat verilerini temizle ve l1y değerlerini yeniden hesapla.
+    1. Negatif/sıfır price_history kayıtlarını sil
+    2. Outlier fiyatları sil (medyandan %90+ sapma)
+    3. l1y_lowest ve l1y_highest'ı temiz veriden yeniden hesapla
+    """
+    import asyncio
+    from app.services.price_data_cleanup import run_price_cleanup
+
+    asyncio.create_task(run_price_cleanup())
+    return {"status": "started", "message": "Fiyat verisi temizliği arka planda çalışıyor"}
+
+
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
 
 

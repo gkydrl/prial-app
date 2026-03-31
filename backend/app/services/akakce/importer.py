@@ -151,10 +151,26 @@ async def import_product_history(
         # 5. Price history kaydet (batch insert — duplicate'leri toplu kontrol)
         saved = await _save_price_points_batch(store.id, data_points, db, source=source)
 
-        # 6. l1y istatistiklerini guncelle
-        prices = [dp.price for dp in data_points]
-        product.l1y_lowest_price = Decimal(str(min(prices)))
-        product.l1y_highest_price = Decimal(str(max(prices)))
+        # 6. l1y istatistiklerini guncelle (outlier filtreli)
+        prices = sorted([dp.price for dp in data_points if dp.price > 0])
+        if len(prices) >= 3:
+            # IQR-based outlier removal
+            q1 = prices[len(prices) // 4]
+            q3 = prices[3 * len(prices) // 4]
+            iqr = q3 - q1
+            lower = q1 - 1.5 * iqr
+            upper = q3 + 1.5 * iqr
+            clean_prices = [p for p in prices if lower <= p <= upper]
+            if not clean_prices:
+                clean_prices = prices  # fallback
+        elif prices:
+            clean_prices = prices
+        else:
+            clean_prices = []
+
+        if clean_prices:
+            product.l1y_lowest_price = Decimal(str(min(clean_prices)))
+            product.l1y_highest_price = Decimal(str(max(clean_prices)))
 
         await db.flush()
         return {"status": "ok", "data_points": saved}
@@ -224,6 +240,9 @@ async def _save_price_points_batch(
     saved = 0
     for dp in data_points:
         if dp.date in existing_dates:
+            continue
+        # Skip invalid prices
+        if dp.price <= 0:
             continue
 
         record = PriceHistory(
