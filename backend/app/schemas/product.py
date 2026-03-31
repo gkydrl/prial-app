@@ -54,6 +54,8 @@ class ProductResponse(BaseModel):
     reasoning_cons: list[str] | None = None
     predicted_direction: str | None = None
     prediction_confidence: float | None = None
+    category_id: uuid.UUID | None = None
+    category_slug: str | None = None
     variants: list[ProductVariantResponse]
     stores: list[ProductStoreResponse]
     created_at: datetime

@@ -86,6 +86,7 @@ export interface ProductResponse {
   stores: ProductStoreResponse[];
   variants: ProductVariantResponse[];
   category_id: string | null;
+  category_slug: string | null;
   created_at: string;
 }
 
