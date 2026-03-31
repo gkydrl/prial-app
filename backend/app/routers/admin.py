@@ -657,7 +657,13 @@ async def test_reasoning(
             messages=[{"role": "user", "content": prompt}],
         )
         claude_raw = message.content[0].text.strip()
-        parsed = _json.loads(claude_raw)
+        # Strip markdown code fences
+        parse_str = claude_raw
+        if parse_str.startswith("```"):
+            parse_str = parse_str.split("\n", 1)[1] if "\n" in parse_str else parse_str[3:]
+            if parse_str.endswith("```"):
+                parse_str = parse_str[:-3].strip()
+        parsed = _json.loads(parse_str)
         reasoning_text = _json.dumps(parsed, ensure_ascii=False)
     except Exception as e:
         claude_error = f"{type(e).__name__}: {e}"

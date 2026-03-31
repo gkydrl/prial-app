@@ -139,7 +139,11 @@ async def generate_reasoning_text(
             messages=[{"role": "user", "content": prompt}],
         )
         result = message.content[0].text.strip()
-        print(f"[reasoning_generator] Claude yanıt: {result[:100]}...", flush=True)
+        # Strip markdown code fences if present
+        if result.startswith("```"):
+            result = result.split("\n", 1)[1] if "\n" in result else result[3:]
+            if result.endswith("```"):
+                result = result[:-3].strip()
         parsed = json.loads(result)
 
         output = {
