@@ -3,7 +3,6 @@ reasoning_text null olan mevcut tahminler için açıklama üretir.
 """
 from __future__ import annotations
 
-from datetime import date
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
@@ -16,16 +15,27 @@ from app.services.prediction.reasoning_generator import generate_reasoning_text
 async def backfill_reasoning_texts() -> dict:
     """Bugünkü reasoning_text=null tahminler için Claude ile açıklama üret."""
     stats = {"total": 0, "updated": 0, "errors": 0}
-    today = date.today()
 
     async with AsyncSessionLocal() as db:
-        # Bugünkü reasoning_text null olan tahminleri getir
+        # reasoning_text null olan en son tahminleri getir (her ürün için 1 tane)
+        from sqlalchemy import func as sa_func
+        # En son prediction_date her ürün için
+        subq = (
+            select(
+                PricePrediction.product_id,
+                sa_func.max(PricePrediction.prediction_date).label("max_date"),
+            )
+            .group_by(PricePrediction.product_id)
+            .subquery()
+        )
         result = await db.execute(
             select(PricePrediction)
-            .where(
-                PricePrediction.prediction_date == today,
-                PricePrediction.reasoning_text.is_(None),
+            .join(
+                subq,
+                (PricePrediction.product_id == subq.c.product_id)
+                & (PricePrediction.prediction_date == subq.c.max_date),
             )
+            .where(PricePrediction.reasoning_text.is_(None))
         )
         predictions = result.scalars().all()
         stats["total"] = len(predictions)

@@ -584,11 +584,71 @@ async def run_all_predictions(
 async def backfill_reasoning(
     _: None = Depends(require_admin),
 ):
-    """reasoning_text null olan bugünkü tahminler için açıklama üret."""
+    """reasoning_text null olan tahminler için açıklama üret."""
     import asyncio
     from app.services.prediction.reasoning_backfill import backfill_reasoning_texts
     asyncio.create_task(backfill_reasoning_texts())
     return {"status": "started", "message": "Reasoning backfill arka planda çalışıyor"}
+
+
+@router.post("/predictions/test-reasoning/{product_id}")
+async def test_reasoning(
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Tek ürün için reasoning üret — senkron, debug amaçlı."""
+    from app.models.prediction import PricePrediction
+    from app.services.prediction.reasoning_generator import generate_reasoning_text
+    from sqlalchemy import func
+
+    product = await db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    # En son tahmini bul (tarih fark etmez)
+    result = await db.execute(
+        select(PricePrediction)
+        .where(PricePrediction.product_id == product_id)
+        .order_by(PricePrediction.prediction_date.desc())
+        .limit(1)
+    )
+    pred = result.scalar_one_or_none()
+    if not pred:
+        return {"error": "Bu ürün için tahmin yok"}
+
+    # Mevcut fiyatı bul
+    price_result = await db.execute(
+        select(func.min(ProductStore.current_price))
+        .where(
+            ProductStore.product_id == product.id,
+            ProductStore.is_active == True,  # noqa: E712
+            ProductStore.in_stock == True,    # noqa: E712
+        )
+    )
+    current_price = price_result.scalar_one_or_none() or pred.current_price
+
+    reasoning_text = await generate_reasoning_text(
+        product_title=product.title,
+        recommendation=pred.recommendation.value,
+        confidence=float(pred.confidence),
+        current_price=float(current_price),
+        reasoning=pred.reasoning or {},
+        l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+        l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+        predicted_direction=pred.predicted_direction.value,
+    )
+
+    # Kaydet
+    pred.reasoning_text = reasoning_text
+    await db.commit()
+
+    return {
+        "product_id": str(product_id),
+        "prediction_date": str(pred.prediction_date),
+        "recommendation": pred.recommendation.value,
+        "reasoning_text": reasoning_text,
+    }
 
 
 # ─── Exchange Rate Endpoints ─────────────────────────────────────────────────
