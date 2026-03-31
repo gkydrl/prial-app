@@ -520,6 +520,89 @@ async def akakce_status(
 # ─── Prediction Endpoints ───────────────────────────────────────────────────
 
 
+@router.get("/predictions/bottleneck")
+async def prediction_bottleneck(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Tahmin üretilemeyen ürünlerin nedenlerini analiz et."""
+    from sqlalchemy import func, distinct, and_
+    from app.models.price_history import PriceHistory
+    from datetime import timedelta, date as date_cls
+
+    total_products = (await db.execute(
+        select(func.count(Product.id))
+    )).scalar() or 0
+
+    # 1. Aktif store + current_price olan ürünler
+    with_active_store = (await db.execute(
+        select(func.count(distinct(ProductStore.product_id)))
+        .where(
+            ProductStore.is_active == True,  # noqa: E712
+            ProductStore.current_price.isnot(None),
+        )
+    )).scalar() or 0
+
+    # 2. Herhangi bir store'u olan ürünler (price olsun olmasın)
+    with_any_store = (await db.execute(
+        select(func.count(distinct(ProductStore.product_id)))
+    )).scalar() or 0
+
+    # 3. current_price NULL olan aktif store'lar
+    null_price_stores = (await db.execute(
+        select(func.count(ProductStore.id))
+        .where(
+            ProductStore.is_active == True,  # noqa: E712
+            ProductStore.current_price.is_(None),
+        )
+    )).scalar() or 0
+
+    # 4. Price history data point sayısı olan ürünler (>=5)
+    one_year_ago = date_cls.today() - timedelta(days=365)
+    subq = (
+        select(
+            ProductStore.product_id,
+            func.count(PriceHistory.id).label("ph_count"),
+        )
+        .join(PriceHistory, PriceHistory.product_store_id == ProductStore.id)
+        .where(PriceHistory.recorded_at >= one_year_ago)
+        .group_by(ProductStore.product_id)
+        .subquery()
+    )
+    with_enough_history = (await db.execute(
+        select(func.count()).where(subq.c.ph_count >= 5)
+    )).scalar() or 0
+
+    with_any_history = (await db.execute(
+        select(func.count()).where(subq.c.ph_count >= 1)
+    )).scalar() or 0
+
+    # 5. Bugünkü tahmin sayısı
+    from app.models.prediction import PricePrediction
+    today_predictions = (await db.execute(
+        select(func.count(PricePrediction.id))
+        .where(PricePrediction.prediction_date == date_cls.today())
+    )).scalar() or 0
+
+    return {
+        "total_products": total_products,
+        "with_any_store": with_any_store,
+        "with_active_store_and_price": with_active_store,
+        "stores_with_null_price": null_price_stores,
+        "with_any_price_history_1y": with_any_history,
+        "with_5plus_price_history_1y": with_enough_history,
+        "today_predictions": today_predictions,
+        "funnel": {
+            "1_total": total_products,
+            "2_has_store": with_any_store,
+            "3_has_active_price": with_active_store,
+            "4_has_history_1y": with_any_history,
+            "5_has_5plus_history": with_enough_history,
+            "6_predicted_today": today_predictions,
+        },
+    }
+
+
 @router.get("/predictions/distribution")
 async def prediction_distribution(
     db: AsyncSession = Depends(get_db),
