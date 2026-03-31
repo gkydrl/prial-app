@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/alarms", tags=["alarms"])
 @router.post("/", response_model=AlarmResponse, status_code=201)
 async def create_alarm(
     payload: AlarmCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -94,6 +95,7 @@ async def create_alarm(
     await db.flush()
 
     # Aktif alarm var → variant'a bağlı tüm store'ları HIGH önceliğe al
+    variant_stores = []
     if variant_id:
         vs_result = await db.execute(
             select(ProductStore).where(
@@ -112,6 +114,16 @@ async def create_alarm(
             target_store.check_priority = 1
             target_store.next_check_at = datetime.now(timezone.utc)
             db.add(target_store)
+
+    # Anlık fiyat kontrolü — 15dk bekleme yerine hemen tetikle
+    from app.services.price_tracker import check_product_price
+    store_ids_to_check = []
+    if variant_id and variant_stores:
+        store_ids_to_check = [vs.id for vs in variant_stores]
+    elif store_id:
+        store_ids_to_check = [store_id]
+    for sid in store_ids_to_check:
+        background_tasks.add_task(check_product_price, sid)
 
     # İlişkileriyle birlikte döndür
     res = await db.execute(

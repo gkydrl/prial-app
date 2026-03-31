@@ -1557,3 +1557,41 @@ async def trigger_review_enrichment(
     from app.services.review_enrichment import enrich_reviews_daily
     background_tasks.add_task(enrich_reviews_daily, batch_size)
     return {"status": "started", "batch_size": batch_size}
+
+
+# ─── Pipeline Monitoring ────────────────────────────────────────────────────
+
+
+@router.get("/pipeline/status", dependencies=[Depends(require_admin)])
+async def pipeline_status():
+    """Son pipeline çalışmalarının listesi."""
+    from app.services.pipeline_monitor import get_recent_runs
+    runs = await get_recent_runs(limit=50)
+    return {"runs": runs}
+
+
+@router.get("/pipeline/health", dependencies=[Depends(require_admin)])
+async def pipeline_health():
+    """Son 7 günün pipeline sağlık özeti (job başına başarı oranı, ortalama süre)."""
+    from app.services.pipeline_monitor import get_pipeline_health
+    return await get_pipeline_health()
+
+
+# ─── ScraperAPI Bütçe ───────────────────────────────────────────────────────
+
+
+@router.get("/scraper-budget", dependencies=[Depends(require_admin)])
+async def scraper_budget_status():
+    """Güncel ScraperAPI kredi kullanımı ve bütçe durumu."""
+    from app.services.scraper_budget import get_budget_status
+    return get_budget_status()
+
+
+# ─── Veri Kalitesi ──────────────────────────────────────────────────────────
+
+
+@router.get("/data-quality", dependencies=[Depends(require_admin)])
+async def data_quality_report():
+    """Anlık veri kalitesi raporu."""
+    from app.services.data_quality import run_data_quality_check
+    return await run_data_quality_check()

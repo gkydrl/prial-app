@@ -87,8 +87,13 @@ async def check_due_prices() -> None:
 
     async def process(store: ProductStore) -> None:
         async with semaphore:
+            # Bütçe kontrolü — priority'ye göre scrape izni
+            from app.services.scraper_budget import can_scrape, record_credit
+            if not await can_scrape(priority=store.check_priority):
+                return  # Bütçe aşıldı, bu store'u atla
             try:
                 await check_product_price(store.id)
+                await record_credit()
             except Exception as e:
                 print(f"[price_tracker] Hata (store_id={store.id}): {e}")
 
@@ -124,19 +129,22 @@ async def check_product_price(product_store_id) -> None:
         old_price = store.current_price
         price_changed = old_price != new_price
 
+        # Anomali tespiti — büyük düşüşlerde çapraz doğrulama
+        if price_changed and old_price and new_price < old_price:
+            from app.services.anomaly_detector import check_price_anomaly, should_skip_price_update
+            anomaly = await check_price_anomaly(db, store, old_price, new_price)
+            if await should_skip_price_update(anomaly):
+                # Muhtemel scrape hatası — fiyatı güncelleme, sonraki kontrole bırak
+                store.next_check_at = now + next_check_delta(store.check_priority)
+                store.last_checked_at = now
+                await db.commit()
+                return
+
         if price_changed:
             store.current_price = new_price
             store.original_price = scraped.original_price
             store.discount_percent = scraped.discount_percent
             store.in_stock = scraped.in_stock
-
-        # Always update delivery & installment info (even if price didn't change)
-        if scraped.estimated_delivery_days is not None:
-            store.estimated_delivery_days = scraped.estimated_delivery_days
-        if scraped.delivery_text:
-            store.delivery_text = scraped.delivery_text
-        if scraped.installment_text:
-            store.installment_text = scraped.installment_text
 
             history = PriceHistory(
                 product_store_id=store.id,
@@ -159,6 +167,14 @@ async def check_product_price(product_store_id) -> None:
                     if variant.lowest_price_ever is None or new_price < variant.lowest_price_ever:
                         variant.lowest_price_ever = new_price
                     db.add(variant)
+
+        # Always update delivery & installment info (even if price didn't change)
+        if scraped.estimated_delivery_days is not None:
+            store.estimated_delivery_days = scraped.estimated_delivery_days
+        if scraped.delivery_text:
+            store.delivery_text = scraped.delivery_text
+        if scraped.installment_text:
+            store.installment_text = scraped.installment_text
 
         # Önceliği yenile ve bir sonraki kontrol zamanını ayarla
         await refresh_store_priority(db, store)

@@ -14,8 +14,6 @@ async def lifespan(app: FastAPI):
     # Tablolar alembic migration ile oluşturuluyor (start.sh → alembic upgrade head)
     import app.models  # noqa: F401 — modelleri register et
 
-    # Öncelik kuyruğuna göre fiyat takip zamanlayıcısı
-    # Her 15 dakikada çalışır; sadece next_check_at'i geçmiş store'ları işler.
     from app.services.price_tracker import check_due_prices
     from app.services.catalog_crawler import crawl_all_variants
     from app.services.summary_service import send_daily_summaries, send_weekly_summaries
@@ -25,6 +23,10 @@ async def lifespan(app: FastAPI):
     from app.services.prediction.runner import run_daily_predictions
     from app.services.prediction.evaluator import evaluate_predictions
     from app.services.exchange_rate import fetch_and_store_rates
+    from app.services.pipeline_monitor import run_monitored
+    from app.services.data_quality import run_data_quality_check
+
+    # ── Yüksek frekanslı job'lar (monitörlenmez, çok sık) ──
 
     scheduler.add_job(
         check_due_prices,
@@ -34,104 +36,135 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # Haftalık katalog taraması — her Pazar gece 03:00'da (sadece store'u olmayan variant'lar)
-    scheduler.add_job(
-        lambda: crawl_all_variants(new_only=True),
-        trigger="cron",
-        day_of_week="sun",
-        hour=3,
-        minute=0,
-        id="catalog_crawl",
-        replace_existing=True,
-    )
-
-    # Günlük özet bildirimi — her gün 10:00
-    scheduler.add_job(
-        send_daily_summaries,
-        trigger="cron",
-        hour=10,
-        minute=0,
-        id="daily_summary",
-        replace_existing=True,
-    )
-
-    # Günlük ürün keşfi — her gün 04:00'da
-    scheduler.add_job(
-        discover_daily,
-        trigger="cron",
-        hour=4,
-        minute=0,
-        id="product_discovery",
-        replace_existing=True,
-    )
-
-    # Haftalık özet bildirimi — her Pazartesi 10:00
-    scheduler.add_job(
-        send_weekly_summaries,
-        trigger="cron",
-        day_of_week="mon",
-        hour=10,
-        minute=0,
-        id="weekly_summary",
-        replace_existing=True,
-    )
-
-    # Akakçe toplu import — her gece 02:00 (akakce_url'si olmayan ürünler)
-    scheduler.add_job(
-        lambda: akakce_bulk_import(batch_size=50, only_new=True),
-        trigger="cron",
-        hour=2,
-        minute=0,
-        id="akakce_bulk_import",
-        replace_existing=True,
-    )
-
-    # Akakçe FULL günlük zenginleştirme — her gece 03:00 (TÜM ürünler, ~90dk)
-    scheduler.add_job(
-        akakce_daily_enrichment_full,
-        trigger="cron",
-        hour=3,
-        minute=0,
-        id="akakce_daily_enrichment_full",
-        replace_existing=True,
-    )
-
-    # Review enrichment — her gün 05:00 (500 ürün/gün)
-    scheduler.add_job(
-        lambda: enrich_reviews_daily(batch_size=500),
-        trigger="cron",
-        hour=5,
-        minute=0,
-        id="review_enrichment",
-        replace_existing=True,
-    )
-
-    # Günlük AL/BEKLE tahminleri — her gün 06:00
-    scheduler.add_job(
-        run_daily_predictions,
-        trigger="cron",
-        hour=6,
-        minute=0,
-        id="daily_predictions",
-        replace_existing=True,
-    )
-
-    # Tahmin değerlendirmesi — her gün 07:00 (7 gün önceki tahminler)
-    scheduler.add_job(
-        evaluate_predictions,
-        trigger="cron",
-        hour=7,
-        minute=0,
-        id="prediction_evaluation",
-        replace_existing=True,
-    )
-
-    # Döviz kuru güncelleme — her saat başı
     scheduler.add_job(
         fetch_and_store_rates,
         trigger="interval",
         hours=1,
         id="exchange_rate_update",
+        replace_existing=True,
+    )
+
+    # ── Gece pipeline'ı (monitörlü) ──
+
+    # 02:00 — Akakce yeni ürün import
+    async def _akakce_bulk():
+        await run_monitored("akakce_bulk_import", akakce_bulk_import(batch_size=50, only_new=True))
+
+    scheduler.add_job(
+        _akakce_bulk,
+        trigger="cron",
+        hour=2, minute=0,
+        id="akakce_bulk_import",
+        replace_existing=True,
+    )
+
+    # 03:00 — Full enrichment (tüm ürünler, ~90dk)
+    async def _enrichment_full():
+        await run_monitored("akakce_enrichment_full", akakce_daily_enrichment_full())
+
+    scheduler.add_job(
+        _enrichment_full,
+        trigger="cron",
+        hour=3, minute=0,
+        id="akakce_daily_enrichment_full",
+        replace_existing=True,
+    )
+
+    # 04:00 — Ürün keşfi
+    async def _discover():
+        await run_monitored("product_discovery", discover_daily())
+
+    scheduler.add_job(
+        _discover,
+        trigger="cron",
+        hour=4, minute=0,
+        id="product_discovery",
+        replace_existing=True,
+    )
+
+    # 05:00 — Review enrichment (500 ürün/gün)
+    async def _review():
+        await run_monitored("review_enrichment", enrich_reviews_daily(batch_size=500))
+
+    scheduler.add_job(
+        _review,
+        trigger="cron",
+        hour=5, minute=0,
+        id="review_enrichment",
+        replace_existing=True,
+    )
+
+    # 06:00 — AI tahminleri
+    async def _predictions():
+        await run_monitored("daily_predictions", run_daily_predictions())
+
+    scheduler.add_job(
+        _predictions,
+        trigger="cron",
+        hour=6, minute=0,
+        id="daily_predictions",
+        replace_existing=True,
+    )
+
+    # 07:00 — Tahmin değerlendirme
+    async def _evaluate():
+        await run_monitored("prediction_evaluation", evaluate_predictions())
+
+    scheduler.add_job(
+        _evaluate,
+        trigger="cron",
+        hour=7, minute=0,
+        id="prediction_evaluation",
+        replace_existing=True,
+    )
+
+    # 08:00 — Veri kalitesi kontrolü (tüm gece pipeline'ı bittikten sonra)
+    async def _quality():
+        await run_monitored("data_quality_check", run_data_quality_check())
+
+    scheduler.add_job(
+        _quality,
+        trigger="cron",
+        hour=8, minute=0,
+        id="data_quality_check",
+        replace_existing=True,
+    )
+
+    # 10:00 — Günlük özet bildirimi
+    async def _daily_summary():
+        await run_monitored("daily_summary", send_daily_summaries())
+
+    scheduler.add_job(
+        _daily_summary,
+        trigger="cron",
+        hour=10, minute=0,
+        id="daily_summary",
+        replace_existing=True,
+    )
+
+    # Haftalık — Pazar 03:00 katalog taraması
+    async def _catalog_crawl():
+        await run_monitored("catalog_crawl", crawl_all_variants(new_only=True))
+
+    scheduler.add_job(
+        _catalog_crawl,
+        trigger="cron",
+        day_of_week="sun",
+        hour=3, minute=0,
+        id="catalog_crawl",
+        replace_existing=True,
+    )
+
+    # Haftalık — Pazartesi 10:00 haftalık özet
+    async def _weekly_summary():
+        await run_monitored("weekly_summary", send_weekly_summaries())
+
+    scheduler.add_job(
+        _weekly_summary,
+        trigger="cron",
+        day_of_week="mon",
+        hour=10, minute=0,
+        id="weekly_summary",
         replace_existing=True,
     )
 

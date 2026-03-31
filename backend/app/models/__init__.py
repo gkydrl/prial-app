@@ -8,6 +8,7 @@ from app.models.promo_code import PromoCode
 from app.models.campaign import StoreAccount, Campaign, CodePool, UserPromoAssignment
 from app.models.prediction import PricePrediction, PredictionOutcome, ModelParameters
 from app.models.exchange_rate import ExchangeRate
+from app.models.pipeline_run import PipelineRun
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "PredictionOutcome",
     "ModelParameters",
     "ExchangeRate",
+    "PipelineRun",
 ]

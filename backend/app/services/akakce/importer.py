@@ -373,9 +373,13 @@ async def daily_enrichment_full() -> dict:
     }
     semaphore = asyncio.Semaphore(10)
 
-    # 1. Tüm akakce_url'si olan ürünleri çek
+    # 1. Tüm akakce_url'si olan ürünleri çek — alarm sayısına göre sırala (yüksek öncelik önce)
     async with AsyncSessionLocal() as db:
-        query = select(Product).where(Product.akakce_url.isnot(None))
+        query = (
+            select(Product)
+            .where(Product.akakce_url.isnot(None))
+            .order_by(Product.alarm_count.desc())
+        )
         result = await db.execute(query)
         products = result.scalars().all()
 
@@ -408,6 +412,11 @@ async def daily_enrichment_full() -> dict:
 
                     for listing in store_listings:
                         try:
+                            # Bütçe kontrolü
+                            from app.services.scraper_budget import can_scrape, record_credit
+                            if not await can_scrape(priority=2):
+                                break  # Bütçe doldu, kalan store'ları atla
+
                             # Sadece bilinen marketplace'leri scrape et
                             if listing.store_enum and listing.store_enum not in (StoreName.OTHER,):
                                 # Redirect URL'den gerçek mağaza URL'sini çöz
@@ -425,6 +434,7 @@ async def daily_enrichment_full() -> dict:
                                 else:
                                     try:
                                         scraped = await scrape_url(final_url)
+                                        await record_credit()
                                         stats["stores_scraped"] += 1
 
                                         # ProductStore güncelle veya oluştur
