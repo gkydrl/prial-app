@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { ProductResponse, ProductStoreResponse } from "@/lib/api";
 import { formatPrice } from "@/lib/formatPrice";
 import { storeLabel } from "@/lib/stores";
@@ -10,30 +13,47 @@ interface Props {
 
 const CARD_CONFIG = {
   AL: {
-    bg: "bg-success/10",
-    border: "border-success/30",
+    bg: "bg-[#EDFCF2]",
+    border: "border-[#86EFAC]",
     badgeBg: "bg-success",
+    textColor: "text-gray-700",
   },
   BEKLE: {
-    bg: "bg-bekle/10",
-    border: "border-bekle/30",
-    badgeBg: "bg-bekle",
+    bg: "bg-[#FAEEDA]",
+    border: "border-[#FAC775]",
+    badgeBg: "bg-[#D97706]",
+    textColor: "text-[#633806]",
   },
   GUCLU_BEKLE: {
-    bg: "bg-danger/10",
-    border: "border-danger/30",
-    badgeBg: "bg-danger",
+    bg: "bg-[#FAEEDA]",
+    border: "border-[#FAC775]",
+    badgeBg: "bg-[#D97706]",
+    textColor: "text-[#633806]",
   },
 } as const;
 
 export function PredictionCard({ product, bestStore }: Props) {
   const rec = product.recommendation;
   const config = rec ? CARD_CONFIG[rec] : null;
+  const [sliderOpen, setSliderOpen] = useState(false);
+
+  const bestPrice = bestStore?.current_price ?? 0;
+  const sliderMin = Math.round(bestPrice * 0.5);
+  const sliderMax = Math.round(bestPrice);
+  const defaultTarget = product.l1y_lowest_price
+    ? Math.round(Number(product.l1y_lowest_price))
+    : Math.round(bestPrice * 0.85);
+  const [targetPrice, setTargetPrice] = useState(
+    Math.max(sliderMin, Math.min(sliderMax, defaultTarget))
+  );
+
+  // Mock social proof — 0 ise gösterilmeyecek
+  const campaignRequestCount = product.alarm_count || 0;
 
   // No prediction available
   if (!config) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,123 +73,169 @@ export function PredictionCard({ product, bestStore }: Props) {
   const isBekle = rec === "BEKLE" || rec === "GUCLU_BEKLE";
 
   return (
-    <div className={`rounded-2xl border-2 ${config.border} ${config.bg} p-6`}>
-      {/* Badge + Confidence */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <SignalBadge recommendation={rec!} size="lg" />
-          {product.prediction_confidence != null && (
-            <span className="text-xs text-gray-500">
-              %{Math.round(product.prediction_confidence * 100)} güven
-            </span>
-          )}
+    <div>
+      <div className={`rounded-xl border-2 ${config.border} ${config.bg} p-6`}>
+        {/* Badge + Confidence */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <SignalBadge recommendation={rec!} size="lg" />
+            {product.prediction_confidence != null && (
+              <span className="text-xs text-gray-500">
+                %{Math.round(product.prediction_confidence * 100)} güven
+              </span>
+            )}
+          </div>
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${config.badgeBg} text-white`}>
+            AI Tavsiyesi
+          </span>
         </div>
-        <span className={`text-xs font-medium px-2 py-1 rounded-full ${config.badgeBg} text-white`}>
-          AI Tavsiyesi
-        </span>
+
+        {/* AI Reasoning — tek cümle */}
+        {product.reasoning_text && (
+          <p className={`text-sm ${config.textColor} leading-relaxed mb-4`}>
+            {product.reasoning_text}
+          </p>
+        )}
+
+        {/* AL → Best store link */}
+        {isAl && bestStore && (
+          <div className="p-3 bg-white/80 rounded-xl border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">En ucuz fiyat</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {formatPrice(bestStore.current_price)}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {storeLabel(bestStore.store)}
+                </p>
+              </div>
+              <a
+                href={bestStore.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-success text-white font-semibold py-2.5 px-5 rounded-xl hover:bg-success/90 transition-colors text-sm"
+              >
+                Magazaya Git
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* BEKLE → Slider-based target price */}
+        {isBekle && (
+          <div>
+            {!sliderOpen ? (
+              <button
+                onClick={() => setSliderOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 bg-[#D97706] text-white font-semibold py-3 px-5 rounded-xl hover:bg-[#B45309] transition-colors text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Fiyat Belirle
+              </button>
+            ) : (
+              <div className="p-4 bg-white/80 rounded-xl border border-gray-100 space-y-4">
+                {/* Selected price — large */}
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Hedef fiyat</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {formatPrice(targetPrice)}
+                  </p>
+                </div>
+
+                {/* Slider */}
+                <div className="px-1">
+                  <input
+                    type="range"
+                    min={sliderMin}
+                    max={sliderMax}
+                    step={Math.max(1, Math.round((sliderMax - sliderMin) / 100))}
+                    value={targetPrice}
+                    onChange={(e) => setTargetPrice(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#D97706]"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>{formatPrice(sliderMin)}</span>
+                    <span>{formatPrice(sliderMax)}</span>
+                  </div>
+                </div>
+
+                {/* Kampanya Talep Et */}
+                <a
+                  href={`prial://product/${product.id}?action=alarm&target=${targetPrice}`}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#D97706] text-white font-semibold py-3 px-5 rounded-xl hover:bg-[#B45309] transition-colors text-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  Kampanya Talep Et
+                </a>
+
+                {/* Social proof */}
+                {campaignRequestCount > 0 && (
+                  <p className="text-xs text-gray-500 text-center">
+                    {campaignRequestCount} kisi bu urun icin kampanya talep etti
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Social proof for AL */}
+        {isAl && campaignRequestCount > 0 && (
+          <p className="text-xs text-gray-500 text-center mt-3">
+            {campaignRequestCount} kisi bu urunu takip ediyor
+          </p>
+        )}
       </div>
 
-      {/* Summary */}
-      {product.reasoning_text && (
-        <p className="text-sm text-gray-700 leading-relaxed mb-4">
-          {product.reasoning_text}
-        </p>
-      )}
+      {/* Seasonal context — below the card */}
+      <SeasonalContext />
+    </div>
+  );
+}
 
-      {/* Pros & Cons */}
-      {(product.reasoning_pros || product.reasoning_cons) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          {/* Pros */}
-          {product.reasoning_pros && product.reasoning_pros.length > 0 && (
-            <div className="space-y-1.5">
-              {product.reasoning_pros.map((pro, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm">
-                  <svg className="w-4 h-4 text-success flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-gray-700">{pro}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Cons */}
-          {product.reasoning_cons && product.reasoning_cons.length > 0 && (
-            <div className="space-y-1.5">
-              {product.reasoning_cons.map((con, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm">
-                  <svg className="w-4 h-4 text-danger flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  <span className="text-gray-700">{con}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+/** Sezonsal bağlam satırı — yaklaşan kampanya varsa göster */
+function SeasonalContext() {
+  // Hardcoded for now — sonraki fazda dinamik
+  const now = new Date();
+  const events = [
+    { name: "23 Nisan Indirimleri", date: new Date(now.getFullYear(), 3, 23) },
+    { name: "Yaz Indirimleri", date: new Date(now.getFullYear(), 5, 21) },
+    { name: "Kurban Bayrami Indirimleri", date: new Date(now.getFullYear(), 5, 6) },
+    { name: "Ekim Indirimleri", date: new Date(now.getFullYear(), 9, 29) },
+    { name: "11.11 Indirimleri", date: new Date(now.getFullYear(), 10, 11) },
+    { name: "Black Friday", date: new Date(now.getFullYear(), 10, 28) },
+    { name: "Yilbasi Indirimleri", date: new Date(now.getFullYear(), 11, 25) },
+  ];
 
-      {/* AL → Best store link */}
-      {isAl && bestStore && (
-        <div className="mb-4 p-3 bg-white rounded-xl border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500">En ucuz fiyat</p>
-              <p className="text-xl font-bold text-gray-900">
-                {formatPrice(bestStore.current_price)}
-              </p>
-              <p className="text-xs text-gray-500">
-                {storeLabel(bestStore.store)}
-              </p>
-            </div>
-            <a
-              href={bestStore.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-success text-white font-semibold py-2.5 px-5 rounded-xl hover:bg-success/90 transition-colors text-sm"
-            >
-              Mağazaya Git
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      )}
+  // En yakın gelecek event'i bul
+  const upcoming = events
+    .map((e) => {
+      let date = e.date;
+      if (date < now) {
+        date = new Date(date.getFullYear() + 1, date.getMonth(), date.getDate());
+      }
+      const daysLeft = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return { ...e, daysLeft };
+    })
+    .filter((e) => e.daysLeft > 0 && e.daysLeft <= 45)
+    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
 
-      {/* BEKLE → Target price + Kampanya Talep Et */}
-      {isBekle && (
-        <div className="mb-4 p-3 bg-white rounded-xl border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500">Hedef fiyat</p>
-              <p className="text-xl font-bold text-gray-900">
-                {product.l1y_lowest_price
-                  ? formatPrice(product.l1y_lowest_price)
-                  : product.lowest_price_ever
-                    ? formatPrice(product.lowest_price_ever)
-                    : "—"}
-              </p>
-              <p className="text-xs text-gray-500">Son 1 yılın en düşüğü</p>
-            </div>
-            <a
-              href={`prial://product/${product.id}?action=alarm`}
-              className={`inline-flex items-center gap-2 ${config.badgeBg} text-white font-semibold py-2.5 px-5 rounded-xl hover:opacity-90 transition-opacity text-sm`}
-            >
-              Kampanya Talep Et
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      )}
+  if (!upcoming) return null;
 
-      {/* Social proof */}
-      {product.alarm_count > 0 && (
-        <p className="text-xs text-gray-500 text-center">
-          {product.alarm_count} kişi takip ediyor
-        </p>
-      )}
+  return (
+    <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 px-1">
+      <span>🗓</span>
+      <span>
+        Bu urun {upcoming.name} doneminde tarihi olarak indirime giriyor. {upcoming.daysLeft} gun kaldi.
+      </span>
     </div>
   );
 }
