@@ -76,7 +76,9 @@ async def run_price_cleanup() -> dict:
 async def _clean_product_outliers(product: Product, db: AsyncSession) -> int:
     """
     Ürünün price_history'sindeki outlier'ları sil.
-    Medyandan %90+ sapan değerler outlier kabul edilir.
+    İki strateji:
+    1. Tüm price_history, mevcut fiyattan çok farklıysa → yanlış Akakce eşleşmesi, hepsini sil
+    2. Medyandan %90+ sapan bireysel değerler → outlier, tek tek sil
     """
     # Ürünün tüm store'larını bul
     stores_result = await db.execute(
@@ -93,20 +95,42 @@ async def _clean_product_outliers(product: Product, db: AsyncSession) -> int:
         .where(PriceHistory.price > 0)
     )
     rows = prices_result.all()
-    if len(rows) < 5:
-        return 0  # Yeterli veri yok, outlier tespiti yapma
+    if not rows:
+        return 0
 
     prices = sorted([float(r[1]) for r in rows])
     median = prices[len(prices) // 2]
+    product_label = f"{product.brand or ''} {product.title[:40]}".strip()
 
     if median <= 0:
         return 0
 
-    # Outlier sınırları: medyanın %10'undan az veya 3 katından fazla
+    # Strateji 1: Mevcut fiyatla karşılaştır — yanlış eşleşme tespiti
+    current_price = await _get_current_price(product, db)
+    if current_price and float(current_price) > 0:
+        cp = float(current_price)
+        # Medyan, mevcut fiyatın %30'undan düşükse → tüm veri yanlış eşleşme
+        if median < cp * 0.3:
+            all_ids = [r[0] for r in rows]
+            await db.execute(
+                delete(PriceHistory).where(PriceHistory.id.in_(all_ids))
+            )
+            # Akakce URL'sini de temizle (yanlış eşleşme)
+            product.akakce_url = None
+            print(
+                f"[cleanup] {product_label}: TÜM {len(all_ids)} kayıt silindi "
+                f"(yanlış eşleşme: median={median:,.0f}, current={cp:,.0f})",
+                flush=True,
+            )
+            return len(all_ids)
+
+    # Strateji 2: Medyan bazlı outlier tespiti
+    if len(rows) < 5:
+        return 0
+
     lower_bound = median * 0.1
     upper_bound = median * 3.0
 
-    # Outlier ID'leri bul
     outlier_ids = [
         r[0] for r in rows
         if float(r[1]) < lower_bound or float(r[1]) > upper_bound
@@ -115,12 +139,10 @@ async def _clean_product_outliers(product: Product, db: AsyncSession) -> int:
     if not outlier_ids:
         return 0
 
-    # Sil
     await db.execute(
         delete(PriceHistory).where(PriceHistory.id.in_(outlier_ids))
     )
 
-    product_label = f"{product.brand or ''} {product.title[:40]}".strip()
     print(
         f"[cleanup] {product_label}: {len(outlier_ids)} outlier silindi "
         f"(median={median:,.0f}, bounds={lower_bound:,.0f}-{upper_bound:,.0f})",
