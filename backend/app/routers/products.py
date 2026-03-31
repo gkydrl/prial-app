@@ -67,11 +67,15 @@ async def get_product_prediction(
     if not pred:
         return {"status": "no_prediction"}
 
+    from app.services.prediction.batch_loader import _parse_reasoning
+    summary, pros, cons = _parse_reasoning(pred.reasoning_text)
     return {
         "status": "ok",
         "recommendation": pred.recommendation.value,
         "confidence": float(pred.confidence),
-        "reasoning_text": pred.reasoning_text,
+        "reasoning_text": summary,
+        "reasoning_pros": pros,
+        "reasoning_cons": cons,
         "predicted_direction": pred.predicted_direction.value,
         "current_price": float(pred.current_price),
     }

@@ -50,6 +50,8 @@ class ProductResponse(BaseModel):
     alarm_count: int
     recommendation: str | None = None
     reasoning_text: str | None = None
+    reasoning_pros: list[str] | None = None
+    reasoning_cons: list[str] | None = None
     predicted_direction: str | None = None
     prediction_confidence: float | None = None
     variants: list[ProductVariantResponse]
