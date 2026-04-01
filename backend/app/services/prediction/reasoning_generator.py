@@ -43,7 +43,7 @@ def _template_reasoning(
 
         # Mağaza karşılaştırması
         if shipping_info and len(shipping_info) >= 2:
-            stores = [f"{s['store']}'da {s.get('text') or f\"{s.get('days', '?')} iş günü kargo\"}" for s in shipping_info[:2]]
+            stores = [f"{s['store']}'da {s.get('text') or str(s.get('days', '?')) + ' iş günü kargo'}" for s in shipping_info[:2]]
             parts.append(f"{stores[0]}, {stores[1]} avantajı var.")
         elif shipping_info:
             s = shipping_info[0]
