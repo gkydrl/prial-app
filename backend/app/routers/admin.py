@@ -1505,7 +1505,9 @@ async def trigger_enrichment_full(
                 "store_listings": [
                     {
                         "store": l.store_name,
+                        "store_enum": l.store_enum.value if l.store_enum else None,
                         "price": l.price,
+                        "url": l.url,
                         "redirect_url": l.redirect_url,
                     }
                     for l in listings
@@ -1540,7 +1542,9 @@ async def trigger_enrichment_full(
             "store_listings": [
                 {
                     "store": l.store_name,
+                    "store_enum": l.store_enum.value if l.store_enum else None,
                     "price": l.price,
+                    "url": l.url,
                     "redirect_url": l.redirect_url,
                 }
                 for l in listings
