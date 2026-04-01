@@ -25,15 +25,7 @@ export default function Header() {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-4">
-            <Link
-              href="/blog"
-              className="hidden sm:inline-flex text-sm text-gray-600 hover:text-brand transition-colors"
-            >
-              Blog
-            </Link>
-            <HeaderAuth />
-          </div>
+          <HeaderAuth />
         </div>
       </div>
     </header>

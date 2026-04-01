@@ -33,3 +33,12 @@ body {
 .price-updated {
   animation: price-flash 1.5s ease-out;
 }
+
+/* Signal badge pulse */
+@keyframes signal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.signal-pulse {
+  animation: signal-pulse 2s ease-in-out infinite;
+}

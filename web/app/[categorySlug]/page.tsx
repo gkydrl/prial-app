@@ -63,9 +63,9 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         <h1 className="text-3xl font-bold text-gray-900">
           {category.name} Fiyatları
         </h1>
-        {category.product_count != null && (
+        {products.length > 0 && (
           <p className="mt-2 text-gray-500">
-            {category.product_count} ürün bulundu
+            {products.length} ürün bulundu
           </p>
         )}
       </div>
