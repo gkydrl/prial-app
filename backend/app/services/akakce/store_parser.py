@@ -51,6 +51,7 @@ _STORE_MAP: dict[str, StoreName] = {
     "vatan": StoreName.VATAN,
     "vatan bilgisayar": StoreName.VATAN,
     "vatanbilgisayar": StoreName.VATAN,
+    "pazarama": StoreName.PAZARAMA,
 }
 
 
@@ -71,10 +72,15 @@ def _normalize_store_name(raw: str) -> tuple[str, StoreName | None]:
 async def parse_store_listings(
     akakce_url: str,
     max_unique_stores: int = 2,
+    known_only: bool = True,
 ) -> list[AkakceStoreListing]:
     """
     Akakce urun sayfasindan magaza listesini parse eder.
     Ilk N FARKLI marketplace'i doner (ayni store'dan en ucuzunu alir).
+
+    known_only=True ise sadece bilinen pazaryerlerini doner
+    (Trendyol, Hepsiburada, n11, Amazon, Pazarama, vb.)
+    Bilinmeyen kucuk magazalari atlar.
 
     1. ld+json'dan offers parse et (direkt URL'ler)
     2. Fallback: HTML store list parse et
@@ -89,6 +95,13 @@ async def parse_store_listings(
     # 2. Fallback: HTML parse
     if not listings:
         listings = _parse_html_listings(html)
+
+    if not listings:
+        return []
+
+    # Bilinen pazaryeri filtresi: sadece store_enum'u olan listing'leri tut
+    if known_only:
+        listings = [l for l in listings if l.store_enum is not None]
 
     if not listings:
         return []
@@ -239,6 +252,8 @@ def _guess_store_from_url(url: str) -> str:
         return "vatan"
     if "ciceksepeti" in url_lower:
         return "ciceksepeti"
+    if "pazarama.com" in url_lower:
+        return "pazarama"
     return ""
 
 
