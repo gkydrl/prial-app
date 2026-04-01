@@ -1,9 +1,12 @@
 """
 Gunluk tahmin runner — tum urunler icin AL/BEKLE tahmini uretir.
 Scheduler'dan cagrilir.
+
+V2: 1 yıl minimum veri filtresi, fiyat değişmezse Haiku skip.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -26,7 +29,7 @@ async def run_daily_predictions() -> dict:
     Tum aktif urunler icin gunluk tahmin uret.
     Returns: {"total": N, "predicted": N, "skipped": N}
     """
-    stats = {"total": 0, "predicted": 0, "skipped": 0, "errors": 0}
+    stats = {"total": 0, "predicted": 0, "skipped": 0, "errors": 0, "haiku_skipped": 0}
 
     async with AsyncSessionLocal() as db:
         # Store'u olan tüm ürünleri getir (current_price olmasına gerek yok,
@@ -53,12 +56,15 @@ async def run_daily_predictions() -> dict:
                 if not db_product:
                     stats["skipped"] += 1
                     continue
-                predicted = await predict_for_product(db_product, db)
-                if predicted:
-                    stats["predicted"] += 1
-                    await db.commit()
-                else:
+                result = await predict_for_product(db_product, db)
+                if result is None:
                     stats["skipped"] += 1
+                else:
+                    predicted, haiku_skipped = result
+                    stats["predicted"] += 1
+                    if haiku_skipped:
+                        stats["haiku_skipped"] += 1
+                    await db.commit()
         except Exception as e:
             stats["errors"] += 1
             if stats["errors"] <= 10:  # İlk 10 hatayı logla
@@ -72,10 +78,12 @@ async def run_daily_predictions() -> dict:
     return stats
 
 
-async def predict_for_product(product: Product, db: AsyncSession) -> PricePrediction | None:
+async def predict_for_product(
+    product: Product, db: AsyncSession
+) -> tuple[PricePrediction, bool] | None:
     """
     Tek bir urun icin tahmin uret.
-    Returns: PricePrediction or None (yeterli veri yoksa)
+    Returns: (PricePrediction, haiku_skipped) or None (yeterli veri yoksa)
     """
     today = date.today()
 
@@ -116,6 +124,11 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
     if len(history_rows) < 5:
         return None
 
+    # 1 yıllık veri geçmişi kontrolü — en eski kayıt ≥365 gün önce olmalı
+    earliest_date = history_rows[0].recorded_at.date() if hasattr(history_rows[0].recorded_at, 'date') else history_rows[0].recorded_at
+    if (today - earliest_date).days < 365:
+        return None
+
     # Mevcut en dusuk fiyati bul (store'dan veya fiyat gecmisinin son kaydından)
     price_result = await db.execute(
         select(func.min(ProductStore.current_price))
@@ -141,6 +154,7 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
 
     # Kategori slug (ozel gun filtresi icin)
     cat_name = product.category.name if product.category else None
+    category_id = product.category_id
 
     # Feature hesapla
     features = compute_features(
@@ -151,48 +165,119 @@ async def predict_for_product(product: Product, db: AsyncSession) -> PricePredic
         category_slug=cat_name,
     )
 
-    # Tahmin uret ve kaydet
+    # Tahmin uret ve kaydet (category_id ile hiyerarşik katsayı)
     prediction = await predict_and_save(
         product_id=product.id,
         current_price=float(current_price),
         features=features,
         db=db,
+        category_id=category_id,
     )
 
-    # Shipping info for reasoning
-    shipping_info = []
-    stores_result = await db.execute(
-        select(ProductStore).where(
-            ProductStore.product_id == product.id,
-            ProductStore.is_active == True,  # noqa: E712
+    # Haiku çağrısı optimizasyonu: fiyat değişmemişse eski reasoning_text'i kullan
+    haiku_skipped = False
+    wait_days = getattr(prediction, '_wait_days', None)
+    expected_price = getattr(prediction, '_expected_price', None)
+
+    prev_reasoning = await _get_recent_reasoning(product.id, float(current_price), db)
+    if prev_reasoning:
+        # Gün sayısını countdown olarak güncelle
+        prediction.reasoning_text = _patch_wait_days(prev_reasoning, wait_days)
+        haiku_skipped = True
+    else:
+        # Shipping info for reasoning
+        shipping_info = []
+        stores_result = await db.execute(
+            select(ProductStore).where(
+                ProductStore.product_id == product.id,
+                ProductStore.is_active == True,  # noqa: E712
+            )
         )
+        for st in stores_result.scalars().all():
+            if st.delivery_text or st.estimated_delivery_days:
+                shipping_info.append({
+                    "store": st.store.value.capitalize(),
+                    "days": st.estimated_delivery_days,
+                    "text": st.delivery_text,
+                })
+
+        event_details = features.event_details
+
+        # İnsan-dostu açıklama üret
+        try:
+            reasoning_text = await generate_reasoning_text(
+                product_title=product.title,
+                recommendation=prediction.recommendation.value,
+                confidence=float(prediction.confidence),
+                current_price=float(current_price),
+                reasoning=prediction.reasoning or {},
+                l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+                l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+                predicted_direction=prediction.predicted_direction.value,
+                review_summary=product.review_summary,
+                shipping_info=shipping_info if shipping_info else None,
+                daily_lowest_price=float(product.daily_lowest_price) if product.daily_lowest_price else None,
+                daily_lowest_store=product.daily_lowest_store,
+                wait_days=wait_days,
+                expected_price=expected_price,
+                event_details=event_details,
+            )
+            prediction.reasoning_text = reasoning_text
+        except Exception as e:
+            print(f"[prediction/runner] Reasoning text hatası ({product.title[:40]}): {e}", flush=True)
+
+    return prediction, haiku_skipped
+
+
+async def _get_recent_reasoning(
+    product_id, current_price: float, db: AsyncSession
+) -> str | None:
+    """
+    Son 7 gün içinde reasoning_text varsa ve fiyat <%0.1 değişmişse eski text'i döner.
+    Aksi halde None → yeni Haiku çağrısı gerekli.
+    """
+    seven_days_ago = date.today() - timedelta(days=7)
+
+    result = await db.execute(
+        select(PricePrediction.reasoning_text, PricePrediction.current_price)
+        .where(
+            PricePrediction.product_id == product_id,
+            PricePrediction.prediction_date >= seven_days_ago,
+            PricePrediction.reasoning_text.isnot(None),
+        )
+        .order_by(PricePrediction.prediction_date.desc())
+        .limit(1)
     )
-    for st in stores_result.scalars().all():
-        if st.delivery_text or st.estimated_delivery_days:
-            shipping_info.append({
-                "store": st.store.value.capitalize(),
-                "days": st.estimated_delivery_days,
-                "text": st.delivery_text,
-            })
+    row = result.first()
+    if not row or not row.reasoning_text:
+        return None
 
-    # İnsan-dostu açıklama üret
-    try:
-        reasoning_text = await generate_reasoning_text(
-            product_title=product.title,
-            recommendation=prediction.recommendation.value,
-            confidence=float(prediction.confidence),
-            current_price=float(current_price),
-            reasoning=prediction.reasoning or {},
-            l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
-            l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
-            predicted_direction=prediction.predicted_direction.value,
-            review_summary=product.review_summary,
-            shipping_info=shipping_info if shipping_info else None,
-            daily_lowest_price=float(product.daily_lowest_price) if product.daily_lowest_price else None,
-            daily_lowest_store=product.daily_lowest_store,
-        )
-        prediction.reasoning_text = reasoning_text
-    except Exception as e:
-        print(f"[prediction/runner] Reasoning text hatası ({product.title[:40]}): {e}", flush=True)
+    prev_price = float(row.current_price)
+    if prev_price <= 0:
+        return None
 
-    return prediction
+    price_change_pct = abs(current_price - prev_price) / prev_price * 100
+    if price_change_pct < 0.1:
+        return row.reasoning_text
+
+    return None
+
+
+def _patch_wait_days(text: str, new_wait_days: int | None) -> str:
+    """
+    Reuse edilen reasoning_text'teki gün sayısını güncel countdown ile değiştir.
+    Örnek: "7 gün beklemenizi" → "6 gün beklemenizi"
+            "7 gün içinde"     → "6 gün içinde"
+            "7 gün kaldı"      → "6 gün kaldı"
+    """
+    if new_wait_days is None or not text:
+        return text
+
+    # "X gün" kalıplarını bul ve güncelle
+    # Yaygın kalıplar: "7 gün bekle", "7 gün içinde", "7 gün kaldı", "7 gün sonra"
+    patched = re.sub(
+        r'\b(\d{1,3})\s+gün\b',
+        lambda m: f"{new_wait_days} gün",
+        text,
+    )
+    return patched

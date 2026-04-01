@@ -14,18 +14,26 @@ from app.models.category import Category
 
 
 def _parse_reasoning(reasoning_text: str | None) -> tuple[str | None, list[str] | None, list[str] | None]:
-    """reasoning_text JSON string'ini parse et → (summary, pros, cons)"""
+    """
+    reasoning_text parse et → (summary, pros, cons)
+    Desteklenen formatlar:
+    - V2: düz paragraf string → (paragraf, None, None)
+    - V1: JSON string {"summary": ..., "pros": [...], "cons": [...]} → (summary, pros, cons)
+    """
     if not reasoning_text:
         return None, None, None
     try:
         data = json.loads(reasoning_text)
-        return (
-            data.get("summary"),
-            data.get("pros"),
-            data.get("cons"),
-        )
+        if isinstance(data, dict) and ("pros" in data or "cons" in data):
+            return (
+                data.get("summary"),
+                data.get("pros"),
+                data.get("cons"),
+            )
+        # JSON but not our format — treat as plain text
+        return reasoning_text, None, None
     except (json.JSONDecodeError, TypeError):
-        # Eski format: plain text string
+        # V2 format: plain text paragraph
         return reasoning_text, None, None
 
 

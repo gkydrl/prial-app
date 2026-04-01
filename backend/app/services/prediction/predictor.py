@@ -1,11 +1,13 @@
 """
 Weighted scoring modeli — AL/BEKLE/GUCLU_BEKLE tahmini.
 6 faktor agirlikli skor: percentile, trend, volatility, drop_frequency, seasonal, near_historical_low.
+Hierarchical weights: product → category → global (model_parameters).
 """
 from __future__ import annotations
 
+import uuid as _uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -13,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.prediction import (
     PricePrediction, ModelParameters, Recommendation, PredictedDirection,
+    PredictionTarget, CategoryCoefficients, ProductCoefficients,
 )
 from app.services.prediction.analyzer import PriceFeatures
 
@@ -54,6 +57,116 @@ async def get_active_weights(db: AsyncSession) -> tuple[dict, str]:
         return model.parameters, model.version
 
     return DEFAULT_WEIGHTS.copy(), DEFAULT_VERSION
+
+
+async def get_resolved_weights(
+    db: AsyncSession,
+    product_id: _uuid.UUID | None = None,
+    category_id: _uuid.UUID | None = None,
+) -> tuple[dict, str]:
+    """
+    Hiyerarşik katsayı çözümleme: product → category → global.
+    En spesifik aktif katsayıyı döner.
+    """
+    # 1. Product-level
+    if product_id:
+        result = await db.execute(
+            select(ProductCoefficients).where(
+                ProductCoefficients.product_id == product_id,
+                ProductCoefficients.is_active == True,  # noqa: E712
+            )
+        )
+        pc = result.scalar_one_or_none()
+        if pc:
+            return pc.weights, f"product:{product_id}"
+
+    # 2. Category-level
+    if category_id:
+        result = await db.execute(
+            select(CategoryCoefficients).where(
+                CategoryCoefficients.category_id == category_id,
+                CategoryCoefficients.is_active == True,  # noqa: E712
+            )
+        )
+        cc = result.scalar_one_or_none()
+        if cc:
+            return cc.weights, f"category:{category_id}"
+
+    # 3. Global (model_parameters)
+    return await get_active_weights(db)
+
+
+def compute_wait_days(recommendation: Recommendation, features: PriceFeatures) -> int | None:
+    """
+    Bekleme süresi hesapla.
+    AL → None (hemen al)
+    GUCLU_BEKLE → 30 gün
+    BEKLE → event/trend bazlı 1-14 gün
+    """
+    if recommendation == Recommendation.AL:
+        return None
+
+    if recommendation == Recommendation.GUCLU_BEKLE:
+        return 30
+
+    # BEKLE — event ve trend'e göre
+    if features.event_details:
+        closest_event = features.event_details[0]
+        days_to_event = closest_event.get("days_to_start", 999)
+        if days_to_event <= 1:
+            return 1
+        if days_to_event <= 7:
+            return 7
+        if days_to_event <= 21:
+            return 14
+
+    # Güçlü düşüş trendi
+    if features.trend_30d is not None and features.trend_30d < -10:
+        return 7
+
+    # Normal düşüş trendi
+    if features.trend_30d is not None and features.trend_30d < 0:
+        return 14
+
+    # Default BEKLE
+    return 14
+
+
+def compute_expected_price(
+    current_price: float,
+    wait_days: int | None,
+    features: PriceFeatures,
+) -> float:
+    """
+    Beklenen fiyat hesapla.
+    AL → current_price (hemen al)
+    BEKLE → event/trend/seasonal bazlı indirim tahmini
+    Taban: asla l1y_lowest altına düşmez.
+    """
+    if wait_days is None:
+        return current_price
+
+    expected = current_price
+
+    # Event bazlı indirim
+    if features.event_details:
+        closest_event = features.event_details[0]
+        discount_pct = closest_event.get("expected_discount_pct", 0)
+        if discount_pct:
+            expected = current_price * (1 - discount_pct / 100)
+    # Trend bazlı
+    elif features.trend_30d is not None and features.trend_30d < 0:
+        daily_trend = features.trend_30d / 30 / 100  # %/gün → oran/gün
+        expected = current_price * (1 + daily_trend * wait_days)
+    # Seasonal
+    elif features.seasonal_score is not None and features.seasonal_score > 0:
+        expected = current_price * (1 - features.seasonal_score * 0.05)
+
+    # Taban: l1y_lowest altına düşmez
+    if features.l1y_min and expected < features.l1y_min:
+        expected = features.l1y_min
+
+    return round(expected, 2)
 
 
 def predict(features: PriceFeatures, weights: dict) -> PredictionResult:
@@ -221,9 +334,10 @@ async def predict_and_save(
     current_price: float,
     features: PriceFeatures,
     db: AsyncSession,
+    category_id: _uuid.UUID | None = None,
 ) -> PricePrediction:
-    """Tahmin uret ve DB'ye kaydet."""
-    weights, version = await get_active_weights(db)
+    """Tahmin uret, PredictionTarget ile birlikte DB'ye kaydet."""
+    weights, version = await get_resolved_weights(db, product_id, category_id)
     result = predict(features, weights)
 
     prediction = PricePrediction(
@@ -237,4 +351,60 @@ async def predict_and_save(
         predicted_direction=result.direction,
     )
     db.add(prediction)
+
+    # wait_days: önce önceki prediction'ın target_date'inden countdown hesapla
+    wait_days = await _countdown_or_compute(product_id, result.recommendation, features, db)
+    expected_price = compute_expected_price(current_price, wait_days, features)
+
+    target = PredictionTarget(
+        prediction_id=prediction.id,
+        wait_days=wait_days,
+        expected_price=Decimal(str(expected_price)),
+        target_date=date.today() + timedelta(days=wait_days) if wait_days else None,
+    )
+    db.add(target)
+
+    # Attach to prediction for downstream use
+    prediction._wait_days = wait_days
+    prediction._expected_price = expected_price
+
     return prediction
+
+
+async def _countdown_or_compute(
+    product_id,
+    recommendation: Recommendation,
+    features: PriceFeatures,
+    db: AsyncSession,
+) -> int | None:
+    """
+    Önceki prediction'ın target_date'i varsa kalan günü countdown yap.
+    Yoksa veya target geçmişse yeni wait_days hesapla.
+    """
+    if recommendation == Recommendation.AL:
+        return None
+
+    today = date.today()
+
+    # Dünkü (veya son 7 gündeki) prediction'ın target'ını bul
+    result = await db.execute(
+        select(PredictionTarget.target_date)
+        .join(PricePrediction)
+        .where(
+            PricePrediction.product_id == product_id,
+            PricePrediction.prediction_date >= today - timedelta(days=7),
+            PricePrediction.prediction_date < today,
+            PredictionTarget.target_date.isnot(None),
+        )
+        .order_by(PricePrediction.prediction_date.desc())
+        .limit(1)
+    )
+    prev_target_date = result.scalar_one_or_none()
+
+    if prev_target_date and prev_target_date > today:
+        remaining = (prev_target_date - today).days
+        if remaining > 0:
+            return remaining
+
+    # Önceki target yok veya geçmiş → yeni hesapla
+    return compute_wait_days(recommendation, features)

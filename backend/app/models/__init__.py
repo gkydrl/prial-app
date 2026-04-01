@@ -6,7 +6,10 @@ from app.models.alarm import Alarm
 from app.models.notification import Notification
 from app.models.promo_code import PromoCode
 from app.models.campaign import StoreAccount, Campaign, CodePool, UserPromoAssignment
-from app.models.prediction import PricePrediction, PredictionOutcome, ModelParameters
+from app.models.prediction import (
+    PricePrediction, PredictionOutcome, ModelParameters,
+    PredictionTarget, CategoryCoefficients, ProductCoefficients,
+)
 from app.models.exchange_rate import ExchangeRate
 from app.models.pipeline_run import PipelineRun
 
@@ -26,6 +29,9 @@ __all__ = [
     "PricePrediction",
     "PredictionOutcome",
     "ModelParameters",
+    "PredictionTarget",
+    "CategoryCoefficients",
+    "ProductCoefficients",
     "ExchangeRate",
     "PipelineRun",
 ]

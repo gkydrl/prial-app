@@ -82,7 +82,19 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # 05:00 — Review enrichment (500 ürün/gün)
+    # 04:30 — Katalog crawl (mağazasız ürünler için store ara — her gün)
+    async def _daily_crawl():
+        await run_monitored("daily_catalog_crawl", crawl_all_variants(new_only=True))
+
+    scheduler.add_job(
+        _daily_crawl,
+        trigger="cron",
+        hour=4, minute=30,
+        id="daily_catalog_crawl",
+        replace_existing=True,
+    )
+
+    # 05:00 — Review enrichment (500 ürün/gün — Haiku'yu besler)
     async def _review():
         await run_monitored("review_enrichment", enrich_reviews_daily(batch_size=500))
 

@@ -83,10 +83,7 @@ async def backfill_reasoning_texts() -> dict:
                     (PricePrediction.product_id == subq.c.product_id)
                     & (PricePrediction.prediction_date == subq.c.max_date),
                 )
-                .where(
-                    (PricePrediction.reasoning_text.is_(None))
-                    | (~PricePrediction.reasoning_text.startswith("{"))
-                )
+                .where(PricePrediction.reasoning_text.is_(None))
             )
             predictions = result.scalars().all()
 

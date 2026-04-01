@@ -67,6 +67,9 @@ class PricePrediction(Base):
     outcome: Mapped["PredictionOutcome | None"] = relationship(
         "PredictionOutcome", back_populates="prediction", uselist=False, lazy="noload"
     )
+    target: Mapped["PredictionTarget | None"] = relationship(
+        "PredictionTarget", back_populates="prediction", uselist=False, lazy="noload"
+    )
 
 
 class PredictionOutcome(Base):
@@ -93,6 +96,83 @@ class PredictionOutcome(Base):
     # Relationships
     prediction: Mapped["PricePrediction"] = relationship(
         "PricePrediction", back_populates="outcome"
+    )
+
+
+class PredictionTarget(Base):
+    __tablename__ = "prediction_targets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    prediction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("price_predictions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    wait_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expected_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    target_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    actual_price_at_target: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    price_hit: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    prediction: Mapped["PricePrediction"] = relationship(
+        "PricePrediction", back_populates="target"
+    )
+
+
+class CategoryCoefficients(Base):
+    __tablename__ = "category_coefficients"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    weights: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    accuracy_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    total_predictions: Mapped[int] = mapped_column(Integer, default=0)
+    correct_predictions: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ProductCoefficients(Base):
+    __tablename__ = "product_coefficients"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    weights: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    accuracy_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    total_predictions: Mapped[int] = mapped_column(Integer, default=0)
+    correct_predictions: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )
 
 
