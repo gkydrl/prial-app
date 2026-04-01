@@ -71,8 +71,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       </div>
 
       {/* Sort */}
-      <div className="mt-6 flex items-center gap-2">
-        <span className="text-sm text-gray-500">Sırala:</span>
+      <div className="mt-6 flex items-center gap-2 overflow-x-auto">
+        <span className="text-sm text-gray-500 flex-shrink-0">Sırala:</span>
         <SortLink slug={categorySlug} sort="alarm_count" current={sort} label="Popüler" />
         <SortLink slug={categorySlug} sort="price_asc" current={sort} label="En Ucuz" />
         <SortLink slug={categorySlug} sort="price_desc" current={sort} label="En Pahalı" />
@@ -134,7 +134,7 @@ function SortLink({
   return (
     <a
       href={`/${slug}?sort=${sort}`}
-      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+      className={`px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap flex-shrink-0 ${
         isActive
           ? "bg-brand text-white"
           : "bg-gray-100 text-gray-600 hover:bg-gray-200"

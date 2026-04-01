@@ -91,7 +91,7 @@ export default async function HomePage() {
           {/* App Store Buttons */}
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
-              href="https://apps.apple.com/app/prial"
+              href="https://apps.apple.com/tr/app/prial-fiyat-takip-asistani/id6746519498"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 transition-colors shadow-lg"

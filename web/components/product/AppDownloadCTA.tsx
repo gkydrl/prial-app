@@ -13,7 +13,7 @@ export function AppDownloadCTA({ productId }: { productId?: string }) {
       </p>
       <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
         <a
-          href="https://apps.apple.com/app/prial"
+          href="https://apps.apple.com/tr/app/prial-fiyat-takip-asistani/id6746519498"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 bg-white text-brand px-6 py-3 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors"

@@ -58,7 +58,7 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                  href="https://apps.apple.com/app/prial"
+                  href="https://apps.apple.com/tr/app/prial-fiyat-takip-asistani/id6746519498"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-brand"
