@@ -20,10 +20,10 @@ export function StickyMobileCTA() {
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white truncate">
-            Prial Uygulaması
+            Prial
           </p>
           <p className="text-xs text-blue-200">
-            Fiyat düşünce bildirim al
+            Akıllı Alışveriş Asistanı
           </p>
         </div>
 
