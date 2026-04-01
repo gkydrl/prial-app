@@ -18,6 +18,7 @@ class StoreName(str, enum.Enum):
     TEKNOSA = "teknosa"
     VATAN = "vatan"
     PAZARAMA = "pazarama"
+    BOYNER = "boyner"
     OTHER = "other"
 
 

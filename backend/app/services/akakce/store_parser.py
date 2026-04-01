@@ -52,6 +52,7 @@ _STORE_MAP: dict[str, StoreName] = {
     "vatan bilgisayar": StoreName.VATAN,
     "vatanbilgisayar": StoreName.VATAN,
     "pazarama": StoreName.PAZARAMA,
+    "boyner": StoreName.BOYNER,
 }
 
 
@@ -254,6 +255,8 @@ def _guess_store_from_url(url: str) -> str:
         return "ciceksepeti"
     if "pazarama.com" in url_lower:
         return "pazarama"
+    if "boyner.com" in url_lower:
+        return "boyner"
     return ""
 
 
