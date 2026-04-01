@@ -113,7 +113,7 @@ export default async function BlogPostPage({ params }: Props) {
           </p>
           <div className="mt-4 flex justify-center gap-3">
             <a
-              href="https://apps.apple.com/tr/app/prial-fiyat-takip-asistani/id6746519498"
+              href="https://apps.apple.com/tr/app/prial/id6760142538"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-white text-brand px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors"

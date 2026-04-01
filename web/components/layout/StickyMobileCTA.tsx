@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 
-const APP_STORE_URL = "https://apps.apple.com/tr/app/prial-fiyat-takip-asistani/id6746519498";
+const APP_STORE_URL = "https://apps.apple.com/tr/app/prial/id6760142538";
 
 export function StickyMobileCTA() {
   const [dismissed, setDismissed] = useState(false);
@@ -15,7 +15,7 @@ export function StickyMobileCTA() {
       <div className="flex items-center gap-3">
         {/* App icon */}
         <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
-          <Image src="/logo-icon.png" alt="Prial" width={40} height={40} />
+          <Image src="/app-icon.png" alt="Prial" width={40} height={40} />
         </div>
 
         <div className="flex-1 min-w-0">

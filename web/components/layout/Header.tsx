@@ -15,6 +15,7 @@ export default function Header() {
               alt="Prial"
               width={80}
               height={28}
+              className="w-14 sm:w-20 h-auto"
               priority
             />
           </Link>
