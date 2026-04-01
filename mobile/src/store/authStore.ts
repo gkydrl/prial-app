@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { authApi } from '@/api/auth';
 import { setTokens, clearTokens, getAccessToken, getRefreshToken, getOnboardingDone, setOnboardingDone } from '@/utils/storage';
-import type { UserResponse } from '@/types/api';
+import type { UserResponse, SocialLoginResponse } from '@/types/api';
+
+interface SocialLoginResult {
+  is_new_user: boolean;
+  needs_consent: boolean;
+}
 
 interface AuthState {
   user: UserResponse | null;
@@ -13,6 +18,7 @@ interface AuthState {
 
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
+  socialLogin: (provider: 'google' | 'apple', idToken: string, fullName?: string) => Promise<SocialLoginResult>;
   logout: () => void;
   setTokens: (access: string, refresh: string) => void;
   updateUser: (partial: Partial<UserResponse>) => void;
@@ -42,6 +48,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ accessToken: data.access_token, refreshToken: data.refresh_token });
     const { data: user } = await authApi.me();
     set({ user, isAuthenticated: true });
+  },
+
+  socialLogin: async (provider, idToken, fullName) => {
+    const { data } = await authApi.socialLogin(provider, idToken, fullName);
+    await setTokens(data.access_token, data.refresh_token);
+    set({ accessToken: data.access_token, refreshToken: data.refresh_token });
+    const { data: user } = await authApi.me();
+    set({ user, isAuthenticated: true });
+    return { is_new_user: data.is_new_user, needs_consent: data.needs_consent };
   },
 
   logout: () => {

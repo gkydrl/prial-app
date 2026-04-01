@@ -14,6 +14,7 @@ from app.schemas.user import (
     UserRegister, UserLogin, TokenResponse, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest,
     VerifyEmailRequest, ResendVerificationRequest,
+    SocialLoginRequest, SocialLoginResponse, ConsentRequest,
 )
 from app.core.security import (
     hash_password,
@@ -118,7 +119,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı")
 
     if not user.is_active:
@@ -230,7 +231,97 @@ async def delete_account(
     current_user.email = f"deleted_{current_user.id}@deleted.prial.app"
     current_user.firebase_token = None
     current_user.avatar_url = None
+    current_user.auth_provider = None
+    current_user.provider_id = None
     current_user.reset_token_hash = None
     current_user.reset_token_expires = None
     db.add(current_user)
     await db.commit()
+
+
+@router.post("/social", response_model=SocialLoginResponse)
+async def social_login(payload: SocialLoginRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Google veya Apple ile giriş yap / kayıt ol.
+    - Mevcut provider_id ile kullanıcı varsa → giriş
+    - Aynı email ile kullanıcı varsa → hesap bağla (account linking)
+    - Hiç yoksa → yeni kullanıcı oluştur
+    """
+    from app.core.oauth import verify_google_token, verify_apple_token, OAuthError
+
+    # 1. Token doğrula
+    try:
+        if payload.provider == "google":
+            info = verify_google_token(payload.id_token)
+        else:
+            info = await verify_apple_token(payload.id_token)
+    except OAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+    provider_id = info["sub"]
+    email = info.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="E-posta adresi alınamadı")
+
+    is_new_user = False
+
+    # 2. provider_id ile kullanıcı ara
+    result = await db.execute(
+        select(User).where(User.auth_provider == payload.provider, User.provider_id == provider_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # 3. Email ile ara (account linking)
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+        if user:
+            # Hesabı bağla
+            user.auth_provider = payload.provider
+            user.provider_id = provider_id
+            if not user.avatar_url and info.get("picture"):
+                user.avatar_url = info["picture"]
+            db.add(user)
+        else:
+            # 4. Yeni kullanıcı oluştur
+            name = payload.full_name or info.get("name")
+            user = User(
+                email=email,
+                password_hash=None,
+                full_name=name,
+                avatar_url=info.get("picture"),
+                auth_provider=payload.provider,
+                provider_id=provider_id,
+                is_verified=True,
+            )
+            db.add(user)
+            await db.flush()
+            is_new_user = True
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Hesap devre dışı")
+
+    needs_consent = not user.has_completed_consent
+
+    return SocialLoginResponse(
+        access_token=create_access_token(user.id),
+        refresh_token=create_refresh_token(user.id),
+        is_new_user=is_new_user,
+        needs_consent=needs_consent,
+    )
+
+
+@router.post("/consent", status_code=status.HTTP_204_NO_CONTENT)
+async def save_consent(
+    payload: ConsentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """İletişim tercihlerini kaydet (KVKK uyumlu, default hepsi OFF)."""
+    current_user.push_notifications_enabled = payload.push_notifications_enabled
+    current_user.email_notifications_enabled = payload.email_notifications_enabled
+    current_user.notify_on_price_drop = payload.notify_on_price_drop
+    current_user.notify_on_back_in_stock = payload.notify_on_back_in_stock
+    current_user.has_completed_consent = True
+    db.add(current_user)

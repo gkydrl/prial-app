@@ -6,6 +6,14 @@ export interface TokenResponse {
   token_type: string;
 }
 
+export interface SocialLoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  is_new_user: boolean;
+  needs_consent: boolean;
+}
+
 // ─── User ────────────────────────────────────────────────────────────────────
 
 export interface UserResponse {
@@ -18,6 +26,8 @@ export interface UserResponse {
   notify_on_price_drop: boolean;
   notify_on_back_in_stock: boolean;
   is_verified: boolean;
+  auth_provider: string | null;
+  has_completed_consent: boolean;
   created_at: string;
 }
 

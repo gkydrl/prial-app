@@ -19,6 +19,9 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 python-multipart==0.0.12
+google-auth>=2.29.0
+PyJWT>=2.8.0
+cryptography>=42.0.0
 
 # Scraping
 playwright==1.47.0

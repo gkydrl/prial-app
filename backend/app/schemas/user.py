@@ -24,6 +24,8 @@ class UserResponse(BaseModel):
     notify_on_price_drop: bool
     notify_on_back_in_stock: bool
     is_verified: bool
+    auth_provider: str | None = None
+    has_completed_consent: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -50,6 +52,27 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+class SocialLoginRequest(BaseModel):
+    provider: str = Field(pattern=r"^(google|apple)$")
+    id_token: str
+    full_name: str | None = Field(None, max_length=100)
+
+
+class SocialLoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    is_new_user: bool = False
+    needs_consent: bool = False
+
+
+class ConsentRequest(BaseModel):
+    push_notifications_enabled: bool = False
+    email_notifications_enabled: bool = False
+    notify_on_price_drop: bool = False
+    notify_on_back_in_stock: bool = False
 
 
 class ForgotPasswordRequest(BaseModel):

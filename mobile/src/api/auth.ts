@@ -1,6 +1,6 @@
 import client from './client';
 import { ENDPOINTS } from '@/constants/api';
-import type { TokenResponse, UserResponse } from '@/types/api';
+import type { TokenResponse, SocialLoginResponse, UserResponse } from '@/types/api';
 
 export const authApi = {
   register: (email: string, password: string, full_name?: string) =>
@@ -28,4 +28,14 @@ export const authApi = {
 
   deleteAccount: () =>
     client.delete(ENDPOINTS.DELETE_ACCOUNT),
+
+  socialLogin: (provider: 'google' | 'apple', id_token: string, full_name?: string) =>
+    client.post<SocialLoginResponse>(ENDPOINTS.SOCIAL_LOGIN, { provider, id_token, full_name }),
+
+  saveConsent: (prefs: {
+    push_notifications_enabled: boolean;
+    email_notifications_enabled: boolean;
+    notify_on_price_drop: boolean;
+    notify_on_back_in_stock: boolean;
+  }) => client.post(ENDPOINTS.CONSENT, prefs),
 };

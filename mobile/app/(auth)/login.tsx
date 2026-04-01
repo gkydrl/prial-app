@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Platform, ActivityIndicator } from 'react-native';
 import { showAlert } from '@/store/alertStore';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
+import { useSocialAuth } from '@/hooks/useSocialAuth';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
+  const { handleGoogleLogin, handleAppleLogin, loading: socialLoading, isAppleAvailable } = useSocialAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -24,7 +26,6 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      // Check if user is verified after login
       const user = useAuthStore.getState().user;
       if (user && !user.is_verified) {
         router.replace('/(auth)/verify-email');
@@ -37,6 +38,23 @@ export default function LoginScreen() {
       setLoading(false);
     }
   };
+
+  const handleSocial = async (provider: 'google' | 'apple') => {
+    try {
+      const result = provider === 'google' ? await handleGoogleLogin() : await handleAppleLogin();
+      if (!result) return;
+
+      if (result.needs_consent) {
+        router.replace('/(auth)/consent');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (e: any) {
+      showAlert('Giriş Başarısız', e.response?.data?.detail ?? 'Bir hata oluştu');
+    }
+  };
+
+  const isBusy = loading || !!socialLoading;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0A1628' }} edges={[]}>
@@ -65,7 +83,71 @@ export default function LoginScreen() {
             <Text style={{ color: '#FFFFFF', fontSize: 16 }}>Fiyat Talep Platformu</Text>
           </View>
 
-          {/* Form */}
+          {/* Social login buttons */}
+          <View style={{ gap: 12 }}>
+            <TouchableOpacity
+              onPress={() => handleSocial('google')}
+              disabled={isBusy}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                backgroundColor: '#FFFFFF',
+                borderRadius: 12,
+                paddingVertical: 14,
+                opacity: isBusy ? 0.6 : 1,
+              }}
+            >
+              {socialLoading === 'google' ? (
+                <ActivityIndicator size="small" color="#1D4ED8" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color="#4285F4" />
+                  <Text style={{ color: '#1F2937', fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>
+                    Google ile devam et
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {isAppleAvailable && (
+              <TouchableOpacity
+                onPress={() => handleSocial('apple')}
+                disabled={isBusy}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  backgroundColor: '#000000',
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  opacity: isBusy ? 0.6 : 1,
+                }}
+              >
+                {socialLoading === 'apple' ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>
+                      Apple ile devam et
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Divider */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: '#1E293B' }} />
+            <Text style={{ color: '#64748B', fontSize: 13 }}>veya</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: '#1E293B' }} />
+          </View>
+
+          {/* Email/password form */}
           <View style={{ gap: 16 }}>
             <Input
               label="E-posta"
@@ -83,7 +165,7 @@ export default function LoginScreen() {
               secureTextEntry
               placeholder="En az 8 karakter"
             />
-            <Button onPress={handleLogin} loading={loading}>
+            <Button onPress={handleLogin} loading={loading} disabled={isBusy}>
               Giriş Yap
             </Button>
             <TouchableOpacity
@@ -109,7 +191,7 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
 
-      {/* Guest link — ekranın en altında */}
+      {/* Guest link */}
       <TouchableOpacity
         onPress={() => router.replace('/(tabs)')}
         style={{

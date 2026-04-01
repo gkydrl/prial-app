@@ -8,6 +8,7 @@ export function useAuth() {
   const register = useAuthStore((s) => s.register);
   const logout = useAuthStore((s) => s.logout);
   const updateUser = useAuthStore((s) => s.updateUser);
+  const socialLogin = useAuthStore((s) => s.socialLogin);
 
-  return { user, isAuthenticated, isHydrated, login, register, logout, updateUser };
+  return { user, isAuthenticated, isHydrated, login, register, socialLogin, logout, updateUser };
 }

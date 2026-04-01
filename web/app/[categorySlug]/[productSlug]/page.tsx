@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProduct, getProductPriceHistory } from "@/lib/api";
+import { getProduct, getProductPriceHistory, getCategoryProducts, filterDisplayable } from "@/lib/api";
 import { extractShortId, productSlug } from "@/lib/slugify";
 import { productMeta } from "@/lib/metaTags";
 import { formatPrice } from "@/lib/formatPrice";
@@ -12,6 +12,8 @@ import { VariantSelector } from "@/components/product/VariantSelector";
 import { AppDownloadCTA } from "@/components/product/AppDownloadCTA";
 import { ProductImage } from "@/components/product/ProductImage";
 import { PredictionCard } from "@/components/product/PredictionCard";
+import { FAQSchema } from "@/components/seo/FAQSchema";
+import { ProductCard } from "@/components/product/ProductCard";
 
 interface Props {
   params: Promise<{ categorySlug: string; productSlug: string }>;
@@ -69,9 +71,21 @@ export default async function ProductDetailPage({ params }: Props) {
   const product = await findProduct(pSlug);
   if (!product) notFound();
 
-  const priceHistory = await getProductPriceHistory(product.id).catch(
-    () => []
+  // Image, fiyat veya AI recommendation yoksa yayınlama
+  const hasPrice = product.stores?.some(
+    (s: { current_price: number | null; in_stock: boolean }) =>
+      s.current_price != null && s.in_stock
   );
+  if (!product.image_url || !hasPrice || !product.recommendation) notFound();
+
+  const [priceHistory, rawRelated] = await Promise.all([
+    getProductPriceHistory(product.id).catch(() => []),
+    getCategoryProducts(categorySlug, 1, 10, "alarm_count", 3600).catch(() => []),
+  ]);
+
+  const relatedProducts = filterDisplayable(rawRelated)
+    .filter((p) => p.id !== product.id)
+    .slice(0, 5);
 
   const activeStores = product.stores
     .filter(
@@ -115,7 +129,7 @@ export default async function ProductDetailPage({ params }: Props) {
         <div className="bg-white rounded-2xl p-8 flex items-center justify-center border border-gray-100">
           <ProductImage
             src={product.image_url}
-            alt={product.title}
+            alt={`${product.brand ? product.brand + " " : ""}${product.title} - fiyat karşılaştırma`}
             className="max-h-96 w-full object-contain"
           />
         </div>
@@ -248,6 +262,27 @@ export default async function ProductDetailPage({ params }: Props) {
           <p className="text-gray-600 leading-relaxed whitespace-pre-line">
             {product.description}
           </p>
+        </section>
+      )}
+
+      {/* FAQ Section */}
+      <FAQSchema
+        title={product.title}
+        stores={product.stores}
+        predicted_direction={product.predicted_direction}
+      />
+
+      {/* Related Products */}
+      {relatedProducts.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Benzer Ürünler
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {relatedProducts.map((rp) => (
+              <ProductCard key={rp.id} product={rp} categorySlug={categorySlug} />
+            ))}
+          </div>
         </section>
       )}
 

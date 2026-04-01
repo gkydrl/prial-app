@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     web_base_url: str = "https://prial.io"
     revalidate_secret: str = ""
 
+    # OAuth / Social Login
+    google_client_id: str = ""
+    google_ios_client_id: str = ""
+    apple_team_id: str = ""
+    apple_key_id: str = ""
+    apple_private_key: str = ""  # base64-encoded .p8 file
+    apple_web_client_id: str = "io.prial.web.signin"
+
     # CORS
     allowed_origins: str = "http://localhost:3000,http://localhost:8081,https://prial.io,https://www.prial.io"
 

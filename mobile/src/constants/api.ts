@@ -11,6 +11,8 @@ export const ENDPOINTS = {
   FORGOT_PASSWORD: '/auth/forgot-password',
   RESET_PASSWORD: '/auth/reset-password',
   DELETE_ACCOUNT: '/auth/account',
+  SOCIAL_LOGIN: '/auth/social',
+  CONSENT: '/auth/consent',
 
   // Users
   USER_ME: '/users/me',

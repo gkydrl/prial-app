@@ -33,6 +33,11 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.auth_provider and not current_user.password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="Sosyal giriş ile kayıt olduğunuz için şifre değiştiremezsiniz",
+        )
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
     current_user.password_hash = hash_password(payload.new_password)

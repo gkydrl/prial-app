@@ -219,10 +219,11 @@ export async function getAIWaitPicks(revalidate = 1800): Promise<ProductResponse
 
 // --- Filters ---
 
-/** Filter out products without image or without any price (no store data) */
+/** Filter out products without image, price, or AI recommendation */
 export function filterDisplayable(products: ProductResponse[]): ProductResponse[] {
   return products.filter((p) => {
     if (!p.image_url) return false;
+    if (!p.recommendation) return false;
     const hasPrice = p.stores.some((s) => s.current_price != null && s.in_stock);
     if (!hasPrice) return false;
     return true;

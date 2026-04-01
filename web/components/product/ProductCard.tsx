@@ -32,7 +32,7 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
       <div className="relative aspect-square bg-white p-4">
         <ProductImage
           src={product.image_url}
-          alt={product.title}
+          alt={`${product.brand ? product.brand + " " : ""}${product.title} - fiyat karşılaştırma`}
           className="w-full h-full object-contain group-hover:scale-105 transition-transform"
         />
         {product.recommendation && (

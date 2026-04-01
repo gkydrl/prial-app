@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #1D4ED8;
+  --color-brand-light: #3B82F6;
+  --color-brand-dark: #1E3A8A;
+  --color-surface: #F9FAFB;
+  --color-success: #16A34A;
+  --color-danger: #DC2626;
+  --color-bekle: #F59E0B;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  color: #111827;
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mobile bottom padding for sticky CTA */
+@media (max-width: 767px) {
+  body {
+    padding-bottom: 4.5rem;
+  }
+}
+
+/* Price animation */
+@keyframes price-flash {
+  0% { background-color: #dcfce7; }
+  100% { background-color: transparent; }
+}
+.price-updated {
+  animation: price-flash 1.5s ease-out;
+}
