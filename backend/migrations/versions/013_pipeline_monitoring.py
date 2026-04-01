@@ -15,7 +15,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Pipeline monitoring tablosu
+    # Idempotent: tablo zaten varsa atla
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text("SELECT 1 FROM information_schema.tables WHERE table_name = 'pipeline_runs'")
+    )
+    if result.fetchone():
+        return  # Tablo zaten var
+
     op.create_table(
         "pipeline_runs",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
@@ -29,7 +36,6 @@ def upgrade() -> None:
         sa.Column("credits_used", sa.Integer(), nullable=True),
     )
 
-    # Index: son çalışmaları hızlı çekmek için
     op.create_index("ix_pipeline_runs_started_at", "pipeline_runs", ["started_at"])
 
 

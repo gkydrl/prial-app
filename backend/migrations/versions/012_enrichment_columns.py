@@ -15,15 +15,17 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Idempotent: IF NOT EXISTS kullan (önceki kısmi çalışma durumunda tekrar çalışabilir)
+
     # ProductStore: delivery & installment fields
-    op.add_column("product_stores", sa.Column("estimated_delivery_days", sa.Integer(), nullable=True))
-    op.add_column("product_stores", sa.Column("delivery_text", sa.String(200), nullable=True))
-    op.add_column("product_stores", sa.Column("installment_text", sa.String(200), nullable=True))
+    op.execute("ALTER TABLE product_stores ADD COLUMN IF NOT EXISTS estimated_delivery_days INTEGER")
+    op.execute("ALTER TABLE product_stores ADD COLUMN IF NOT EXISTS delivery_text VARCHAR(200)")
+    op.execute("ALTER TABLE product_stores ADD COLUMN IF NOT EXISTS installment_text VARCHAR(200)")
 
     # Product: review summary & daily lowest price
-    op.add_column("products", sa.Column("review_summary", JSONB(), nullable=True))
-    op.add_column("products", sa.Column("daily_lowest_price", sa.Numeric(12, 2), nullable=True))
-    op.add_column("products", sa.Column("daily_lowest_store", sa.String(50), nullable=True))
+    op.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS review_summary JSONB")
+    op.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS daily_lowest_price NUMERIC(12, 2)")
+    op.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS daily_lowest_store VARCHAR(50)")
 
 
 def downgrade() -> None:
