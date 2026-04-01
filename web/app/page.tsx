@@ -174,7 +174,7 @@ export default async function HomePage() {
                 <Link
                   key={cat.id}
                   href={`/${cat.slug}`}
-                  className="flex flex-col items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-brand/30 hover:shadow-md transition-all text-center"
+                  className="flex flex-col items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-brand/30 hover:shadow-md active:border-brand active:scale-[0.97] transition-all text-center"
                 >
                   <div className="mb-2">
                     <CategoryIcon slug={cat.slug} />

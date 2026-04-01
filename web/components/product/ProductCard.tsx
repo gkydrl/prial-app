@@ -26,7 +26,7 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
   const discount = bestStore?.discount_percent;
 
   return (
-    <div className="group relative flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-brand/30 transition-all">
+    <div className="group relative flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-brand/30 active:border-brand active:shadow-md active:scale-[0.98] transition-all">
       {/* Quick add alarm button */}
       <button
         onClick={(e) => {
