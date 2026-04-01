@@ -584,9 +584,24 @@ async def prediction_bottleneck(
         .where(PricePrediction.prediction_date == date_cls.today())
     )).scalar() or 0
 
+    # 6. 2+ aktif store'u olan ürün sayısı
+    multi_store_subq = (
+        select(
+            ProductStore.product_id,
+            func.count(ProductStore.id).label("store_count"),
+        )
+        .where(ProductStore.is_active == True)  # noqa: E712
+        .group_by(ProductStore.product_id)
+        .subquery()
+    )
+    with_2plus_stores = (await db.execute(
+        select(func.count()).where(multi_store_subq.c.store_count >= 2)
+    )).scalar() or 0
+
     return {
         "total_products": total_products,
         "with_any_store": with_any_store,
+        "with_2plus_stores": with_2plus_stores,
         "with_active_store_and_price": with_active_store,
         "stores_with_null_price": null_price_stores,
         "with_any_price_history_1y": with_any_history,
@@ -595,6 +610,7 @@ async def prediction_bottleneck(
         "funnel": {
             "1_total": total_products,
             "2_has_store": with_any_store,
+            "2b_has_2plus_stores": with_2plus_stores,
             "3_has_active_price": with_active_store,
             "4_has_history_1y": with_any_history,
             "5_has_5plus_history": with_enough_history,
