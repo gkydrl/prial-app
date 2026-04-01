@@ -362,7 +362,7 @@ async def daily_enrichment_full() -> dict:
 
     Concurrency: 10, delay: 0.5s arası.
     """
-    from app.services.akakce.store_parser import parse_store_listings, resolve_redirect
+    from app.services.akakce.store_parser import parse_store_listings
     from app.services.scraper.dispatcher import scrape_url, get_scraper
     from app.services.scraper.universal_scraper import UniversalScraper
     from app.models.product import StoreName
@@ -417,32 +417,26 @@ async def daily_enrichment_full() -> dict:
                             if not await can_scrape(priority=2):
                                 break  # Bütçe doldu, kalan store'ları atla
 
-                            # Sadece bilinen marketplace'leri scrape et
-                            if listing.store_enum and listing.store_enum not in (StoreName.OTHER,):
-                                # Redirect URL'den gerçek mağaza URL'sini çöz
-                                final_url = await resolve_redirect(listing.redirect_url)
-                                if not final_url:
-                                    # Scrape edemiyorsak Akakce'deki fiyatı kullan
-                                    _update_daily_lowest(listing, daily_lowest_price, daily_lowest_store)
-                                    continue
-
+                            # Bilinen marketplace + URL varsa scrape et
+                            store_url = listing.url
+                            if listing.store_enum and listing.store_enum not in (StoreName.OTHER,) and store_url:
                                 # Scraper var mı kontrol et
-                                scraper = get_scraper(final_url)
+                                scraper = get_scraper(store_url)
                                 if isinstance(scraper, UniversalScraper):
                                     # Universal scraper ile scrape etme, sadece Akakce fiyatını kaydet
                                     pass
                                 else:
                                     try:
-                                        scraped = await scrape_url(final_url)
+                                        scraped = await scrape_url(store_url)
                                         await record_credit()
                                         stats["stores_scraped"] += 1
 
                                         # ProductStore güncelle veya oluştur
                                         await _upsert_product_store(
-                                            db, db_product, listing, scraped, final_url
+                                            db, db_product, listing, scraped, store_url
                                         )
                                     except Exception as e:
-                                        print(f"[akakce/enrichment_full] Scrape hatası ({final_url[:60]}): {e}", flush=True)
+                                        print(f"[akakce/enrichment_full] Scrape hatası ({store_url[:60]}): {e}", flush=True)
 
                             # daily_lowest tracking
                             if daily_lowest_price is None or listing.price < daily_lowest_price:
