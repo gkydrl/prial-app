@@ -577,6 +577,23 @@ async def prediction_bottleneck(
         select(func.count()).where(subq.c.ph_count >= 1)
     )).scalar() or 0
 
+    # 4b. 365-gün span kontrolü (en eski kayıt ≥365 gün önce olmalı)
+    span_subq = (
+        select(
+            ProductStore.product_id,
+            func.min(PriceHistory.recorded_at).label("earliest"),
+        )
+        .join(PriceHistory, PriceHistory.product_store_id == ProductStore.id)
+        .where(PriceHistory.recorded_at >= one_year_ago, PriceHistory.price > 0)
+        .group_by(ProductStore.product_id)
+        .subquery()
+    )
+    # earliest <= 180 gün önce (runner.py'deki filtre ile uyumlu)
+    earliest_cutoff = date_cls.today() - timedelta(days=180)
+    with_365d_span = (await db.execute(
+        select(func.count()).where(span_subq.c.earliest <= earliest_cutoff)
+    )).scalar() or 0
+
     # 5. Bugünkü tahmin sayısı
     from app.models.prediction import PricePrediction
     today_predictions = (await db.execute(
@@ -606,6 +623,7 @@ async def prediction_bottleneck(
         "stores_with_null_price": null_price_stores,
         "with_any_price_history_1y": with_any_history,
         "with_5plus_price_history_1y": with_enough_history,
+        "with_365d_span": with_365d_span,
         "today_predictions": today_predictions,
         "funnel": {
             "1_total": total_products,
@@ -614,6 +632,7 @@ async def prediction_bottleneck(
             "3_has_active_price": with_active_store,
             "4_has_history_1y": with_any_history,
             "5_has_5plus_history": with_enough_history,
+            "5b_has_365d_span": with_365d_span,
             "6_predicted_today": today_predictions,
         },
     }
@@ -1615,3 +1634,124 @@ async def data_quality_report():
     """Anlık veri kalitesi raporu."""
     from app.services.data_quality import run_data_quality_check
     return await run_data_quality_check()
+
+
+# ─── Akakce Eşleşme Düzeltme ─────────────────────────────────────────────
+
+
+@router.get("/akakce/mismatches", dependencies=[Depends(require_admin)])
+async def detect_akakce_mismatches(
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Yanlış Akakce eşleşmelerini tespit et.
+    Aksesuar URL'si atanmış ana ürünleri bulur (kılıf, koruyucu, şarj vb.)
+    """
+    import re
+
+    accessory_patterns = [
+        "kilif", "kılıf", "kapak", "koruyucu", "cam", "temperli",
+        "sarj", "şarj", "kablo", "adaptor", "adaptör",
+        "aksesuar", "kayis", "kayış", "kordon", "bileklik",
+        "toner", "kartus", "kartuş", "mürekkep", "murekkep",
+    ]
+
+    result = await db.execute(
+        select(Product.id, Product.title, Product.brand, Product.akakce_url)
+        .where(Product.akakce_url.isnot(None))
+    )
+    products = result.all()
+
+    mismatches = []
+    for pid, title, brand, url in products:
+        if not url:
+            continue
+        # URL'deki path'i kontrol et
+        url_lower = url.lower()
+        title_lower = title.lower()
+
+        # Ürün aksesuar değil ama URL aksesuar kategorisinde
+        title_is_accessory = any(p in title_lower for p in accessory_patterns)
+        url_is_accessory = any(p in url_lower for p in accessory_patterns)
+
+        if url_is_accessory and not title_is_accessory:
+            mismatches.append({
+                "id": str(pid),
+                "title": title,
+                "brand": brand,
+                "akakce_url": url,
+                "reason": "URL aksesuar kategorisinde",
+            })
+
+    return {
+        "total_checked": len(products),
+        "mismatches_found": len(mismatches),
+        "mismatches": mismatches[:limit],
+    }
+
+
+@router.post("/akakce/rematch", dependencies=[Depends(require_admin)])
+async def rematch_akakce_products(
+    background_tasks: BackgroundTasks,
+    only_mismatches: bool = True,
+):
+    """
+    Yanlış eşleşen ürünlerin akakce_url'sini sıfırlayıp yeniden eşleştir.
+    only_mismatches=True: sadece aksesuar eşleşmelerini düzelt
+    only_mismatches=False: tüm akakce_url'leri sıfırlayıp yeniden eşleştir
+    """
+    import asyncio
+
+    async def _rematch():
+        from app.services.akakce.searcher import find_akakce_url, _is_accessory
+        from app.database import AsyncSessionLocal
+
+        stats = {"total": 0, "fixed": 0, "cleared": 0, "failed": 0}
+
+        async with AsyncSessionLocal() as db:
+            query = select(Product).where(Product.akakce_url.isnot(None))
+            result = await db.execute(query)
+            products = result.scalars().all()
+
+        for product in products:
+            if only_mismatches:
+                # Sadece yanlış eşleşmeleri düzelt
+                url_lower = product.akakce_url.lower() if product.akakce_url else ""
+                title_lower = product.title.lower()
+                title_is_acc = _is_accessory(product.title)
+                url_is_acc = _is_accessory(product.akakce_url)
+                if not (url_is_acc and not title_is_acc):
+                    continue
+
+            stats["total"] += 1
+
+            async with AsyncSessionLocal() as db:
+                db_product = await db.get(Product, product.id)
+                if not db_product:
+                    continue
+
+                old_url = db_product.akakce_url
+                db_product.akakce_url = None
+                await db.flush()
+
+                # Yeniden eşleştir
+                new_url = await find_akakce_url(db_product.title, db_product.brand)
+                if new_url:
+                    db_product.akakce_url = new_url
+                    stats["fixed"] += 1
+                    print(f"[akakce/rematch] DÜZELTME: {db_product.title[:40]} → {new_url[:60]}", flush=True)
+                else:
+                    stats["cleared"] += 1
+                    print(f"[akakce/rematch] TEMİZLENDİ (eşleşme yok): {db_product.title[:40]}", flush=True)
+
+                await db.commit()
+                await asyncio.sleep(1.0)  # Rate limit
+
+            if stats["total"] % 50 == 0:
+                print(f"[akakce/rematch] İlerleme: {stats}", flush=True)
+
+        print(f"[akakce/rematch] Tamamlandı: {stats}", flush=True)
+
+    asyncio.create_task(_rematch())
+    return {"status": "started", "message": "Akakce yeniden eşleştirme arka planda başladı"}

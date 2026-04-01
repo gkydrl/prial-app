@@ -116,15 +116,32 @@ async def search_akakce(query: str) -> list[AkakceSearchResult]:
     return results
 
 
+# Aksesuar / yanlış ürün tespiti için anahtar kelimeler
+_ACCESSORY_WORDS = {
+    "kılıf", "kilif", "kapak", "koruyucu", "cam", "koruma", "temperli",
+    "şarj", "sarj", "kablo", "adaptör", "adaptor", "çevirici",
+    "aksesuar", "yedek", "batarya", "pil", "tutucu", "standı", "stand",
+    "çanta", "canta", "kayış", "kayis", "kordon", "bileklik",
+    "sticker", "etiket", "dekor", "süs", "mouse", "pad", "mousepad",
+    "toner", "kartuş", "kartus", "mürekkep", "murekkep",
+}
+
+
+def _is_accessory(title: str) -> bool:
+    """Sonuç başlığı aksesuar/parça mı kontrol et."""
+    words = set(re.findall(r'[a-zçğıöşü0-9]+', title.lower()))
+    return bool(words & _ACCESSORY_WORDS)
+
+
 async def find_akakce_url(product_title: str, brand: str | None = None) -> str | None:
     """
     Bir Prial urunu icin Akakce'deki en iyi eslesen URL'yi bulur.
-    1. Jaccard >= 0.30 → direkt kabul
-    2. Jaccard düşükse → Claude Haiku ile LLM matching
+    1. Aksesuar sonuçlarını filtrele (kılıf, koruyucu, şarj vb.)
+    2. Jaccard >= 0.50 → direkt kabul
+    3. Jaccard düşükse → Claude Haiku ile LLM matching
     """
     # Sorgu oluştur — gereksiz kelimeleri temizle
     if brand and product_title.upper().startswith(brand.upper()):
-        # Title zaten brand ile başlıyorsa tekrarlama (SAMSUNG SAMSUNG Galaxy → Samsung Galaxy)
         query = product_title
     elif brand:
         query = f"{brand} {product_title}"
@@ -132,9 +149,8 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
         query = product_title
     # Parantez, tırnak, özel karakterleri temizle
     query = re.sub(r'["""\'\(\)&;,]', ' ', query)
-    # "Fiyat" ve sonrasını kes (ör. "Galaxy S24 Fiyat &amp; Özellikleri")
+    # "Fiyat" ve sonrasını kes
     query = re.split(r'\b[Ff]iyat\b', query)[0].strip()
-    # Tekrar eden boşlukları temizle
     query = re.sub(r'\s+', ' ', query).strip()
     words = query.split()
     if len(words) > 8:
@@ -147,28 +163,48 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
         print(f"[akakce/searcher] Sonuç bulunamadı: {query}", flush=True)
         return None
 
-    # Fuzzy match ile en iyi eslesmeyi bul
+    # Ürünün kendisi aksesuar değilse, aksesuar sonuçlarını filtrele
     catalog_label = f"{brand or ''} {product_title}".strip()
-    best_match: AkakceSearchResult | None = None
-    best_score = 0.0
+    product_is_accessory = _is_accessory(catalog_label)
+
+    if not product_is_accessory:
+        filtered = [r for r in results if not _is_accessory(r.title)]
+        # Filtreden sonuç kalmadıysa orijinali kullan
+        if filtered:
+            results = filtered
+
+    # Fuzzy match — tüm sonuçları skorla, EN İYİSİNİ seç
+    scored: list[tuple[float, AkakceSearchResult]] = []
+
+    cat_words = _normalize(catalog_label)
+    if not cat_words:
+        return None
 
     for r in results:
-        cat_words = _normalize(catalog_label)
         scr_words = _normalize(r.title)
-        if not cat_words or not scr_words:
+        if not scr_words:
             continue
 
         intersection = cat_words & scr_words
         union = cat_words | scr_words
         score = len(intersection) / len(union)
 
-        if score > best_score:
-            best_score = score
-            best_match = r
+        # Bonus: ürün kelimelerinin tamamı sonuçta varsa ekstra puan
+        coverage = len(intersection) / len(cat_words) if cat_words else 0
+        if coverage >= 1.0:
+            score += 0.10  # Tüm kelimeler eşleşti → bonus
 
-    # Jaccard yeterli → direkt kabul
-    if best_match and best_score >= 0.30:
-        print(f"[akakce/searcher] Eşleşme bulundu (jaccard={best_score:.2f}): {best_match.title}", flush=True)
+        scored.append((score, r))
+
+    # En yüksek skorlu sonucu seç
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    best_score = scored[0][0] if scored else 0.0
+    best_match = scored[0][1] if scored else None
+
+    # Jaccard yeterli → direkt kabul (threshold: 0.50)
+    if best_match and best_score >= 0.50:
+        print(f"[akakce/searcher] Eşleşme bulundu (score={best_score:.2f}): {best_match.title}", flush=True)
         return best_match.url
 
     # Jaccard düşük → Haiku ile LLM matching dene
@@ -178,7 +214,7 @@ async def find_akakce_url(product_title: str, brand: str | None = None) -> str |
             print(f"[akakce/searcher] LLM eşleşme bulundu: {haiku_match.title}", flush=True)
             return haiku_match.url
 
-    print(f"[akakce/searcher] Eşleşme yok (jaccard={best_score:.2f}): {query}", flush=True)
+    print(f"[akakce/searcher] Eşleşme yok (score={best_score:.2f}): {query}", flush=True)
     return None
 
 
@@ -211,9 +247,10 @@ async def _llm_match(
                 "content": (
                     f"Ürün: {product_label}\n\n"
                     f"Adaylar:\n{candidate_lines}\n\n"
-                    "Bu ürünle aynı olan aday hangisi? "
+                    "Yukarıdaki ürünle BİREBİR AYNI ürün hangisi? "
+                    "DİKKAT: Kılıf, koruyucu, şarj aleti, kablo gibi aksesuarlar AYNI ÜRÜN DEĞİLDİR. "
                     "Sadece numarasını yaz (1-{len}). "
-                    "Hiçbiri aynı değilse 0 yaz."
+                    "Hiçbiri aynı ürün değilse 0 yaz."
                 ).format(len=len(candidates)),
             }],
         )

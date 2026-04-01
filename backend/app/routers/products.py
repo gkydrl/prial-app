@@ -184,15 +184,36 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
 ):
     """Tüm ürünleri listeler (Keşfet ekranı için). category slug ile filtrelenebilir."""
+    from sqlalchemy import case
+    from datetime import timedelta
+
+    seven_days_ago = date.today() - timedelta(days=7)
+
+    # Prediction'ı olan ürünleri önceliklendirmek için subquery
+    has_prediction_sq = (
+        select(PricePrediction.product_id)
+        .where(PricePrediction.prediction_date >= seven_days_ago)
+        .distinct()
+        .correlate(None)
+        .subquery()
+    )
+
     query = select(Product).options(
         selectinload(Product.variants).selectinload(ProductVariant.stores),
         selectinload(Product.stores),
+    ).outerjoin(
+        has_prediction_sq, Product.id == has_prediction_sq.c.product_id
     )
     if category:
         cat_sq = select(Category.id).where(Category.slug == category).scalar_subquery()
         query = query.where(Product.category_id == cat_sq)
     result = await db.execute(
-        query.order_by(Product.alarm_count.desc(), Product.created_at.desc()).limit(limit)
+        query.order_by(
+            # Prediction'ı olanlar önce
+            case((has_prediction_sq.c.product_id.isnot(None), 0), else_=1),
+            Product.alarm_count.desc(),
+            Product.created_at.desc(),
+        ).limit(limit)
     )
     products = result.scalars().all()
     await attach_predictions(products, db)

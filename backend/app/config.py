@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     discovery_price_max: int = 100000     # maksimum fiyat (TL)
     discovery_concurrency: int = 3        # kaç arama aynı anda çalışsın
 
+    # SEO Pipeline
+    web_base_url: str = "https://prial.io"
+    revalidate_secret: str = ""
+
     # CORS
     allowed_origins: str = "http://localhost:3000,http://localhost:8081,https://prial.io,https://www.prial.io"
 

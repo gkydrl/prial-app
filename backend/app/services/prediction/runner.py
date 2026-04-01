@@ -124,9 +124,10 @@ async def predict_for_product(
     if len(history_rows) < 5:
         return None
 
-    # 1 yıllık veri geçmişi kontrolü — en eski kayıt ≥365 gün önce olmalı
+    # 6 aylık veri geçmişi kontrolü — en eski kayıt ≥180 gün önce olmalı
     earliest_date = history_rows[0].recorded_at.date() if hasattr(history_rows[0].recorded_at, 'date') else history_rows[0].recorded_at
-    if (today - earliest_date).days < 365:
+    history_days = (today - earliest_date).days
+    if history_days < 180:
         return None
 
     # Mevcut en dusuk fiyati bul (store'dan veya fiyat gecmisinin son kaydından)

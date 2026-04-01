@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     from app.services.exchange_rate import fetch_and_store_rates
     from app.services.pipeline_monitor import run_monitored
     from app.services.data_quality import run_data_quality_check
+    from app.services.seo_pipeline import seo_revalidate, seo_audit
 
     # ── Yüksek frekanslı job'lar (monitörlenmez, çok sık) ──
 
@@ -139,6 +140,30 @@ async def lifespan(app: FastAPI):
         trigger="cron",
         hour=8, minute=0,
         id="data_quality_check",
+        replace_existing=True,
+    )
+
+    # 08:30 — SEO: Web cache revalidation + sitemap ping
+    async def _seo_revalidate():
+        await run_monitored("seo_revalidate", seo_revalidate())
+
+    scheduler.add_job(
+        _seo_revalidate,
+        trigger="cron",
+        hour=8, minute=30,
+        id="seo_revalidate",
+        replace_existing=True,
+    )
+
+    # 09:00 — SEO: Günlük SEO audit
+    async def _seo_audit():
+        await run_monitored("seo_audit", seo_audit())
+
+    scheduler.add_job(
+        _seo_audit,
+        trigger="cron",
+        hour=9, minute=0,
+        id="seo_audit",
         replace_existing=True,
     )
 

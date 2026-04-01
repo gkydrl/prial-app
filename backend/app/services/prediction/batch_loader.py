@@ -47,7 +47,7 @@ async def attach_predictions(products: list[Product], db: AsyncSession) -> None:
     ids = [p.id for p in products]
     today = date.today()
 
-    # Predictions
+    # Predictions — bugünkü yoksa son 7 günün en güncelini al
     result = await db.execute(
         select(PricePrediction)
         .where(
@@ -57,6 +57,24 @@ async def attach_predictions(products: list[Product], db: AsyncSession) -> None:
     )
     predictions = result.scalars().all()
     pred_map = {pred.product_id: pred for pred in predictions}
+
+    # Bugün prediction'ı olmayan ürünler için son 7 güne bak
+    missing_ids = [pid for pid in ids if pid not in pred_map]
+    if missing_ids:
+        from datetime import timedelta
+        seven_days_ago = today - timedelta(days=7)
+        fallback_result = await db.execute(
+            select(PricePrediction)
+            .where(
+                PricePrediction.product_id.in_(missing_ids),
+                PricePrediction.prediction_date >= seven_days_ago,
+                PricePrediction.prediction_date < today,
+            )
+            .order_by(PricePrediction.prediction_date.desc())
+        )
+        for pred in fallback_result.scalars().all():
+            if pred.product_id not in pred_map:
+                pred_map[pred.product_id] = pred
 
     # Category slugs — tek sorgu ile tüm gerekli kategorileri çek
     cat_ids = list({p.category_id for p in products if p.category_id})
