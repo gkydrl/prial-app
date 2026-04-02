@@ -24,7 +24,7 @@ from app.services.prediction.predictor import DEFAULT_WEIGHTS
 
 async def evaluate_predictions() -> dict:
     """
-    target_date = today olan tahminleri + 7 gün önceki AL tahminlerini değerlendir.
+    target_date = today olan tahminleri + 7 gün önceki IYI_FIYAT tahminlerini değerlendir.
     Her tahmin için outcome kaydet, çok seviyeli katsayı ayarla.
     """
     stats = {"evaluated": 0, "correct": 0, "errors": []}
@@ -33,7 +33,7 @@ async def evaluate_predictions() -> dict:
         today = date.today()
         seven_days_ago = today - timedelta(days=7)
 
-        # 1. target_date = today olan BEKLE/GUCLU_BEKLE tahminleri
+        # 1. target_date = today olan FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tahminleri
         target_result = await db.execute(
             select(PricePrediction)
             .join(PredictionTarget)
@@ -45,14 +45,14 @@ async def evaluate_predictions() -> dict:
         )
         target_predictions = list(target_result.scalars().all())
 
-        # 2. 7 gün önceki AL tahminleri (target_date = null)
+        # 2. 7 gün önceki IYI_FIYAT tahminleri (target_date = null)
         al_result = await db.execute(
             select(PricePrediction)
             .outerjoin(PredictionTarget)
             .outerjoin(PredictionOutcome)
             .where(
                 PricePrediction.prediction_date == seven_days_ago,
-                PricePrediction.recommendation == Recommendation.AL,
+                PricePrediction.recommendation == Recommendation.IYI_FIYAT,
                 PredictionOutcome.id.is_(None),
             )
         )
@@ -64,7 +64,7 @@ async def evaluate_predictions() -> dict:
             return stats
 
         print(f"[prediction/evaluator] {len(predictions)} tahmin değerlendirilecek "
-              f"({len(target_predictions)} hedefli, {len(al_predictions)} AL)", flush=True)
+              f"({len(target_predictions)} hedefli, {len(al_predictions)} IYI_FIYAT)", flush=True)
 
         error_types = {"missed_buy": 0, "premature_buy": 0, "correct_buy": 0, "correct_wait": 0}
         # Track per-category and per-product errors for multi-level adjustment
@@ -172,8 +172,8 @@ def _evaluate_single(
 ) -> tuple[bool, str, dict]:
     """
     Tek bir tahmini degerlendir.
-    AL → doğru eğer fiyat ≥%97 (>3% düşmedi)
-    BEKLE/GUCLU_BEKLE → doğru eğer actual ≤ expected × 1.05
+    IYI_FIYAT → doğru eğer fiyat ≥%97 (>3% düşmedi)
+    FIYAT_DUSEBILIR/FIYAT_YUKSELISTE → doğru eğer actual ≤ expected × 1.05
     """
     pred_price = float(pred.current_price)
     price_change_pct = ((actual_price - pred_price) / pred_price) * 100 if pred_price > 0 else 0
@@ -187,31 +187,31 @@ def _evaluate_single(
         "direction": pred.predicted_direction.value,
     }
 
-    # AL dedik — fiyat düştü mü?
-    if pred.recommendation == Recommendation.AL:
+    # IYI_FIYAT dedik — fiyat düştü mü?
+    if pred.recommendation == Recommendation.IYI_FIYAT:
         if price_change_pct >= 0:
-            lesson["verdict"] = "AL doğru — fiyat yükselmeden alındı"
+            lesson["verdict"] = "IYI_FIYAT doğru — fiyat yükselmeden alındı"
             return True, "correct_buy", lesson
         elif price_change_pct < -3:
-            lesson["verdict"] = f"Erken AL — fiyat %{abs(price_change_pct):.1f} düştü"
+            lesson["verdict"] = f"Erken IYI_FIYAT — fiyat %{abs(price_change_pct):.1f} düştü"
             return False, "premature_buy", lesson
         else:
-            lesson["verdict"] = "AL kabul edilebilir — küçük düşüş"
+            lesson["verdict"] = "IYI_FIYAT kabul edilebilir — küçük düşüş"
             return True, "correct_buy", lesson
 
-    # BEKLE/GUCLU_BEKLE — expected_price'a ulaştı mı?
+    # FIYAT_DUSEBILIR/FIYAT_YUKSELISTE — expected_price'a ulaştı mı?
     else:
         if expected_price and actual_price <= expected_price * 1.05:
-            lesson["verdict"] = f"BEKLE doğru — fiyat {actual_price:,.0f} TL'ye düştü (beklenen: {expected_price:,.0f} TL)"
+            lesson["verdict"] = f"FIYAT_DUSEBILIR doğru — fiyat {actual_price:,.0f} TL'ye düştü (beklenen: {expected_price:,.0f} TL)"
             return True, "correct_wait", lesson
         elif price_change_pct <= 0:
-            lesson["verdict"] = "BEKLE doğru — fiyat düştü veya sabit"
+            lesson["verdict"] = "FIYAT_DUSEBILIR doğru — fiyat düştü veya sabit"
             return True, "correct_wait", lesson
         elif price_change_pct > 5:
-            lesson["verdict"] = f"Kaçırılan AL — fiyat %{price_change_pct:.1f} arttı"
+            lesson["verdict"] = f"Kaçırılan IYI_FIYAT — fiyat %{price_change_pct:.1f} arttı"
             return False, "missed_buy", lesson
         else:
-            lesson["verdict"] = "BEKLE kabul edilebilir — küçük artış"
+            lesson["verdict"] = "FIYAT_DUSEBILIR kabul edilebilir — küçük artış"
             return True, "correct_wait", lesson
 
 

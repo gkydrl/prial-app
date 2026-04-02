@@ -1,5 +1,5 @@
 """
-Weighted scoring modeli — AL/BEKLE/GUCLU_BEKLE tahmini.
+Weighted scoring modeli — IYI_FIYAT/FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tahmini.
 6 faktor agirlikli skor: percentile, trend, volatility, drop_frequency, seasonal, near_historical_low.
 Hierarchical weights: product → category → global (model_parameters).
 """
@@ -99,17 +99,17 @@ async def get_resolved_weights(
 def compute_wait_days(recommendation: Recommendation, features: PriceFeatures) -> int | None:
     """
     Bekleme süresi hesapla.
-    AL → None (hemen al)
-    GUCLU_BEKLE → 30 gün
-    BEKLE → event/trend bazlı 1-14 gün
+    IYI_FIYAT → None (hemen al)
+    FIYAT_YUKSELISTE → 30 gün
+    FIYAT_DUSEBILIR → event/trend bazlı 1-14 gün
     """
-    if recommendation == Recommendation.AL:
+    if recommendation == Recommendation.IYI_FIYAT:
         return None
 
-    if recommendation == Recommendation.GUCLU_BEKLE:
+    if recommendation == Recommendation.FIYAT_YUKSELISTE:
         return 30
 
-    # BEKLE — event ve trend'e göre
+    # FIYAT_DUSEBILIR — event ve trend'e göre
     if features.event_details:
         closest_event = features.event_details[0]
         days_to_event = closest_event.get("days_to_start", 999)
@@ -128,7 +128,7 @@ def compute_wait_days(recommendation: Recommendation, features: PriceFeatures) -
     if features.trend_30d is not None and features.trend_30d < 0:
         return 14
 
-    # Default BEKLE
+    # Default FIYAT_DUSEBILIR
     return 14
 
 
@@ -139,8 +139,8 @@ def compute_expected_price(
 ) -> float:
     """
     Beklenen fiyat hesapla.
-    AL → current_price (hemen al)
-    BEKLE → event/trend/seasonal bazlı indirim tahmini
+    IYI_FIYAT → current_price (hemen al)
+    FIYAT_DUSEBILIR → event/trend/seasonal bazlı indirim tahmini
     Taban: asla l1y_lowest altına düşmez.
     """
     if wait_days is None:
@@ -171,8 +171,8 @@ def compute_expected_price(
 
 def predict(features: PriceFeatures, weights: dict) -> PredictionResult:
     """
-    Feature'lardan AL/BEKLE/GUCLU_BEKLE tahmini uret.
-    Yuksek skor = AL (iyi fiyat), dusuk skor = BEKLE (daha da dusebilir).
+    Feature'lardan IYI_FIYAT/FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tahmini uret.
+    Yuksek skor = IYI_FIYAT, dusuk skor = FIYAT_DUSEBILIR (daha da dusebilir).
     """
     scores = {}
     reasoning = {}
@@ -254,7 +254,7 @@ def predict(features: PriceFeatures, weights: dict) -> PredictionResult:
         scores["near_historical_low"] = 1.0
         reasoning["near_historical_low"] = {
             "score": 1.0,
-            "note": "1y en düşüğe %5 yakın — güçlü AL sinyali",
+            "note": "1y en düşüğe %5 yakın — güçlü İyi Fiyat sinyali",
         }
     else:
         scores["near_historical_low"] = 0.0
@@ -292,11 +292,11 @@ def predict(features: PriceFeatures, weights: dict) -> PredictionResult:
 
     # Recommendation
     if total_score >= 0.65:
-        rec = Recommendation.AL
+        rec = Recommendation.IYI_FIYAT
     elif total_score <= 0.30:
-        rec = Recommendation.GUCLU_BEKLE
+        rec = Recommendation.FIYAT_YUKSELISTE
     else:
-        rec = Recommendation.BEKLE
+        rec = Recommendation.FIYAT_DUSEBILIR
 
     # Predicted direction based on trend
     if features.trend_7d is not None:
@@ -381,7 +381,7 @@ async def _countdown_or_compute(
     Önceki prediction'ın target_date'i varsa kalan günü countdown yap.
     Yoksa veya target geçmişse yeni wait_days hesapla.
     """
-    if recommendation == Recommendation.AL:
+    if recommendation == Recommendation.IYI_FIYAT:
         return None
 
     today = date.today()

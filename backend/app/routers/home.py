@@ -369,7 +369,7 @@ async def ai_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """Bugünkü AL tavsiyeleri, confidence DESC sıralı."""
+    """Bugünkü IYI_FIYAT tavsiyeleri, confidence DESC sıralı."""
     from datetime import date as date_cls
 
     today = date_cls.today()
@@ -379,7 +379,7 @@ async def ai_picks(
             PricePrediction,
             (PricePrediction.product_id == Product.id)
             & (PricePrediction.prediction_date == today)
-            & (PricePrediction.recommendation == Recommendation.AL),
+            & (PricePrediction.recommendation == Recommendation.IYI_FIYAT),
         )
         .options(
             selectinload(Product.stores),
@@ -398,7 +398,7 @@ async def ai_wait_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """Bugunku BEKLE/GUCLU_BEKLE tavsiyeleri — fiyati dusecek urunler."""
+    """Bugunku FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — fiyati dusecek urunler."""
     from datetime import date as date_cls
 
     today = date_cls.today()
@@ -408,7 +408,7 @@ async def ai_wait_picks(
             PricePrediction,
             (PricePrediction.product_id == Product.id)
             & (PricePrediction.prediction_date == today)
-            & (PricePrediction.recommendation.in_([Recommendation.BEKLE, Recommendation.GUCLU_BEKLE])),
+            & (PricePrediction.recommendation.in_([Recommendation.FIYAT_DUSEBILIR, Recommendation.FIYAT_YUKSELISTE])),
         )
         .options(
             selectinload(Product.stores),

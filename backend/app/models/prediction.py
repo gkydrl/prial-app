@@ -11,9 +11,9 @@ from app.database import Base
 
 
 class Recommendation(str, enum.Enum):
-    AL = "AL"
-    BEKLE = "BEKLE"
-    GUCLU_BEKLE = "GUCLU_BEKLE"
+    IYI_FIYAT = "IYI_FIYAT"
+    FIYAT_DUSEBILIR = "FIYAT_DUSEBILIR"
+    FIYAT_YUKSELISTE = "FIYAT_YUKSELISTE"
 
 
 class PredictedDirection(str, enum.Enum):

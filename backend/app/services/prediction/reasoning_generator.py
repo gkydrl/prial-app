@@ -27,7 +27,7 @@ def _template_reasoning(
     price_str = f"{current_price:,.0f} TL"
     parts: list[str] = []
 
-    if recommendation == "AL":
+    if recommendation == "IYI_FIYAT":
         parts.append(f"Şu anki {price_str} fiyat uygun seviyede.")
 
         # Fiyat pozisyonu
@@ -49,7 +49,7 @@ def _template_reasoning(
             s = shipping_info[0]
             parts.append(f"{s['store']}'da {s.get('text') or 'hızlı kargo'} avantajı var.")
 
-    elif recommendation == "GUCLU_BEKLE":
+    elif recommendation == "FIYAT_YUKSELISTE":
         parts.append(f"Şu anki {price_str} fiyat yüksek seviyede.")
 
         if wait_days and expected_price:
@@ -61,7 +61,7 @@ def _template_reasoning(
 
         parts.append("Beklemenizi öneriyorum.")
 
-    else:  # BEKLE
+    else:  # FIYAT_DUSEBILIR
         if event_details:
             event = event_details[0]
             days_to = event.get("days_to_start", "?")
@@ -181,8 +181,8 @@ async def generate_reasoning_text(
         f"- Düz paragraf yaz, JSON veya madde işareti kullanma\n"
         f"- Max 3-4 cümle, sade ve samimi Türkçe\n"
         f"- Somut rakamlar kullan (fiyat, yüzde, gün sayısı)\n"
-        f"- BEKLE ise: ne kadar beklemeli (gün), neden beklemeli, beklenen fiyat belirt\n"
-        f"- AL ise: neden şimdi almalı belirt, 2+ mağaza varsa kargo ve taksit farkını belirt\n"
+        f"- FIYAT_DUSEBILIR ise: ne kadar beklemeli (gün), neden beklemeli, beklenen fiyat belirt\n"
+        f"- IYI_FIYAT ise: neden şimdi almalı belirt, 2+ mağaza varsa kargo ve taksit farkını belirt\n"
         f"- SADECE düz metin döndür, başka bir şey ekleme"
     )
 
