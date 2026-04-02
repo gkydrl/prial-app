@@ -93,12 +93,12 @@ async def attach_predictions(products: list[Product], db: AsyncSession) -> None:
         pred = pred_map.get(product.id)
         if pred:
             summary, pros, cons = _parse_reasoning(pred.reasoning_text)
-            product.recommendation = pred.recommendation.value  # type: ignore[attr-defined]
+            product.recommendation = pred.recommendation.value if pred.recommendation else None  # type: ignore[attr-defined]
             product.reasoning_text = summary  # type: ignore[attr-defined]
             product.reasoning_pros = pros  # type: ignore[attr-defined]
             product.reasoning_cons = cons  # type: ignore[attr-defined]
-            product.predicted_direction = pred.predicted_direction.value  # type: ignore[attr-defined]
-            product.prediction_confidence = float(pred.confidence)  # type: ignore[attr-defined]
+            product.predicted_direction = pred.predicted_direction.value if pred.predicted_direction else None  # type: ignore[attr-defined]
+            product.prediction_confidence = float(pred.confidence) if pred.confidence is not None else None  # type: ignore[attr-defined]
         else:
             product.recommendation = None  # type: ignore[attr-defined]
             product.reasoning_text = None  # type: ignore[attr-defined]
