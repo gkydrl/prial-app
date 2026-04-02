@@ -45,7 +45,7 @@ export function SignalBadge({ recommendation, size = "md", inline = false, showL
   const sz = inline ? SIZES.sm : SIZES[size];
 
   return (
-    <span className={`inline-flex items-center ${sz.gap} ${sz.px} rounded-full bg-gray-100 ${className}`}>
+    <span className={`inline-flex items-center whitespace-nowrap ${sz.gap} ${sz.px} rounded-full bg-gray-100 ${className}`}>
       <span className={`${sz.dot} rounded-full ${cfg.color} ${cfg.glow} flex-shrink-0 signal-pulse`} />
       {showLabel && (
         <span className={`${sz.text} text-gray-700 font-semibold`}>
