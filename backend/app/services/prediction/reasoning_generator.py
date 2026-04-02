@@ -3,9 +3,10 @@ Prediction sonucu için insan-dostu Türkçe açıklama üretir.
 Claude Haiku kullanır — doğal, ürüne özel paragraf.
 Fallback: template-based metin (Claude fail olursa).
 
-V2: Düz paragraf formatı (JSON değil). wait_days + expected_price bilgisi eklendi.
+V3: JSON formatı {summary, pros, cons}. SEO için artı/eksi listeleri eklendi.
 Maliyet: ~$7-17/ay (sadece fiyat değişen ürünler)
 """
+import json
 import anthropic
 from app.config import settings
 
@@ -22,6 +23,8 @@ def _template_reasoning(
     expected_price: float | None = None,
     event_details: list[dict] | None = None,
     shipping_info: list[dict] | None = None,
+    review_summary: dict | None = None,
+    installment_info: list[dict] | None = None,
 ) -> str:
     """Claude başarısız olursa veri-bazlı template paragraf üret."""
     price_str = f"{current_price:,.0f} TL"
@@ -80,7 +83,59 @@ def _template_reasoning(
                 parts.append(f"Son 30 günde %{abs(trend_30d):.0f} düşüş yaşandı, düşüş devam edebilir.")
             parts.append("Daha iyi fiyatlar gelebilir, beklemenizi öneriyorum.")
 
-    return " ".join(parts)
+    # Kullanıcı yorum puanı (en yüksek rating'i al)
+    best_rating = None
+    if review_summary:
+        for store_key in ("trendyol", "hepsiburada"):
+            store_data = review_summary.get(store_key)
+            if store_data and isinstance(store_data, dict):
+                rating = store_data.get("rating")
+                if rating and (best_rating is None or rating > best_rating):
+                    best_rating = rating
+        if best_rating and best_rating >= 4.5:
+            parts.append(f"Kullanıcı yorumları olumlu ({best_rating}/5).")
+
+    # Taksit bilgisi
+    if installment_info:
+        inst_texts = [i["text"] for i in installment_info if i.get("text")]
+        if inst_texts:
+            parts.append(f"{inst_texts[0]} taksit seçeneği mevcut.")
+
+    summary = " ".join(parts)
+
+    # Build pros/cons from features
+    pros: list[str] = []
+    cons: list[str] = []
+
+    if recommendation == "IYI_FIYAT":
+        if l1y_lowest and current_price and l1y_highest and l1y_highest != l1y_lowest:
+            range_pct = (current_price - l1y_lowest) / (l1y_highest - l1y_lowest) * 100
+            if range_pct <= 15:
+                pros.append("Fiyat 1 yılın en düşüğüne çok yakın")
+            elif range_pct <= 40:
+                pros.append("Fiyat son 1 yıl ortalamasının altında")
+        if predicted_direction == "UP":
+            pros.append("Fiyatın yükselmesi bekleniyor, şimdi almak avantajlı")
+        if best_rating and best_rating >= 4.0:
+            pros.append(f"Kullanıcı yorumları olumlu ({best_rating}/5)")
+        if shipping_info and len(shipping_info) >= 2:
+            pros.append(f"{len(shipping_info)} farklı mağazada mevcut")
+        if event_details:
+            cons.append(f"Yaklaşan {event_details[0].get('name', 'indirim dönemi')} daha iyi fiyat getirebilir")
+    else:
+        if event_details:
+            ev = event_details[0]
+            pros.append(f"Yaklaşan {ev.get('name', 'indirim dönemi')} fiyatı düşürebilir")
+            cons.append(f"Şu an almak erken olabilir, {ev.get('days_to_start', '?')} gün beklenmeli")
+        if wait_days and expected_price:
+            pros.append(f"Beklenen fiyat: {expected_price:,.0f} TL ({wait_days} gün sonra)")
+        if predicted_direction == "DOWN":
+            pros.append("Düşüş trendi devam edebilir")
+        cons.append("Mevcut fiyat yüksek seviyede")
+        if l1y_lowest and current_price and l1y_lowest < current_price:
+            cons.append(f"Son 1 yılda {l1y_lowest:,.0f} TL'ye kadar düşmüştü")
+
+    return json.dumps({"summary": summary, "pros": pros, "cons": cons}, ensure_ascii=False)
 
 
 async def generate_reasoning_text(
@@ -99,6 +154,7 @@ async def generate_reasoning_text(
     wait_days: int | None = None,
     expected_price: float | None = None,
     event_details: list[dict] | None = None,
+    installment_info: list[dict] | None = None,
 ) -> str:
     """
     Claude Haiku ile doğal Türkçe paragraf üret.
@@ -109,6 +165,7 @@ async def generate_reasoning_text(
             recommendation, current_price, l1y_lowest, l1y_highest,
             predicted_direction, confidence, reasoning,
             wait_days, expected_price, event_details, shipping_info,
+            review_summary, installment_info,
         )
 
     # Reasoning dict'ten faktörleri çıkar
@@ -130,6 +187,19 @@ async def generate_reasoning_text(
                 count = store_data.get("count", 0)
                 if rating:
                     review_lines.append(f"- {store_key.capitalize()}: {rating}/5 ({count} yorum)")
+                    # Highlights (pozitif)
+                    highlights = store_data.get("highlights", [])
+                    for h in highlights[:2]:
+                        review_lines.append(f'  [+] "{h[:120]}"')
+                    # Lowlights (negatif)
+                    lowlights = store_data.get("lowlights", [])
+                    for l in lowlights[:1]:
+                        review_lines.append(f'  [-] "{l[:120]}"')
+                    # Fallback: eski format (samples)
+                    if not highlights and not lowlights:
+                        samples = store_data.get("samples", [])
+                        for sample in samples[:2]:
+                            review_lines.append(f'  "{sample[:120]}"')
         if review_lines:
             review_section = "\n\nKullanıcı Yorumları:\n" + "\n".join(review_lines)
 
@@ -143,6 +213,13 @@ async def generate_reasoning_text(
             ship_lines.append(f"- {store}: {text}")
         if ship_lines:
             shipping_section = "\n\nKargo Süreleri:\n" + "\n".join(ship_lines)
+
+    # Build installment section
+    installment_section = ""
+    if installment_info:
+        inst_lines = [f"- {i['store']}: {i['text']}" for i in installment_info if i.get("text")]
+        if inst_lines:
+            installment_section = "\n\nTaksit Seçenekleri:\n" + "\n".join(inst_lines)
 
     # Build daily lowest section
     daily_section = ""
@@ -176,14 +253,17 @@ async def generate_reasoning_text(
         f"Analiz faktörleri:\n{factors_text}"
         f"{review_section}"
         f"{shipping_section}"
+        f"{installment_section}"
         f"{daily_section}\n\n"
         f"Kurallar:\n"
-        f"- Düz paragraf yaz, JSON veya madde işareti kullanma\n"
-        f"- Max 3-4 cümle, sade ve samimi Türkçe\n"
+        f"- JSON formatında yanıt ver: {{\"summary\": \"...\", \"pros\": [\"...\", \"...\"], \"cons\": [\"...\", \"...\"]}}\n"
+        f"- summary: Max 3-4 cümle, sade ve samimi Türkçe paragraf\n"
+        f"- pros: 2-4 maddelik artılar listesi (kısa, 1 cümlelik)\n"
+        f"- cons: 1-3 maddelik eksiler/riskler listesi (kısa, 1 cümlelik)\n"
         f"- Somut rakamlar kullan (fiyat, yüzde, gün sayısı)\n"
-        f"- FIYAT_DUSEBILIR ise: ne kadar beklemeli (gün), neden beklemeli, beklenen fiyat belirt\n"
-        f"- IYI_FIYAT ise: neden şimdi almalı belirt, 2+ mağaza varsa kargo ve taksit farkını belirt\n"
-        f"- SADECE düz metin döndür, başka bir şey ekleme"
+        f"- FIYAT_DUSEBILIR ise: pros'ta bekleme avantajlarını, cons'ta mevcut yüksek fiyatı belirt\n"
+        f"- IYI_FIYAT ise: pros'ta neden şimdi almalı, cons'ta varsa riskleri belirt\n"
+        f"- SADECE JSON döndür, başka bir şey ekleme"
     )
 
     try:
@@ -206,7 +286,19 @@ async def generate_reasoning_text(
         if result.startswith('"') and result.endswith('"'):
             result = result[1:-1]
 
-        return result
+        # Validate JSON V3 format
+        try:
+            parsed = json.loads(result)
+            if isinstance(parsed, dict) and "summary" in parsed:
+                # Ensure all required keys exist
+                parsed.setdefault("pros", [])
+                parsed.setdefault("cons", [])
+                return json.dumps(parsed, ensure_ascii=False)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # If not valid JSON, wrap plain text in V3 format
+        return json.dumps({"summary": result, "pros": [], "cons": []}, ensure_ascii=False)
     except Exception as e:
         import traceback
         print(f"[reasoning_generator] Claude hatası ({product_title[:30]}): {type(e).__name__}: {e}", flush=True)
@@ -215,4 +307,5 @@ async def generate_reasoning_text(
             recommendation, current_price, l1y_lowest, l1y_highest,
             predicted_direction, confidence, reasoning,
             wait_days, expected_price, event_details, shipping_info,
+            review_summary, installment_info,
         )

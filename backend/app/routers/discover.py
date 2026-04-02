@@ -1,13 +1,20 @@
 import uuid
+from itertools import combinations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, exists, func
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.product import Product, ProductStore, ProductVariant
 from app.models.category import Category
 from app.schemas.product import CategoryResponse, ProductResponse
 from app.services.prediction.batch_loader import attach_predictions
+
+
+class ComparisonPair(BaseModel):
+    product_a: ProductResponse
+    product_b: ProductResponse
 
 router = APIRouter(prefix="/discover", tags=["discover"])
 
@@ -190,3 +197,59 @@ async def search_products(
     products = result.scalars().all()
     await attach_predictions(products, db)
     return products
+
+
+@router.get("/comparisons", response_model=list[ComparisonPair])
+async def get_comparisons(
+    category: str = Query(default=None, description="Kategori slug (opsiyonel)"),
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Popüler karşılaştırma çiftleri — alarm_count en yüksek ürünlerden ikili kombinasyonlar."""
+    from sqlalchemy.orm import selectinload
+
+    query = (
+        select(Product)
+        .where(_has_store_subquery())
+        .options(
+            selectinload(Product.variants).selectinload(ProductVariant.stores),
+            selectinload(Product.stores),
+        )
+        .order_by(desc(Product.alarm_count), desc(Product.lowest_price_ever))
+    )
+
+    if category:
+        cat_result = await db.execute(select(Category).where(Category.slug == category))
+        cat = cat_result.scalar_one_or_none()
+        if cat:
+            query = query.where(Product.category_id == cat.id)
+
+    # Get top 10 products by popularity
+    result = await db.execute(query.limit(10))
+    products = list(result.scalars().all())
+    await attach_predictions(products, db)
+
+    # Build pairs from combinations, prioritize similar price ranges
+    pairs: list[ComparisonPair] = []
+    for a, b in combinations(products, 2):
+        # Get best prices for similarity filtering
+        price_a = min(
+            (s.current_price for s in a.stores if s.current_price and s.is_active),
+            default=None,
+        )
+        price_b = min(
+            (s.current_price for s in b.stores if s.current_price and s.is_active),
+            default=None,
+        )
+        if not price_a or not price_b:
+            continue
+        ratio = max(price_a, price_b) / min(price_a, price_b) if min(price_a, price_b) > 0 else 999
+        if ratio <= 2:
+            pairs.insert(0, ComparisonPair(product_a=a, product_b=b))
+        else:
+            pairs.append(ComparisonPair(product_a=a, product_b=b))
+
+        if len(pairs) >= limit:
+            break
+
+    return pairs[:limit]

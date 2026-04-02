@@ -40,7 +40,8 @@ interface Props {
 }
 
 export function SignalBadge({ recommendation, size = "md", inline = false, showLabel = true, className = "" }: Props) {
-  const cfg = CONFIG[recommendation];
+  const cfg = CONFIG[recommendation as Recommendation];
+  if (!cfg) return null;
   const sz = inline ? SIZES.sm : SIZES[size];
 
   return (

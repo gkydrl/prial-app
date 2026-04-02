@@ -35,7 +35,7 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
           window.location.href = href;
         }}
         className="absolute top-1.5 right-1.5 z-10 w-7 h-7 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-brand hover:border-brand hover:bg-brand/5 transition-all opacity-0 group-hover:opacity-100"
-        title="Kampanya talebi oluştur"
+        aria-label="Kampanya talebi oluştur"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -53,14 +53,14 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           />
           {discount && discount > 0 && (
-            <span className="absolute top-1.5 left-1.5 bg-danger text-white text-[10px] sm:text-xs font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md">
+            <span className="absolute top-1.5 left-1.5 bg-danger text-white text-[10px] sm:text-xs font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full">
               {formatDiscount(discount)}
             </span>
           )}
         </div>
 
         {/* Info */}
-        <div className="p-2.5 sm:p-3 flex flex-col justify-end flex-1">
+        <div className="p-3 sm:p-4 flex flex-col justify-end flex-1">
           <h3 className="text-xs sm:text-sm font-medium text-gray-900 line-clamp-2 leading-snug">
             {product.short_title || product.title}
           </h3>
@@ -70,9 +70,12 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
           )}
 
           {product.reasoning_text && (
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-1 line-clamp-1 italic hidden sm:block">
-              {product.reasoning_text.split(".")[0]}.
-            </p>
+            <div className="mt-1 flex items-start gap-1 hidden sm:flex">
+              <span className="text-[10px] sm:text-xs text-brand font-semibold shrink-0">Prial:</span>
+              <p className="text-[10px] sm:text-xs text-gray-400 line-clamp-2">
+                {product.reasoning_text.split(".").slice(0, 2).join(".").trim()}.
+              </p>
+            </div>
           )}
 
           <div className="mt-1.5 sm:mt-2">

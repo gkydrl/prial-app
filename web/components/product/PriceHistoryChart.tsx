@@ -67,22 +67,41 @@ export function PriceHistoryChart({ data }: Props) {
     return filtered.length > 1 ? filtered : valid;
   }, [data]);
 
-  // Varsayılan aralık: veri 90 günden azsa tümünü göster, yoksa 6A
-  const defaultRange = cleanData.length <= 90 ? 365 : 180;
+  // En son veri noktasının tarihini bul — aralık filtresi buna göre çalışsın
+  const latestDate = useMemo(() => {
+    if (!cleanData.length) return new Date();
+    return cleanData.reduce((max, d) => {
+      const t = new Date(d.recorded_at);
+      return t > max ? t : max;
+    }, new Date(0));
+  }, [cleanData]);
+
+  // Varsayılan aralık: veri aralığına göre belirle
+  const dataSpanDays = useMemo(() => {
+    if (cleanData.length < 2) return 0;
+    const earliest = cleanData.reduce((min, d) => {
+      const t = new Date(d.recorded_at);
+      return t < min ? t : min;
+    }, new Date());
+    return Math.ceil((latestDate.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24));
+  }, [cleanData, latestDate]);
+
+  const defaultRange = dataSpanDays <= 90 ? 365 : 180;
   const [rangeDays, setRangeDays] = useState(defaultRange);
 
   const displayData = useMemo(() => {
-    const now = new Date();
-    const cutoff = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+    // Aralık filtresini en son veri noktasına göre hesapla (bugüne göre değil)
+    const cutoff = new Date(latestDate.getTime() - rangeDays * 24 * 60 * 60 * 1000);
     const inRange = cleanData.filter(
       (d) => new Date(d.recorded_at) >= cutoff
     );
+    const result = inRange.length > 0 ? inRange : cleanData;
     // Tarihe göre sırala (eskiden yeniye)
-    return inRange.sort(
+    return result.sort(
       (a, b) =>
         new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
     );
-  }, [cleanData, rangeDays]);
+  }, [cleanData, rangeDays, latestDate]);
 
   const chartData = useMemo(
     () =>
@@ -116,7 +135,7 @@ export function PriceHistoryChart({ data }: Props) {
           <button
             key={r.label}
             onClick={() => setRangeDays(r.days)}
-            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
               rangeDays === r.days
                 ? "bg-brand text-white"
                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"

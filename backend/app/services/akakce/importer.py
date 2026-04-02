@@ -1,8 +1,9 @@
 """
 Price history import orchestrator.
-Her Prial urunu icin Akakce'de arama, bulunamazsa Epey'de arama,
+Her Prial urunu icin Akakce'de arama, bulunamazsa Epey'de, o da yoksa Cimri'de arama,
 fiyat gecmisi cekme, DB'ye kayit.
 
+Fallback zinciri: Akakce → Epey → Cimri
 Concurrent: 5 ürün aynı anda işlenir (ScraperAPI rate limit'e dikkat).
 """
 from __future__ import annotations
@@ -127,15 +128,30 @@ async def import_product_history(
             if epey_url:
                 epey_points = await epey_extract(epey_url, epey_id)
                 if epey_points:
-                    # Convert EpeyPricePoint to PriceDataPoint
                     data_points = [
                         PriceDataPoint(date=p.date, price=p.price)
                         for p in epey_points
                     ]
                     source = "akakce_import"  # Reuse existing source enum
                     if not akakce_url:
-                        # Epey URL'sini akakce_url alanina kaydet (genel "karsilastirma URL" olarak)
                         product.akakce_url = epey_url
+                        await db.flush()
+
+        # 4. Epey'de de bulunamadıysa Cimri'de dene
+        if not data_points:
+            from app.services.cimri.scraper import find_cimri_url, extract_price_history as cimri_extract
+
+            cimri_url = await find_cimri_url(product.title, product.brand)
+            if cimri_url:
+                cimri_points = await cimri_extract(cimri_url)
+                if cimri_points:
+                    data_points = [
+                        PriceDataPoint(date=p.date, price=p.price)
+                        for p in cimri_points
+                    ]
+                    source = "akakce_import"  # Reuse existing source enum
+                    if not akakce_url:
+                        product.akakce_url = cimri_url
                         await db.flush()
 
         if not data_points:
@@ -224,8 +240,27 @@ async def _save_price_points_batch(
     """
     Price data point'lerini toplu kaydet.
     Önce mevcut tarihleri tek sorguda çek, sonra sadece yenileri ekle.
+    IQR filtresi ile outlier'ları eler.
     """
     if not data_points:
+        return 0
+
+    # IQR-based outlier filtresi
+    valid_prices = sorted([dp.price for dp in data_points if dp.price > 0])
+    if len(valid_prices) >= 4:
+        q1 = valid_prices[len(valid_prices) // 4]
+        q3 = valid_prices[3 * len(valid_prices) // 4]
+        iqr = q3 - q1
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        filtered_points = [dp for dp in data_points if dp.price > 0 and lower <= dp.price <= upper]
+        skipped = len([dp for dp in data_points if dp.price > 0]) - len(filtered_points)
+        if skipped > 0:
+            print(f"[importer] IQR filtresi: {skipped} outlier kayıt elendi (range: {lower:.0f}-{upper:.0f})", flush=True)
+    else:
+        filtered_points = [dp for dp in data_points if dp.price > 0]
+
+    if not filtered_points:
         return 0
 
     # Mevcut tarihleri tek sorguda al
@@ -238,11 +273,8 @@ async def _save_price_points_batch(
     existing_dates = {row[0] for row in existing_dates_result.fetchall()}
 
     saved = 0
-    for dp in data_points:
+    for dp in filtered_points:
         if dp.date in existing_dates:
-            continue
-        # Skip invalid prices
-        if dp.price <= 0:
             continue
 
         record = PriceHistory(
@@ -455,6 +487,17 @@ async def daily_enrichment_full() -> dict:
 
                         except Exception as e:
                             print(f"[akakce/enrichment_full] Store listing hatası: {e}", flush=True)
+
+                    # b2) Akakce store listing boşsa → Google Shopping fallback
+                    if not parse_result.listings and hist_status in ("no_match", "no_data", "error"):
+                        from app.services.google_shopping_fallback import search_and_scrape_stores
+                        fallback_result = await search_and_scrape_stores(db_product, db)
+                        stats["google_fallback"] = stats.get("google_fallback", 0) + 1
+                        if fallback_result["status"] == "ok":
+                            stats["google_fallback_ok"] = stats.get("google_fallback_ok", 0) + 1
+                            if fallback_result.get("daily_lowest_price"):
+                                daily_lowest_price = fallback_result["daily_lowest_price"]
+                                daily_lowest_store = fallback_result["daily_lowest_store"]
 
                     # c) daily_lowest_price güncelle
                     if daily_lowest_price:

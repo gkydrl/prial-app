@@ -107,7 +107,7 @@ export default async function BlogPostPage({ params }: Props) {
           <h3 className="text-lg font-bold">
             Prial ile Akıllı Alışverişe Başla
           </h3>
-          <p className="mt-2 text-blue-100 text-sm">
+          <p className="mt-2 text-white/70 text-sm">
             Fiyat takibi, mağaza karşılaştırması ve kampanya talepleri — hepsi
             tek uygulamada.
           </p>
@@ -116,7 +116,7 @@ export default async function BlogPostPage({ params }: Props) {
               href="https://apps.apple.com/tr/app/prial/id6760142538"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-white text-brand px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors"
+              className="inline-flex items-center gap-2 bg-white text-brand px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-brand/5 transition-colors"
             >
               App Store
             </a>

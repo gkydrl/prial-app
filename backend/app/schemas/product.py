@@ -18,6 +18,9 @@ class ProductStoreResponse(BaseModel):
     discount_percent: int | None
     in_stock: bool
     last_checked_at: datetime | None
+    estimated_delivery_days: int | None = None
+    delivery_text: str | None = None
+    installment_text: str | None = None
     promo_codes: list[PromoCodeResponse] = []
     assigned_promos: list[AssignedPromoResponse] = []
 

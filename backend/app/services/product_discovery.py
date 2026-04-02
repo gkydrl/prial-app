@@ -24,6 +24,16 @@ from app.models.category import Category
 from app.services.discovery_terms import DISCOVERY_TERMS, get_all_terms
 from app.services.store_search.google_search import _is_product_url
 
+__all__ = [
+    "discover_daily",
+    "discover_all",
+    "_search_serper",
+    "_extract_product_urls",
+    "_store_from_url",
+    "_STORE_MAP",
+    "_SUPPORTED_SITES",
+]
+
 # ─── Store Mapping ───────────────────────────────────────────────────────────
 
 _STORE_MAP = {

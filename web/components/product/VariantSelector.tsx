@@ -1,5 +1,3 @@
-"use client";
-
 import type { ProductVariantResponse, ProductStoreResponse } from "@/lib/api";
 import { formatPrice } from "@/lib/formatPrice";
 
@@ -23,10 +21,11 @@ export function VariantSelector({ variants, stores }: Props) {
   return (
     <div>
       <h3 className="text-sm font-medium text-gray-700 mb-2">Varyantlar</h3>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Ürün varyantları">
         {variantPrices.map((v) => (
-          <div
+          <button
             key={v.id}
+            type="button"
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm hover:border-brand cursor-pointer transition-colors"
           >
             <span className="text-gray-900">{v.title || "Standart"}</span>
@@ -35,7 +34,7 @@ export function VariantSelector({ variants, stores }: Props) {
                 {formatPrice(v.lowestPrice)}
               </span>
             )}
-          </div>
+          </button>
         ))}
       </div>
     </div>

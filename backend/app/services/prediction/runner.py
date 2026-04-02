@@ -120,14 +120,8 @@ async def predict_for_product(
     )
     history_rows = history_result.all()
 
-    # Minimum 5 data point gerekli
-    if len(history_rows) < 5:
-        return None
-
-    # 6 aylık veri geçmişi kontrolü — en eski kayıt ≥180 gün önce olmalı
-    earliest_date = history_rows[0].recorded_at.date() if hasattr(history_rows[0].recorded_at, 'date') else history_rows[0].recorded_at
-    history_days = (today - earliest_date).days
-    if history_days < 180:
+    # Minimum 2 data point gerekli (en az 2 fiyat noktası → trend hesaplanabilir)
+    if len(history_rows) < 2:
         return None
 
     # Mevcut en dusuk fiyati bul (store'dan veya fiyat gecmisinin son kaydından)
@@ -186,8 +180,9 @@ async def predict_for_product(
         prediction.reasoning_text = _patch_wait_days(prev_reasoning, wait_days)
         haiku_skipped = True
     else:
-        # Shipping info for reasoning
+        # Shipping & installment info for reasoning
         shipping_info = []
+        installment_info = []
         stores_result = await db.execute(
             select(ProductStore).where(
                 ProductStore.product_id == product.id,
@@ -200,6 +195,11 @@ async def predict_for_product(
                     "store": st.store.value.capitalize(),
                     "days": st.estimated_delivery_days,
                     "text": st.delivery_text,
+                })
+            if st.installment_text:
+                installment_info.append({
+                    "store": st.store.value.capitalize(),
+                    "text": st.installment_text,
                 })
 
         event_details = features.event_details
@@ -217,6 +217,7 @@ async def predict_for_product(
                 predicted_direction=prediction.predicted_direction.value,
                 review_summary=product.review_summary,
                 shipping_info=shipping_info if shipping_info else None,
+                installment_info=installment_info if installment_info else None,
                 daily_lowest_price=float(product.daily_lowest_price) if product.daily_lowest_price else None,
                 daily_lowest_store=product.daily_lowest_store,
                 wait_days=wait_days,

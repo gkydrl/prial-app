@@ -6,6 +6,7 @@ const REFERER_MAP: Record<string, string> = {
   "hepsiburada.net": "https://www.hepsiburada.com/",
   "hepsiburada.com": "https://www.hepsiburada.com/",
   mediamarkt: "https://www.mediamarkt.com.tr/",
+  "mmsrg.com": "https://www.mediamarkt.com.tr/",
   "cdn.akakce.com": "https://www.akakce.com/",
 };
 

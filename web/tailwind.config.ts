@@ -15,6 +15,8 @@ const config: Config = {
         surface: "#F9FAFB",
         success: "#16A34A",
         danger: "#DC2626",
+        bekle: "#F59E0B",
+        "bekle-dark": "#D97706",
       },
     },
   },

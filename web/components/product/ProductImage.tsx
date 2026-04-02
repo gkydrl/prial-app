@@ -14,18 +14,12 @@ interface ProductImageProps {
   priority?: boolean;
 }
 
-function needsProxy(url: string): boolean {
-  return (
-    url.includes("cdn.dsmcdn.com") ||
-    url.includes("trendyol.com") ||
-    url.includes("hepsiburada.net") ||
-    url.includes("hepsiburada.com") ||
-    url.includes("mediamarkt")
-  );
-}
-
+/** Proxy all external images through /api/img to avoid next/image hostname errors */
 function resolveImageSrc(src: string): string {
-  return needsProxy(src) ? `/api/img?url=${encodeURIComponent(src)}` : src;
+  if (src.startsWith("http")) {
+    return `/api/img?url=${encodeURIComponent(src)}`;
+  }
+  return src;
 }
 
 export function ProductImage({

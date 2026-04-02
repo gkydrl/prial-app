@@ -63,15 +63,15 @@ export default function KampanyalarPage() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-16 text-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
         <div className="animate-pulse text-gray-400">Yükleniyor...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-6">
         Kampanya Taleplerim
       </h1>
 
@@ -136,7 +136,7 @@ export default function KampanyalarPage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
             En Çok Talep Edilen Ürünler
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {popular.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -210,7 +210,7 @@ function AlarmCard({ alarm }: { alarm: AlarmResponse }) {
         )}
 
         {isTriggered && (
-          <p className="text-xs text-green-600 font-medium mt-1">
+          <p className="text-xs text-success font-medium mt-1">
             Fiyat {formatPrice(alarm.triggered_price)} seviyesine düştü!
           </p>
         )}
@@ -219,7 +219,7 @@ function AlarmCard({ alarm }: { alarm: AlarmResponse }) {
       {/* Status badge */}
       <div className="flex-shrink-0">
         {isTriggered ? (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
             Düştü
           </span>
         ) : isPaused ? (
@@ -227,7 +227,7 @@ function AlarmCard({ alarm }: { alarm: AlarmResponse }) {
             Durduruldu
           </span>
         ) : (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-brand">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-brand/10 text-brand">
             Aktif
           </span>
         )}

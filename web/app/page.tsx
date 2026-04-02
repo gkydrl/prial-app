@@ -64,7 +64,7 @@ export default async function HomePage() {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
             Alışverişte Doğru Zamanı Bilen Asistanın
           </h1>
-          <p className="mt-4 text-lg md:text-xl text-blue-100 max-w-2xl mx-auto">
+          <p className="mt-4 text-lg md:text-xl text-white/70 max-w-2xl mx-auto">
             Prial, takip ettiğin ürünlerin fiyat geçmişini analiz eder.{" "}
             <SignalBadge recommendation="IYI_FIYAT" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
             sinyali gelince al,{" "}
@@ -76,15 +76,15 @@ export default async function HomePage() {
           <div className="mt-10 flex justify-center gap-8 md:gap-16">
             <div>
               <p className="text-2xl md:text-3xl font-bold text-white">10.000+</p>
-              <p className="text-sm text-blue-200">Takip Edilen Ürün</p>
+              <p className="text-sm text-white/60">Takip Edilen Ürün</p>
             </div>
             <div>
               <p className="text-2xl md:text-3xl font-bold text-white">Her Gün</p>
-              <p className="text-sm text-blue-200">Güncellenen Fiyatlar</p>
+              <p className="text-sm text-white/60">Güncellenen Fiyatlar</p>
             </div>
             <div>
               <p className="text-2xl md:text-3xl font-bold text-white">50+</p>
-              <p className="text-sm text-blue-200">Mağaza Karşılaştırma</p>
+              <p className="text-sm text-white/60">Mağaza Karşılaştırma</p>
             </div>
           </div>
 
@@ -218,7 +218,7 @@ export default async function HomePage() {
         {/* SEO Content */}
         <section className="py-10">
           <div className="flex flex-col md:flex-row md:items-start md:gap-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3 md:mb-0 md:flex-shrink-0">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3 md:mb-0 md:flex-shrink-0">
               Prial ile Akıllı Alışveriş
             </h2>
             <p className="text-sm text-gray-500 leading-relaxed">

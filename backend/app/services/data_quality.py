@@ -125,6 +125,76 @@ async def run_data_quality_check() -> dict:
             row[0].value: row[1] for row in store_dist_result.all()
         }
 
+        # ── 8. Spike tespiti: Son 7 günde %200+ fiyat artışı ──
+        spike_count = 0
+        recent_history = await db.execute(
+            select(
+                PriceHistory.product_store_id,
+                PriceHistory.price,
+                PriceHistory.recorded_at,
+            )
+            .where(PriceHistory.recorded_at >= seven_days_ago)
+            .order_by(PriceHistory.product_store_id, PriceHistory.recorded_at)
+        )
+        rows = recent_history.all()
+        # Gruplama: ardışık kayıtlar arasında spike ara
+        prev_row = None
+        for row in rows:
+            if prev_row and prev_row[0] == row[0]:  # Aynı store
+                old_p, new_p = prev_row[1], row[1]
+                if old_p and old_p > 0 and new_p and new_p > old_p * 3:
+                    spike_count += 1
+            prev_row = row
+
+        report["price_spikes_7d"] = {"count": spike_count}
+
+        # ── 9. Veri boşluğu: 7+ gündür yeni kayıt olmayan aktif store'lar ──
+        active_store_ids = await db.execute(
+            select(ProductStore.id).where(
+                ProductStore.is_active == True,  # noqa: E712
+                ProductStore.current_price.isnot(None),
+            )
+        )
+        active_ids = [r[0] for r in active_store_ids.all()]
+
+        if active_ids:
+            stores_with_recent = await db.execute(
+                select(func.distinct(PriceHistory.product_store_id))
+                .where(
+                    PriceHistory.product_store_id.in_(active_ids),
+                    PriceHistory.recorded_at >= seven_days_ago,
+                )
+            )
+            recent_store_ids = {r[0] for r in stores_with_recent.all()}
+            data_gap_count = len([sid for sid in active_ids if sid not in recent_store_ids])
+        else:
+            data_gap_count = 0
+
+        report["data_gaps_7d"] = {"count": data_gap_count}
+
+        # ── 10. Fiyat tutarsızlığı: Aynı ürünün store'ları arasında 5x+ fark ──
+        from collections import defaultdict
+        product_prices: dict[str, list[float]] = defaultdict(list)
+        store_prices_result = await db.execute(
+            select(ProductStore.product_id, ProductStore.current_price)
+            .where(
+                ProductStore.is_active == True,  # noqa: E712
+                ProductStore.current_price.isnot(None),
+                ProductStore.current_price > 0,
+            )
+        )
+        for pid, price in store_prices_result.all():
+            product_prices[pid].append(float(price))
+
+        inconsistency_count = 0
+        for pid, prices_list in product_prices.items():
+            if len(prices_list) < 2:
+                continue
+            if max(prices_list) / min(prices_list) >= 5:
+                inconsistency_count += 1
+
+        report["price_inconsistency"] = {"count": inconsistency_count}
+
     # ── Genel sağlık skoru ──
     issues = []
     if report["no_price"]["count"] > total_products * 0.1:
@@ -135,6 +205,12 @@ async def run_data_quality_check() -> dict:
         issues.append(f"Scrape başarı oranı düşük: %{report['scrape_health']['success_rate_pct']}")
     if report["broken_stores"]["count"] > 50:
         issues.append(f"Kırık store sayısı yüksek: {report['broken_stores']['count']}")
+    if report["price_spikes_7d"]["count"] > 10:
+        issues.append(f"Son 7 günde {report['price_spikes_7d']['count']} fiyat spike'ı tespit edildi")
+    if report["data_gaps_7d"]["count"] > 50:
+        issues.append(f"7+ gün veri boşluğu olan store: {report['data_gaps_7d']['count']}")
+    if report["price_inconsistency"]["count"] > 10:
+        issues.append(f"Fiyat tutarsızlığı olan ürün: {report['price_inconsistency']['count']}")
 
     report["health"] = {
         "status": "healthy" if not issues else "degraded",

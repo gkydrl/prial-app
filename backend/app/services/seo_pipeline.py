@@ -15,6 +15,7 @@ from sqlalchemy import select, func
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.product import Product, ProductStore
+from app.models.prediction import PricePrediction
 
 
 # ─────────────────────────────────────────────
@@ -42,11 +43,16 @@ async def seo_revalidate() -> dict:
         tags_to_revalidate = [
             "product",
             "category",
+            "comparisons",  # /karsilastir index page
         ]
 
         # Ayrıca son 24 saatte fiyatı değişen ürünlerin tag'lerini ekle
         changed_tags = await _get_changed_product_tags()
         tags_to_revalidate.extend(changed_tags)
+
+        # Bugün yeni prediction alan ürünlerin tag'lerini ekle
+        predicted_tags = await _get_newly_predicted_tags()
+        tags_to_revalidate.extend(predicted_tags)
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -122,6 +128,29 @@ async def _get_changed_product_tags() -> list[str]:
             )
             cat_ids = [row[0] for row in result.all() if row[0]]
             tags.extend(f"category-{cid}" for cid in cat_ids)
+
+    return tags
+
+
+async def _get_newly_predicted_tags() -> list[str]:
+    """Bugün yeni prediction alan ürünlerin ISR tag'lerini döner."""
+    from datetime import date as date_type
+    today = date_type.today()
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(PricePrediction.product_id)
+            .where(PricePrediction.prediction_date == today)
+            .distinct()
+            .limit(500)
+        )
+        product_ids = [row[0] for row in result.all()]
+
+    # Short ID formatında tag'ler (product-short-{8char})
+    tags = []
+    for pid in product_ids:
+        short_id = str(pid).replace("-", "")[:8]
+        tags.append(f"product-short-{short_id}")
 
     return tags
 

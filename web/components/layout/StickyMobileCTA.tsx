@@ -22,7 +22,7 @@ export function StickyMobileCTA() {
           <p className="text-sm font-semibold text-white truncate">
             Prial
           </p>
-          <p className="text-xs text-blue-200">
+          <p className="text-xs text-white/60">
             Akıllı Alışveriş Asistanı
           </p>
         </div>
@@ -38,7 +38,7 @@ export function StickyMobileCTA() {
 
         <button
           onClick={() => setDismissed(true)}
-          className="flex-shrink-0 p-1 text-blue-300 hover:text-white"
+          className="flex-shrink-0 p-1 text-white/50 hover:text-white"
           aria-label="Kapat"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

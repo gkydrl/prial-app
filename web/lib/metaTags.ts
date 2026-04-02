@@ -13,6 +13,7 @@ export function productMeta(product: {
   brand: string | null;
   stores: { current_price: number | null; in_stock: boolean }[];
   image_url: string | null;
+  recommendation?: "IYI_FIYAT" | "FIYAT_DUSEBILIR" | "FIYAT_YUKSELISTE" | null;
 }, slug: string): Metadata {
   const activeStores = product.stores.filter((s) => s.current_price && s.in_stock);
   const lowestPrice = activeStores.length
@@ -21,9 +22,17 @@ export function productMeta(product: {
   const storeCount = activeStores.length;
   const brandText = product.brand ? `En Ucuz ${product.brand}` : "En Ucuz Fiyat";
 
+  const aiSuffix = product.recommendation === "IYI_FIYAT"
+    ? " AI analizi: Şimdi almaya değer."
+    : product.recommendation === "FIYAT_DUSEBILIR"
+      ? " AI analizi: Fiyatı düşebilir, bekleyin."
+      : product.recommendation === "FIYAT_YUKSELISTE"
+        ? " AI analizi: Fiyat yükselişte, kaçırmayın."
+        : "";
+
   const title = `${product.title} Fiyatı ${CURRENT_YEAR} | ${brandText} | ${SITE_NAME}`;
   const description = lowestPrice
-    ? `${product.title} en ucuz fiyatı ${formatPrice(lowestPrice)}. ${storeCount} mağazada karşılaştır. Fiyat geçmişi ve düşüş tahmini.`
+    ? `${product.title} en ucuz ${formatPrice(lowestPrice)}.${aiSuffix} ${storeCount} mağazada karşılaştır.`
     : `${product.title} fiyatlarını ${storeCount} mağazada karşılaştır.`;
 
   return {

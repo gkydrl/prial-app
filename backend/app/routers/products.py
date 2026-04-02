@@ -449,4 +449,17 @@ async def get_price_history(
         query = query.where(PriceHistory.product_store_id == store_id)
 
     result = await db.execute(query.limit(365))  # Son 1 yıl
-    return result.scalars().all()
+    records = result.scalars().all()
+
+    # IQR filtresi — mevcut hatalı verilerin grafikte görünmesini engelle
+    if len(records) >= 4:
+        prices = sorted([float(r.price) for r in records if r.price and r.price > 0])
+        if len(prices) >= 4:
+            q1 = prices[len(prices) // 4]
+            q3 = prices[3 * len(prices) // 4]
+            iqr = q3 - q1
+            lower = q1 - 1.5 * iqr
+            upper = q3 + 1.5 * iqr
+            records = [r for r in records if r.price and lower <= float(r.price) <= upper]
+
+    return records

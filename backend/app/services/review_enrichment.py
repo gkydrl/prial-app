@@ -82,14 +82,14 @@ async def enrich_reviews_daily(batch_size: int = 500) -> dict:
                                 store_product_id=store.store_product_id,
                                 product_title=product.title,
                                 product_url=store.url,
-                                max_reviews=5,
+                                max_reviews=25,
                             )
                         elif store.store == StoreName.HEPSIBURADA:
                             review = await fetch_hepsiburada_reviews(
                                 store_product_id=store.store_product_id,
                                 product_title=product.title,
                                 product_url=store.url,
-                                max_reviews=5,
+                                max_reviews=25,
                             )
                         else:
                             continue
@@ -97,11 +97,13 @@ async def enrich_reviews_daily(batch_size: int = 500) -> dict:
                         if review.status != "ok":
                             continue
 
-                        # Keyword filter
+                        # Keyword filter + sentiment
                         analysis = analyze_reviews(
                             reviews=review.sample_reviews or [],
                             product_title=product.title,
                             store=store.store.value,
+                            highlight_limit=5,
+                            lowlight_limit=3,
                         )
 
                         store_key = store.store.value.lower()
@@ -109,6 +111,13 @@ async def enrich_reviews_daily(batch_size: int = 500) -> dict:
                             "rating": review.rating,
                             "count": review.review_count,
                             "samples": analysis.sample_relevant[:3],
+                            "highlights": analysis.highlights,
+                            "lowlights": analysis.lowlights,
+                            "sentiment": {
+                                "positive": analysis.positive_count,
+                                "negative": analysis.negative_count,
+                                "neutral": analysis.neutral_count,
+                            },
                         }
 
                     if review_data:

@@ -8,14 +8,21 @@
   --color-success: #16A34A;
   --color-danger: #DC2626;
   --color-bekle: #F59E0B;
+  --color-bekle-dark: #D97706;
 }
 
 body {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  color: #111827;
+  color: var(--color-gray-900, #111827);
   background: #ffffff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular figures for price alignment */
+.price, [data-price] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 /* Mobile bottom padding for sticky CTA */
@@ -27,7 +34,7 @@ body {
 
 /* Price animation */
 @keyframes price-flash {
-  0% { background-color: #dcfce7; }
+  0% { background-color: color-mix(in srgb, var(--color-success) 15%, transparent); }
   100% { background-color: transparent; }
 }
 .price-updated {
@@ -41,4 +48,10 @@ body {
 }
 .signal-pulse {
   animation: signal-pulse 2s ease-in-out infinite;
+}
+
+/* PrialSays entrance animation */
+@keyframes prial-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

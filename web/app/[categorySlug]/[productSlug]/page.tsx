@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProduct, getProductPriceHistory, getCategoryProducts, filterDisplayable } from "@/lib/api";
+import { getProduct, getProductPriceHistory, getCategoryProducts, filterDisplayable, normalizeProduct } from "@/lib/api";
 import { extractShortId, productSlug } from "@/lib/slugify";
 import { productMeta } from "@/lib/metaTags";
 import { formatPrice } from "@/lib/formatPrice";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { ProductSchema } from "@/components/seo/ProductSchema";
-import { StoreTable } from "@/components/product/StoreTable";
 import dynamic from "next/dynamic";
 
 const PriceHistoryChart = dynamic(
@@ -16,7 +15,7 @@ const PriceHistoryChart = dynamic(
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { AppDownloadCTA } from "@/components/product/AppDownloadCTA";
 import { ProductImage } from "@/components/product/ProductImage";
-import { PredictionCard } from "@/components/product/PredictionCard";
+import { PrialSays } from "@/components/product/PrialSays";
 import { FAQSchema } from "@/components/seo/FAQSchema";
 import { ProductCard } from "@/components/product/ProductCard";
 
@@ -35,7 +34,10 @@ async function findProduct(slug: string) {
     const res = await fetch(`${API_BASE}/products/by-id-short/${shortId}`, {
       next: { revalidate: 900, tags: [`product-short-${shortId}`] },
     });
-    if (res.ok) return res.json();
+    if (res.ok) {
+      const product = await res.json();
+      return normalizeProduct(product);
+    }
   } catch {
     // fallback below
   }
@@ -50,7 +52,7 @@ async function findProduct(slug: string) {
       const match = products.find((p: { id: string }) =>
         p.id.replace(/-/g, "").startsWith(shortId)
       );
-      if (match) return match;
+      if (match) return normalizeProduct(match);
     }
   } catch {
     // fallback failed
@@ -103,6 +105,7 @@ export default async function ProductDetailPage({ params }: Props) {
     );
 
   const bestStore = activeStores[0] ?? null;
+  const secondBestStore = activeStores[1] ?? null;
   const bestPrice = bestStore?.current_price ?? null;
   const highestPrice = activeStores.length
     ? Math.max(...activeStores.map((s: { current_price: number | null }) => s.current_price!))
@@ -128,7 +131,7 @@ export default async function ProductDetailPage({ params }: Props) {
         ]}
       />
 
-      {/* Product Header: Image + PredictionCard */}
+      {/* Product Header: Image + PrialSays */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Image */}
         <div className="relative bg-white rounded-2xl p-8 border border-gray-100 aspect-square">
@@ -156,9 +159,9 @@ export default async function ProductDetailPage({ params }: Props) {
             {product.title}
           </h1>
 
-          {/* PredictionCard — Hero element */}
+          {/* PrialSays — Hero element */}
           <div className="mt-5">
-            <PredictionCard product={product} bestStore={bestStore} />
+            <PrialSays product={product} bestStore={bestStore} secondBestStore={secondBestStore} />
           </div>
 
           {/* Variants */}
@@ -171,14 +174,6 @@ export default async function ProductDetailPage({ params }: Props) {
               />
             </div>
           )}
-
-          {/* Store count & alarm info */}
-          <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
-            <span>{activeStores.length} mağazada mevcut</span>
-            {product.alarm_count > 0 && (
-              <span>{product.alarm_count} kişi takip ediyor</span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -243,18 +238,10 @@ export default async function ProductDetailPage({ params }: Props) {
         );
       })()}
 
-      {/* Store Price Table */}
-      <section className="mt-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Mağaza Fiyatları
-        </h2>
-        <StoreTable stores={product.stores} />
-      </section>
-
       {/* Price History Chart */}
       {priceHistory.length > 1 && (
         <section className="mt-10">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Fiyat Geçmişi
           </h2>
           <PriceHistoryChart data={priceHistory} />
@@ -264,7 +251,7 @@ export default async function ProductDetailPage({ params }: Props) {
       {/* Description */}
       {product.description && (
         <section className="mt-10">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Ürün Açıklaması
           </h2>
           <p className="text-gray-600 leading-relaxed whitespace-pre-line">
@@ -278,18 +265,36 @@ export default async function ProductDetailPage({ params }: Props) {
         title={product.title}
         stores={product.stores}
         predicted_direction={product.predicted_direction}
+        recommendation={product.recommendation}
+        reasoningText={product.reasoning_text}
+        l1yLowestPrice={product.l1y_lowest_price}
+        bestPrice={bestPrice}
+        brand={product.brand}
+        categoryName={categoryName}
       />
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Benzer Ürünler
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {relatedProducts.map((rp) => (
-              <ProductCard key={rp.id} product={rp} categorySlug={categorySlug} />
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {relatedProducts.map((rp) => {
+              const shortA = product.id.replace(/-/g, "").slice(0, 8);
+              const shortB = rp.id.replace(/-/g, "").slice(0, 8);
+              return (
+                <div key={rp.id} className="flex flex-col">
+                  <ProductCard product={rp} categorySlug={categorySlug} />
+                  <a
+                    href={`/karsilastir/${shortA}-vs-${shortB}`}
+                    className="mt-1.5 text-center text-xs text-brand hover:underline font-medium"
+                  >
+                    Karşılaştır
+                  </a>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

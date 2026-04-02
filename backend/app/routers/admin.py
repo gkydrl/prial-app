@@ -1473,6 +1473,11 @@ async def test_review_analysis(
             "reviews_fetched": analysis.reviews_fetched,
             "filtered_out": analysis.filtered_out,
             "relevant": analysis.relevant,
+            "positive": analysis.positive_count,
+            "negative": analysis.negative_count,
+            "neutral": analysis.neutral_count,
+            "highlights": analysis.highlights,
+            "lowlights": analysis.lowlights,
             "sample_relevant": analysis.sample_relevant,
             "sample_filtered": analysis.sample_filtered,
         })
@@ -1691,6 +1696,22 @@ async def detect_akakce_mismatches(
         "mismatches_found": len(mismatches),
         "mismatches": mismatches[:limit],
     }
+
+
+@router.post("/akakce/verify", dependencies=[Depends(require_admin)])
+async def verify_akakce_prices(
+    background_tasks: BackgroundTasks,
+    limit: int = 200,
+    fix: bool = True,
+):
+    """
+    Akakce fiyat doğrulaması: chart verisini çekip DB fiyatlarıyla karşılaştırır.
+    Yanlış eşleşmeleri tespit eder ve düzeltir.
+    """
+    from app.services.akakce.verify_matches import verify_akakce_matches
+
+    background_tasks.add_task(verify_akakce_matches, limit=limit, fix=fix)
+    return {"status": "started", "message": f"{limit} ürün doğrulanıyor (fix={fix})"}
 
 
 @router.post("/akakce/rematch", dependencies=[Depends(require_admin)])

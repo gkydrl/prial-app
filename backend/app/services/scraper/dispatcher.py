@@ -39,6 +39,116 @@ async def scrape_url(url: str) -> ScrapedProduct:
     return await scraper.scrape(url)
 
 
+async def _trigger_initial_prediction(product_id: uuid.UUID) -> None:
+    """
+    Yeni eklenen ürün için hemen tahmin üret.
+    predict_for_product 2+ fiyat noktası istiyor — yeni ürünlerde 1 tane var.
+    Burada tek fiyat noktasıyla basit bir tahmin yapıp kaydediyoruz.
+    """
+    from app.database import AsyncSessionLocal
+    from app.models.product import Product, ProductStore
+    from app.models.price_history import PriceHistory
+    from app.models.prediction import PricePrediction
+    from app.services.prediction.analyzer import compute_features, PricePoint
+    from app.services.prediction.predictor import predict_and_save
+    from app.services.prediction.reasoning_generator import generate_reasoning_text
+    from sqlalchemy import select, func
+    from sqlalchemy.orm import selectinload
+    from datetime import date, timedelta
+
+    async with AsyncSessionLocal() as db:
+        product = await db.get(Product, product_id, options=[selectinload(Product.category)])
+        if not product:
+            return
+
+        # Mevcut en düşük fiyat
+        price_result = await db.execute(
+            select(func.min(ProductStore.current_price))
+            .where(
+                ProductStore.product_id == product_id,
+                ProductStore.is_active == True,  # noqa: E712
+                ProductStore.current_price.isnot(None),
+            )
+        )
+        current_price = price_result.scalar_one_or_none()
+        if not current_price:
+            return
+
+        # Fiyat geçmişi — yeni üründe 1 nokta olabilir, 2. noktayı oluştur
+        store_ids_result = await db.execute(
+            select(ProductStore.id).where(ProductStore.product_id == product_id)
+        )
+        store_ids = [row[0] for row in store_ids_result.all()]
+
+        history_result = await db.execute(
+            select(PriceHistory.recorded_at, PriceHistory.price)
+            .where(
+                PriceHistory.product_store_id.in_(store_ids),
+                PriceHistory.price > 0,
+            )
+            .order_by(PriceHistory.recorded_at.asc())
+        )
+        history_rows = history_result.all()
+
+        # Minimum 1 nokta gerekli — 2. noktayı aynı fiyatla bir gün önce sentetik ekle
+        today = date.today()
+        if len(history_rows) == 1:
+            price_history = [
+                PricePoint(date=today - timedelta(days=1), price=float(history_rows[0].price)),
+                PricePoint(date=today, price=float(current_price)),
+            ]
+        elif len(history_rows) >= 2:
+            price_history = [
+                PricePoint(date=row.recorded_at.date(), price=float(row.price))
+                for row in history_rows
+            ]
+        else:
+            return
+
+        cat_name = product.category.name if product.category else None
+        features = compute_features(
+            current_price=float(current_price),
+            price_history=price_history,
+            l1y_min=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+            l1y_max=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+            category_slug=cat_name,
+        )
+
+        prediction = await predict_and_save(
+            product_id=product_id,
+            current_price=float(current_price),
+            features=features,
+            db=db,
+            category_id=product.category_id,
+        )
+
+        # Reasoning text üret (V3 JSON — summary + pros + cons)
+        wait_days = getattr(prediction, '_wait_days', None)
+        expected_price = getattr(prediction, '_expected_price', None)
+
+        try:
+            reasoning_text = await generate_reasoning_text(
+                product_title=product.title,
+                recommendation=prediction.recommendation.value,
+                confidence=float(prediction.confidence),
+                current_price=float(current_price),
+                reasoning=prediction.reasoning or {},
+                l1y_lowest=float(product.l1y_lowest_price) if product.l1y_lowest_price else None,
+                l1y_highest=float(product.l1y_highest_price) if product.l1y_highest_price else None,
+                predicted_direction=prediction.predicted_direction.value,
+                review_summary=product.review_summary,
+                wait_days=wait_days,
+                expected_price=expected_price,
+                event_details=features.event_details,
+            )
+            prediction.reasoning_text = reasoning_text
+        except Exception as e:
+            print(f"[dispatcher] Reasoning hatası: {e}")
+
+        await db.commit()
+        print(f"[dispatcher] Yeni ürün tahmini oluşturuldu: {product.title[:50]} → {prediction.recommendation.value}")
+
+
 async def scrape_and_save_product(
     url: str,
     user_id: uuid.UUID,
@@ -127,6 +237,14 @@ async def scrape_and_save_product(
             db.add(alarm)
 
             await db.commit()
+
+            # On-demand prediction: yeni ürün için hemen AI analizi üret
+            # Arka planda çalışır, başarısız olursa ertesi gün run_daily_predictions yakalar
+            try:
+                await _trigger_initial_prediction(product.id)
+            except Exception as pred_err:
+                print(f"[dispatcher] İlk tahmin hatası ({product.title[:40]}): {pred_err}")
+
         except Exception as e:
             await db.rollback()
             print(f"Veritabanı kayıt hatası: {e}")

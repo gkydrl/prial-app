@@ -8,7 +8,7 @@ interface FetchOptions {
 async function apiFetch<T>(path: string, opts: FetchOptions = {}): Promise<T> {
   const url = `${API_BASE}${path}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000); // 10s timeout
+  const timeout = setTimeout(() => controller.abort(), 15_000); // 15s timeout
 
   try {
     const res = await fetch(url, {
@@ -24,9 +24,42 @@ async function apiFetch<T>(path: string, opts: FetchOptions = {}): Promise<T> {
     }
 
     return res.json() as Promise<T>;
+  } catch (err) {
+    console.error(`[apiFetch] Failed: ${url}`, err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// --- Recommendation Mapping (eski DB enum → yeni enum) ---
+
+type RecommendationType = "IYI_FIYAT" | "FIYAT_DUSEBILIR" | "FIYAT_YUKSELISTE";
+
+const RECOMMENDATION_MAP: Record<string, RecommendationType> = {
+  AL: "IYI_FIYAT",
+  BEKLE: "FIYAT_DUSEBILIR",
+  GUCLU_BEKLE: "FIYAT_YUKSELISTE",
+  IYI_FIYAT: "IYI_FIYAT",
+  FIYAT_DUSEBILIR: "FIYAT_DUSEBILIR",
+  FIYAT_YUKSELISTE: "FIYAT_YUKSELISTE",
+};
+
+function normalizeRecommendation(rec: string | null | undefined): RecommendationType | null {
+  if (!rec) return null;
+  return RECOMMENDATION_MAP[rec] ?? null;
+}
+
+/** Normalize product recommendation fields from API response */
+function normalizeProduct<T extends { recommendation?: string | null }>(product: T): T {
+  return {
+    ...product,
+    recommendation: normalizeRecommendation(product.recommendation),
+  };
+}
+
+function normalizeProducts<T extends { recommendation?: string | null }>(products: T[]): T[] {
+  return products.map(normalizeProduct);
 }
 
 // --- Types ---
@@ -53,6 +86,9 @@ export interface ProductStoreResponse {
   in_stock: boolean;
   last_checked_at: string | null;
   variant_id: string | null;
+  estimated_delivery_days: number | null;
+  delivery_text: string | null;
+  installment_text: string | null;
 }
 
 export interface ProductVariantResponse {
@@ -138,17 +174,19 @@ export async function getCategoryProducts(
   sort = "alarm_count",
   revalidate = 3600
 ): Promise<ProductResponse[]> {
-  return apiFetch<ProductResponse[]>(
+  const products = await apiFetch<ProductResponse[]>(
     `/discover/categories/${slug}/products?page=${page}&page_size=${pageSize}&sort=${sort}`,
     { revalidate, tags: [`category-${slug}`] }
   );
+  return normalizeProducts(products);
 }
 
 export async function getProduct(id: string, revalidate = 900): Promise<ProductResponse> {
-  return apiFetch<ProductResponse>(`/products/${id}`, {
+  const product = await apiFetch<ProductResponse>(`/products/${id}`, {
     revalidate,
     tags: [`product-${id}`],
   });
+  return normalizeProduct(product);
 }
 
 export async function getProductPriceHistory(
@@ -169,19 +207,23 @@ export async function getProducts(
   revalidate = 1800
 ): Promise<ProductResponse[]> {
   const params = category ? `?limit=${limit}&category=${category}` : `?limit=${limit}`;
-  return apiFetch<ProductResponse[]>(`/products${params}`, { revalidate });
+  const products = await apiFetch<ProductResponse[]>(`/products${params}`, { revalidate });
+  return normalizeProducts(products);
 }
 
 export async function getDailyDeals(revalidate = 1800): Promise<DailyDealProduct[]> {
-  return apiFetch<DailyDealProduct[]>("/home/daily-deals", { revalidate });
+  const deals = await apiFetch<DailyDealProduct[]>("/home/daily-deals", { revalidate });
+  return normalizeProducts(deals);
 }
 
 export async function getTopDrops(revalidate = 1800): Promise<DailyDealProduct[]> {
-  return apiFetch<DailyDealProduct[]>("/home/top-drops", { revalidate });
+  const drops = await apiFetch<DailyDealProduct[]>("/home/top-drops", { revalidate });
+  return normalizeProducts(drops);
 }
 
 export async function getMostAlarmed(revalidate = 1800): Promise<ProductResponse[]> {
-  return apiFetch<ProductResponse[]>("/home/most-alarmed", { revalidate });
+  const products = await apiFetch<ProductResponse[]>("/home/most-alarmed", { revalidate });
+  return normalizeProducts(products);
 }
 
 export async function getHomeStats(revalidate = 1800): Promise<HomeStats> {
@@ -193,10 +235,11 @@ export async function searchProducts(
   page = 1,
   pageSize = 24
 ): Promise<ProductResponse[]> {
-  return apiFetch<ProductResponse[]>(
+  const products = await apiFetch<ProductResponse[]>(
     `/discover/search?q=${encodeURIComponent(query)}&page=${page}&page_size=${pageSize}`,
     { revalidate: 0 }
   );
+  return normalizeProducts(products);
 }
 
 export async function getProductPrediction(productId: string): Promise<PredictionResponse | null> {
@@ -210,12 +253,43 @@ export async function getProductPrediction(productId: string): Promise<Predictio
 }
 
 export async function getAIPicks(revalidate = 1800): Promise<ProductResponse[]> {
-  return apiFetch<ProductResponse[]>("/home/ai-picks?limit=10", { revalidate });
+  const products = await apiFetch<ProductResponse[]>("/home/ai-picks?limit=10", { revalidate });
+  return normalizeProducts(products);
 }
 
 export async function getAIWaitPicks(revalidate = 1800): Promise<ProductResponse[]> {
-  return apiFetch<ProductResponse[]>("/home/ai-wait-picks?limit=10", { revalidate });
+  const products = await apiFetch<ProductResponse[]>("/home/ai-wait-picks?limit=10", { revalidate });
+  return normalizeProducts(products);
 }
+
+// --- Comparison Types ---
+
+export interface ComparisonPair {
+  product_a: ProductResponse;
+  product_b: ProductResponse;
+}
+
+export async function getComparisons(
+  category?: string,
+  limit = 20,
+  revalidate = 21600
+): Promise<ComparisonPair[]> {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  params.set("limit", String(limit));
+  const pairs = await apiFetch<ComparisonPair[]>(
+    `/discover/comparisons?${params.toString()}`,
+    { revalidate, tags: ["comparisons"] }
+  );
+  return pairs.map((pair) => ({
+    product_a: normalizeProduct(pair.product_a),
+    product_b: normalizeProduct(pair.product_b),
+  }));
+}
+
+// --- Exports for external normalization ---
+
+export { normalizeProduct };
 
 // --- Filters ---
 

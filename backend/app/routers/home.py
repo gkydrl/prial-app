@@ -239,6 +239,7 @@ async def _product_drop_query(db, since, order_by, limit):
         .join(BestStore, (BestStore.product_id == Product.id) & (BestStore.current_price == now_subq.c.price_now) & (BestStore.in_stock == True) & (BestStore.is_active == True))
         .where(
             before_subq.c.price_before > now_subq.c.price_now,
+            before_subq.c.price_before > 0,  # division by zero koruması
         )
         .order_by(order_by(before_subq, now_subq))
         .limit(limit * 2)  # duplicate olabilir, fazla çek
@@ -266,15 +267,18 @@ async def daily_deals(
     db: AsyncSession = Depends(get_db),
 ):
     """Fiyat düşen ürünler. 1d → 7d → indirimli ürünler kademeli fallback."""
-    for fallback_period in [period, "7d"]:
-        since = _since(fallback_period)
-        rows = await _product_drop_query(
-            db, since,
-            order_by=lambda b, n: desc((b.c.price_before - n.c.price_now) / b.c.price_before),
-            limit=limit,
-        )
-        if len(rows) >= 3:
-            return rows
+    try:
+        for fallback_period in [period, "7d"]:
+            since = _since(fallback_period)
+            rows = await _product_drop_query(
+                db, since,
+                order_by=lambda b, n: desc((b.c.price_before - n.c.price_now) / b.c.price_before),
+                limit=limit,
+            )
+            if len(rows) >= 3:
+                return rows
+    except Exception as e:
+        print(f"[home/daily-deals] price_drop_query hatası: {e}", flush=True)
 
     # Son çare: scraper'ın tespit ettiği anlık indirimler
     fb_result = await db.execute(
@@ -285,6 +289,7 @@ async def daily_deals(
             ProductStore.in_stock == True,
             ProductStore.original_price > ProductStore.current_price,
             ProductStore.current_price > 0,
+            ProductStore.original_price > 0,
         )
         .order_by(desc(
             (ProductStore.original_price - ProductStore.current_price) / ProductStore.original_price
@@ -369,26 +374,33 @@ async def ai_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """Bugünkü IYI_FIYAT tavsiyeleri, confidence DESC sıralı."""
-    from datetime import date as date_cls
+    """IYI_FIYAT tavsiyeleri — bugün yoksa son 7 güne fallback."""
+    from datetime import date as date_cls, timedelta as td
 
     today = date_cls.today()
-    result = await db.execute(
-        select(Product)
-        .join(
-            PricePrediction,
-            (PricePrediction.product_id == Product.id)
-            & (PricePrediction.prediction_date == today)
-            & (PricePrediction.recommendation == Recommendation.IYI_FIYAT),
+    week_ago = today - td(days=7)
+
+    # Bugünkü prediction'ları dene, yoksa son 7 güne genişlet
+    for since_date in [today, week_ago]:
+        result = await db.execute(
+            select(Product)
+            .join(
+                PricePrediction,
+                (PricePrediction.product_id == Product.id)
+                & (PricePrediction.prediction_date >= since_date)
+                & (PricePrediction.recommendation == Recommendation.IYI_FIYAT),
+            )
+            .options(
+                selectinload(Product.stores),
+                selectinload(Product.variants),
+            )
+            .order_by(desc(PricePrediction.prediction_date), desc(PricePrediction.confidence))
+            .limit(limit)
         )
-        .options(
-            selectinload(Product.stores),
-            selectinload(Product.variants),
-        )
-        .order_by(desc(PricePrediction.confidence))
-        .limit(limit)
-    )
-    products = result.scalars().all()
+        products = result.scalars().all()
+        if products:
+            break
+
     await attach_predictions(products, db)
     return products
 
@@ -398,26 +410,32 @@ async def ai_wait_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """Bugunku FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — fiyati dusecek urunler."""
-    from datetime import date as date_cls
+    """FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — bugün yoksa son 7 güne fallback."""
+    from datetime import date as date_cls, timedelta as td
 
     today = date_cls.today()
-    result = await db.execute(
-        select(Product)
-        .join(
-            PricePrediction,
-            (PricePrediction.product_id == Product.id)
-            & (PricePrediction.prediction_date == today)
-            & (PricePrediction.recommendation.in_([Recommendation.FIYAT_DUSEBILIR, Recommendation.FIYAT_YUKSELISTE])),
+    week_ago = today - td(days=7)
+
+    for since_date in [today, week_ago]:
+        result = await db.execute(
+            select(Product)
+            .join(
+                PricePrediction,
+                (PricePrediction.product_id == Product.id)
+                & (PricePrediction.prediction_date >= since_date)
+                & (PricePrediction.recommendation.in_([Recommendation.FIYAT_DUSEBILIR, Recommendation.FIYAT_YUKSELISTE])),
+            )
+            .options(
+                selectinload(Product.stores),
+                selectinload(Product.variants),
+            )
+            .order_by(desc(PricePrediction.prediction_date), desc(PricePrediction.confidence))
+            .limit(limit)
         )
-        .options(
-            selectinload(Product.stores),
-            selectinload(Product.variants),
-        )
-        .order_by(desc(PricePrediction.confidence))
-        .limit(limit)
-    )
-    products = result.scalars().all()
+        products = result.scalars().all()
+        if products:
+            break
+
     await attach_predictions(products, db)
     return products
 

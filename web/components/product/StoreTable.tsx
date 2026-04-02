@@ -38,7 +38,7 @@ export function StoreTable({ stores }: { stores: ProductStoreResponse[] }) {
             <tr
               key={store.id}
               className={`${!store.in_stock ? "opacity-50" : ""} ${
-                i === 0 ? "bg-green-50/50" : ""
+                i === 0 ? "bg-success/5" : ""
               }`}
             >
               <td className="py-4">
@@ -73,7 +73,7 @@ export function StoreTable({ stores }: { stores: ProductStoreResponse[] }) {
               </td>
               <td className="py-4 hidden sm:table-cell">
                 {store.discount_percent && store.discount_percent > 0 ? (
-                  <span className="inline-block bg-danger/10 text-danger text-xs font-medium px-2 py-1 rounded">
+                  <span className="inline-block bg-danger/10 text-danger text-xs font-medium px-2 py-1 rounded-full">
                     {formatDiscount(store.discount_percent)}
                   </span>
                 ) : (

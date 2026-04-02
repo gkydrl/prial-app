@@ -8,6 +8,12 @@ interface FAQSchemaProps {
     in_stock: boolean;
   }[];
   predicted_direction: "UP" | "DOWN" | "STABLE" | null;
+  recommendation?: "IYI_FIYAT" | "FIYAT_DUSEBILIR" | "FIYAT_YUKSELISTE" | null;
+  reasoningText?: string | null;
+  l1yLowestPrice?: number | null;
+  bestPrice?: number | null;
+  brand?: string | null;
+  categoryName?: string | null;
 }
 
 interface FAQItem {
@@ -16,7 +22,17 @@ interface FAQItem {
 }
 
 function buildFAQs(props: FAQSchemaProps): FAQItem[] {
-  const { title, stores, predicted_direction } = props;
+  const {
+    title,
+    stores,
+    predicted_direction,
+    recommendation,
+    reasoningText,
+    l1yLowestPrice,
+    bestPrice,
+    brand,
+    categoryName,
+  } = props;
   const activeStores = stores.filter((s) => s.current_price && s.in_stock);
   const sortedStores = [...activeStores].sort(
     (a, b) => (a.current_price ?? Infinity) - (b.current_price ?? Infinity)
@@ -51,6 +67,48 @@ function buildFAQs(props: FAQSchemaProps): FAQItem[] {
     });
   }
 
+  // --- New SEO-enriched FAQs ---
+
+  // "Almaya değer mi?" — from recommendation + reasoning
+  if (recommendation && reasoningText) {
+    const recText =
+      recommendation === "IYI_FIYAT"
+        ? `Evet, AI analizimize göre ${title} şu anda iyi fiyatta. ${reasoningText}`
+        : recommendation === "FIYAT_DUSEBILIR"
+          ? `Şu anda beklemek daha mantıklı olabilir. ${reasoningText}`
+          : `Fiyat yükselişte, ertelememek avantajlı olabilir. ${reasoningText}`;
+    faqs.push({
+      question: `${title} almaya değer mi?`,
+      answer: recText,
+    });
+  }
+
+  // "Ne zaman ucuzlar?" — from predicted direction
+  if (predicted_direction) {
+    const whenText =
+      predicted_direction === "DOWN"
+        ? `AI tahminimize göre ${title} fiyatı yakın zamanda düşebilir. Fiyat alarmı kurarak en uygun zamanı yakalayabilirsiniz.`
+        : predicted_direction === "UP"
+          ? `${title} fiyatı şu an yükseliş trendinde. Kısa vadede ucuzlaması beklenmemektedir.`
+          : `${title} fiyatı şu an stabil seyretmektedir. Kampanya dönemlerinde fiyat düşüşü olabilir.`;
+    faqs.push({
+      question: `${title} ne zaman ucuzlar?`,
+      answer: whenText,
+    });
+  }
+
+  // "En ucuz fiyat nedir?" — from bestPrice + l1y
+  if (brand && categoryName && bestPrice) {
+    const l1yPart =
+      l1yLowestPrice
+        ? ` Son 1 yılda görülen en düşük fiyat ${formatPrice(l1yLowestPrice)} olmuştur.`
+        : "";
+    faqs.push({
+      question: `${brand} ${categoryName} en ucuz fiyat nedir?`,
+      answer: `${title} için şu an en ucuz fiyat ${formatPrice(bestPrice)}.${l1yPart} Prial ile fiyat geçmişini takip edebilirsiniz.`,
+    });
+  }
+
   return faqs;
 }
 
@@ -79,16 +137,16 @@ export function FAQSchema(props: FAQSchemaProps) {
       />
       {/* Visible FAQ section (Google requires visible content for FAQ rich results) */}
       <section className="mt-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
           Sık Sorulan Sorular
         </h2>
         <div className="space-y-4">
           {faqs.map((faq, i) => (
             <details
               key={i}
-              className="group border border-gray-200 rounded-lg"
+              className="group border border-gray-200 rounded-xl"
             >
-              <summary className="flex items-center justify-between cursor-pointer px-5 py-4 text-sm font-medium text-gray-900 hover:bg-gray-50 rounded-lg">
+              <summary className="flex items-center justify-between cursor-pointer px-5 py-4 text-sm font-medium text-gray-900 hover:bg-gray-50 rounded-xl">
                 {faq.question}
                 <svg
                   className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform"

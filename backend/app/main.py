@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     from app.services.exchange_rate import fetch_and_store_rates
     from app.services.pipeline_monitor import run_monitored
     from app.services.data_quality import run_data_quality_check
+    from app.services.akakce.verify_matches import run_daily_verification
     from app.services.seo_pipeline import seo_revalidate, seo_audit
 
     # ── Yüksek frekanslı job'lar (monitörlenmez, çok sık) ──
@@ -128,6 +129,18 @@ async def lifespan(app: FastAPI):
         trigger="cron",
         hour=7, minute=0,
         id="prediction_evaluation",
+        replace_existing=True,
+    )
+
+    # 07:30 — Akakce eşleşme doğrulama (yanlış eşleşmeleri bul ve düzelt)
+    async def _verify_akakce():
+        await run_monitored("akakce_verify_matches", run_daily_verification())
+
+    scheduler.add_job(
+        _verify_akakce,
+        trigger="cron",
+        hour=7, minute=30,
+        id="akakce_verify_matches",
         replace_existing=True,
     )
 
