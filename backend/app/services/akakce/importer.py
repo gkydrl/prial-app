@@ -435,6 +435,11 @@ async def daily_enrichment_full() -> dict:
                                         await _upsert_product_store(
                                             db, db_product, listing, scraped, store_url
                                         )
+
+                                        # Image güncelle (henüz yoksa — bir kere çekilir)
+                                        if scraped.image_url and not db_product.image_url:
+                                            db_product.image_url = scraped.image_url
+                                            stats["images_set"] = stats.get("images_set", 0) + 1
                                     except Exception as e:
                                         print(f"[akakce/enrichment_full] Scrape hatası ({store_url[:60]}): {e}", flush=True)
 
