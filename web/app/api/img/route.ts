@@ -6,6 +6,7 @@ const REFERER_MAP: Record<string, string> = {
   "hepsiburada.net": "https://www.hepsiburada.com/",
   "hepsiburada.com": "https://www.hepsiburada.com/",
   mediamarkt: "https://www.mediamarkt.com.tr/",
+  "cdn.akakce.com": "https://www.akakce.com/",
 };
 
 function getReferer(url: string): string | undefined {
@@ -39,7 +40,11 @@ export async function GET(request: NextRequest) {
       headers["Referer"] = referer;
     }
 
-    const response = await fetch(url, { headers });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(url, { headers, signal: controller.signal });
+    clearTimeout(timeout);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -54,7 +59,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800",
       },
     });
   } catch {
