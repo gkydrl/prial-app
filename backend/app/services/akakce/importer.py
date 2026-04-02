@@ -405,12 +405,17 @@ async def daily_enrichment_full() -> dict:
                     stats["total"] += 1
 
                     # b) Akakce store listing'lerini parse et (ilk 2 unique marketplace)
-                    store_listings = await parse_store_listings(db_product.akakce_url, max_unique_stores=2)
+                    parse_result = await parse_store_listings(db_product.akakce_url, max_unique_stores=2)
+
+                    # Akakce og:image fallback — marketplace scrape başarısız olsa bile image alınır
+                    if parse_result.akakce_image_url and not db_product.image_url:
+                        db_product.image_url = parse_result.akakce_image_url
+                        stats["images_set"] = stats.get("images_set", 0) + 1
 
                     daily_lowest_price = None
                     daily_lowest_store = None
 
-                    for listing in store_listings:
+                    for listing in parse_result.listings:
                         try:
                             # Bütçe kontrolü
                             from app.services.scraper_budget import can_scrape, record_credit

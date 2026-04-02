@@ -1529,13 +1529,14 @@ async def trigger_enrichment_full(
                 raise HTTPException(status_code=400, detail="Ürünün akakce_url'si yok")
 
             # Store listings test
-            listings = await parse_store_listings(product.akakce_url)
+            parse_result = await parse_store_listings(product.akakce_url)
             hist_result = await import_product_history(product, db)
             await db.commit()
 
             return {
                 "product": product.title,
                 "akakce_url": product.akakce_url,
+                "akakce_image": parse_result.akakce_image_url,
                 "history_result": hist_result,
                 "store_listings": [
                     {
@@ -1545,7 +1546,7 @@ async def trigger_enrichment_full(
                         "url": l.url,
                         "redirect_url": l.redirect_url,
                     }
-                    for l in listings
+                    for l in parse_result.listings
                 ],
             }
 
@@ -1566,13 +1567,14 @@ async def trigger_enrichment_full(
         if not product:
             return {"status": "no_products", "message": "akakce_url'si olan ürün yok"}
 
-        listings = await parse_store_listings(product.akakce_url)
+        parse_result = await parse_store_listings(product.akakce_url)
         hist_result = await import_product_history(product, db)
         await db.commit()
 
         return {
             "product": product.title,
             "akakce_url": product.akakce_url,
+            "akakce_image": parse_result.akakce_image_url,
             "history_result": hist_result,
             "store_listings": [
                 {
@@ -1582,7 +1584,7 @@ async def trigger_enrichment_full(
                     "url": l.url,
                     "redirect_url": l.redirect_url,
                 }
-                for l in listings
+                for l in parse_result.listings
             ],
         }
 

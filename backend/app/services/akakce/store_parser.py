@@ -70,14 +70,38 @@ def _normalize_store_name(raw: str) -> tuple[str, StoreName | None]:
     return cleaned, None
 
 
+@dataclass
+class StoreParseResult:
+    listings: list[AkakceStoreListing]
+    akakce_image_url: str | None = None
+
+
+def _extract_akakce_image(html: str) -> str | None:
+    """Akakce sayfasından og:image veya image_src meta tag'inden ürün görselini çıkar."""
+    # og:image
+    m = re.search(r'og:image["\s][^>]*content="([^"]+)"', html)
+    if m:
+        img = m.group(1)
+        if img and "akakce" in img:
+            return img if img.startswith("http") else f"https:{img}"
+    # rel="image_src"
+    m = re.search(r'rel="image_src"[^>]*href="([^"]+)"', html)
+    if m:
+        img = m.group(1)
+        if img:
+            return img if img.startswith("http") else f"https:{img}"
+    return None
+
+
 async def parse_store_listings(
     akakce_url: str,
     max_unique_stores: int = 2,
     known_only: bool = True,
-) -> list[AkakceStoreListing]:
+) -> StoreParseResult:
     """
     Akakce urun sayfasindan magaza listesini parse eder.
     Ilk N FARKLI marketplace'i doner (ayni store'dan en ucuzunu alir).
+    Ayrica Akakce sayfasindaki og:image'i de doner (image fallback).
 
     known_only=True ise sadece bilinen pazaryerlerini doner
     (Trendyol, Hepsiburada, n11, Amazon, Pazarama, vb.)
@@ -88,7 +112,10 @@ async def parse_store_listings(
     """
     html = await _fetch_akakce_page(akakce_url)
     if not html:
-        return []
+        return StoreParseResult(listings=[])
+
+    # Akakce sayfasından ürün görselini çıkar
+    akakce_image = _extract_akakce_image(html)
 
     # 1. ld+json'dan dene (en temiz kaynak)
     listings = _parse_ldjson_offers(html)
@@ -98,14 +125,14 @@ async def parse_store_listings(
         listings = _parse_html_listings(html)
 
     if not listings:
-        return []
+        return StoreParseResult(listings=[], akakce_image_url=akakce_image)
 
     # Bilinen pazaryeri filtresi: sadece store_enum'u olan listing'leri tut
     if known_only:
         listings = [l for l in listings if l.store_enum is not None]
 
     if not listings:
-        return []
+        return StoreParseResult(listings=[], akakce_image_url=akakce_image)
 
     # Deduplicate: her store'dan sadece en ucuzunu tut
     seen: dict[str, AkakceStoreListing] = {}
@@ -116,7 +143,7 @@ async def parse_store_listings(
 
     # Fiyata gore sirala, ilk N unique store'u don
     result = sorted(seen.values(), key=lambda x: x.price)[:max_unique_stores]
-    return result
+    return StoreParseResult(listings=result, akakce_image_url=akakce_image)
 
 
 # ── ld+json Parse ──────────────────────────────────────────────────────────
