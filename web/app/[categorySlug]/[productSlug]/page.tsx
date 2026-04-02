@@ -96,8 +96,8 @@ export default async function ProductDetailPage({ params }: Props) {
 
   const activeStores = product.stores
     .filter(
-      (s: { current_price: number | null; in_stock: boolean }) =>
-        s.current_price != null && s.in_stock
+      (s: { current_price: number | null; in_stock: boolean; store: string }) =>
+        s.current_price != null && s.in_stock && s.store !== "other"
     )
     .sort(
       (a: { current_price: number | null }, b: { current_price: number | null }) =>

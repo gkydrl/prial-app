@@ -298,7 +298,9 @@ export function filterDisplayable(products: ProductResponse[]): ProductResponse[
   return products.filter((p) => {
     if (!p.image_url) return false;
     if (!p.recommendation) return false;
-    const hasPrice = p.stores.some((s) => s.current_price != null && s.in_stock);
+    // Exclude "other" stores (e.g. Akakce links) — keep only real marketplaces
+    const realStores = p.stores.filter((s) => s.store !== "other");
+    const hasPrice = realStores.some((s) => s.current_price != null && s.in_stock);
     if (!hasPrice) return false;
     return true;
   });

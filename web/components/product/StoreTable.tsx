@@ -4,7 +4,7 @@ import { storeLabel, storeColor } from "@/lib/stores";
 
 export function StoreTable({ stores }: { stores: ProductStoreResponse[] }) {
   const sorted = [...stores]
-    .filter((s) => s.current_price != null)
+    .filter((s) => s.current_price != null && s.store !== "other")
     .sort((a, b) => {
       // In-stock first
       if (a.in_stock !== b.in_stock) return a.in_stock ? -1 : 1;

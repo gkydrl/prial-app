@@ -13,11 +13,7 @@ interface PrialSaysProps {
   secondBestStore: ProductStoreResponse | null;
 }
 
-const CTA_THEME = {
-  IYI_FIYAT: "bg-success hover:bg-success/90 text-white",
-  FIYAT_DUSEBILIR: "bg-bekle-dark hover:bg-bekle-dark/90 text-white",
-  FIYAT_YUKSELISTE: "bg-danger hover:bg-danger/90 text-white",
-} as const;
+const CTA_CLASS = "bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white";
 
 function buildPrialParagraph(product: ProductResponse, bestPrice: number | null): string {
   const parts: string[] = [];
@@ -64,7 +60,7 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
 
   const bestPrice = bestStore?.current_price ?? 0;
   const l1yLowest = product.l1y_lowest_price ? Number(product.l1y_lowest_price) : null;
-  const l1yValid = l1yLowest && l1yLowest >= bestPrice * 0.3;
+  const l1yValid = l1yLowest && l1yLowest >= bestPrice * 0.3 && l1yLowest < bestPrice;
   const sliderMin = l1yValid ? Math.round(l1yLowest) : Math.round(bestPrice * 0.7);
   const sliderMax = Math.round(bestPrice);
   const defaultTarget = l1yValid ? Math.round(l1yLowest) : Math.round(bestPrice * 0.85);
@@ -93,10 +89,8 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
     );
   }
 
-  const ctaClass = CTA_THEME[rec];
   const paragraph = buildPrialParagraph(product, bestStore?.current_price ?? null);
-  const isIyiFiyat = rec === "IYI_FIYAT";
-  const stores = [bestStore, secondBestStore].filter(Boolean) as ProductStoreResponse[];
+  const stores = ([bestStore, secondBestStore].filter(Boolean) as ProductStoreResponse[]).filter((s) => s.store !== "other");
 
   return (
     <div>
@@ -179,64 +173,48 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
 
         {/* Social Proof + CTA */}
         <div className="space-y-3">
-          {isIyiFiyat && (
-            <a
-              href={`prial://product/${product.id}?action=alarm`}
-              className={`w-full inline-flex items-center justify-center gap-2 ${ctaClass} font-semibold py-3 px-5 rounded-xl transition-colors text-sm`}
+          {!sliderOpen ? (
+            <button
+              onClick={() => setSliderOpen(true)}
+              className={`w-full inline-flex items-center justify-center gap-2 ${CTA_CLASS} font-semibold py-3 px-5 rounded-xl transition-colors text-sm`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
               </svg>
               Kampanya Talep Et
-            </a>
-          )}
-
-          {!isIyiFiyat && (
-            <>
-              {!sliderOpen ? (
-                <button
-                  onClick={() => setSliderOpen(true)}
-                  className={`w-full inline-flex items-center justify-center gap-2 ${ctaClass} font-semibold py-3 px-5 rounded-xl transition-colors text-sm`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  Kampanya Talep Et
-                </button>
-              ) : (
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500">Hedef fiyat</p>
-                    <p className="text-xl font-bold text-gray-900">{formatPrice(targetPrice)}</p>
-                  </div>
-                  <div>
-                    <input
-                      type="range"
-                      min={sliderMin}
-                      max={sliderMax}
-                      step={Math.max(1, Math.round((sliderMax - sliderMin) / 100))}
-                      value={targetPrice}
-                      onChange={(e) => setTargetPrice(Number(e.target.value))}
-                      aria-label="Hedef fiyat seçici"
-                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-bekle-dark"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>{formatPrice(sliderMin)}</span>
-                      <span>{formatPrice(sliderMax)}</span>
-                    </div>
-                  </div>
-                  <a
-                    href={`prial://product/${product.id}?action=alarm&target=${targetPrice}`}
-                    className={`w-full inline-flex items-center justify-center gap-2 ${ctaClass} font-semibold py-3 px-5 rounded-xl transition-colors text-sm`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    Kampanya Talep Et
-                  </a>
+            </button>
+          ) : (
+            <div className="p-4 bg-brand/5 rounded-xl border border-brand/10 space-y-3">
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Hedef fiyat</p>
+                <p className="text-xl font-bold text-gray-900">{formatPrice(targetPrice)}</p>
+              </div>
+              <div>
+                <input
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={Math.max(1, Math.round((sliderMax - sliderMin) / 100))}
+                  value={targetPrice}
+                  onChange={(e) => setTargetPrice(Number(e.target.value))}
+                  aria-label="Hedef fiyat seçici"
+                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>{formatPrice(sliderMin)}</span>
+                  <span>{formatPrice(sliderMax)}</span>
                 </div>
-              )}
-            </>
+              </div>
+              <a
+                href={`prial://product/${product.id}?action=alarm&target=${targetPrice}`}
+                className={`w-full inline-flex items-center justify-center gap-2 ${CTA_CLASS} font-semibold py-3 px-5 rounded-xl transition-colors text-sm`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Kampanya Talep Et
+              </a>
+            </div>
           )}
 
           {campaignRequestCount > 0 && (

@@ -14,7 +14,7 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
   const href = `/${catSlug}/${slug}`;
 
   const activeStores = product.stores.filter(
-    (s) => s.current_price != null && s.in_stock
+    (s) => s.current_price != null && s.in_stock && s.store !== "other"
   );
   const bestStore = activeStores.length
     ? activeStores.reduce((a, b) =>

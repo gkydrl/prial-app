@@ -66,6 +66,36 @@ export default async function HomePage() {
         {/* How It Works */}
         <HowItWorks />
 
+        {/* Kategoriler */}
+        {categories.length > 0 && (
+          <section className="py-10">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Kategoriler</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {categories
+                .filter((cat) => (cat.product_count ?? 0) > 0)
+                .sort((a, b) => (b.product_count ?? 0) - (a.product_count ?? 0))
+                .slice(0, 10)
+                .map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/${cat.slug}`}
+                  className="flex flex-col items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-brand/30 hover:shadow-md active:border-brand active:scale-[0.97] transition-all text-center"
+                >
+                  <div className="mb-2">
+                    <CategoryIcon slug={cat.slug} />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">
+                    {cat.name}
+                  </span>
+                  <span className="text-xs text-gray-400 mt-1">
+                    {cat.product_count} ürün
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* AI: Şimdi Al */}
         {aiPicks.length > 0 && (
           <section className="py-10">
@@ -113,36 +143,6 @@ export default async function HomePage() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {aiWaitPicks.slice(0, 10).map((product) => (
                 <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Kategoriler */}
-        {categories.length > 0 && (
-          <section className="py-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Kategoriler</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {categories
-                .filter((cat) => (cat.product_count ?? 0) > 0)
-                .sort((a, b) => (b.product_count ?? 0) - (a.product_count ?? 0))
-                .slice(0, 10)
-                .map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/${cat.slug}`}
-                  className="flex flex-col items-center p-4 bg-white rounded-xl border border-gray-100 hover:border-brand/30 hover:shadow-md active:border-brand active:scale-[0.97] transition-all text-center"
-                >
-                  <div className="mb-2">
-                    <CategoryIcon slug={cat.slug} />
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">
-                    {cat.name}
-                  </span>
-                  <span className="text-xs text-gray-400 mt-1">
-                    {cat.product_count} ürün
-                  </span>
-                </Link>
               ))}
             </div>
           </section>
