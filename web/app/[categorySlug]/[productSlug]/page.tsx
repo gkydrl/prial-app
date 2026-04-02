@@ -7,7 +7,12 @@ import { formatPrice } from "@/lib/formatPrice";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { ProductSchema } from "@/components/seo/ProductSchema";
 import { StoreTable } from "@/components/product/StoreTable";
-import { PriceHistoryChart } from "@/components/product/PriceHistoryChart";
+import dynamic from "next/dynamic";
+
+const PriceHistoryChart = dynamic(
+  () => import("@/components/product/PriceHistoryChart").then((m) => m.PriceHistoryChart),
+  { loading: () => <div className="h-[400px] bg-gray-50 rounded-xl animate-pulse" /> }
+);
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { AppDownloadCTA } from "@/components/product/AppDownloadCTA";
 import { ProductImage } from "@/components/product/ProductImage";
@@ -126,11 +131,14 @@ export default async function ProductDetailPage({ params }: Props) {
       {/* Product Header: Image + PredictionCard */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Image */}
-        <div className="bg-white rounded-2xl p-8 flex items-center justify-center border border-gray-100">
+        <div className="relative bg-white rounded-2xl p-8 border border-gray-100 aspect-square">
           <ProductImage
             src={product.image_url}
             alt={`${product.brand ? product.brand + " " : ""}${product.title} - fiyat karşılaştırma`}
-            className="max-h-96 w-full object-contain"
+            fill
+            className="object-contain p-8"
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            priority
           />
         </div>
 

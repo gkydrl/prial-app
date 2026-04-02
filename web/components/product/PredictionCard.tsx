@@ -12,19 +12,19 @@ interface Props {
 }
 
 const CARD_CONFIG = {
-  AL: {
+  IYI_FIYAT: {
     bg: "bg-[#EDFCF2]",
     border: "border-[#86EFAC]",
     badgeBg: "bg-success",
     textColor: "text-gray-700",
   },
-  BEKLE: {
+  FIYAT_DUSEBILIR: {
     bg: "bg-[#FAEEDA]",
     border: "border-[#FAC775]",
     badgeBg: "bg-[#D97706]",
     textColor: "text-[#633806]",
   },
-  GUCLU_BEKLE: {
+  FIYAT_YUKSELISTE: {
     bg: "bg-[#FAEEDA]",
     border: "border-[#FAC775]",
     badgeBg: "bg-[#D97706]",
@@ -72,8 +72,8 @@ export function PredictionCard({ product, bestStore }: Props) {
     );
   }
 
-  const isAl = rec === "AL";
-  const isBekle = rec === "BEKLE" || rec === "GUCLU_BEKLE";
+  const isIyiFiyat = rec === "IYI_FIYAT";
+  const isDusebilirOrYukseliste = rec === "FIYAT_DUSEBILIR" || rec === "FIYAT_YUKSELISTE";
 
   return (
     <div>
@@ -101,7 +101,7 @@ export function PredictionCard({ product, bestStore }: Props) {
         )}
 
         {/* AL → Best store link */}
-        {isAl && bestStore && (
+        {isIyiFiyat && bestStore && (
           <div className="p-3 bg-white/80 rounded-xl border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -129,7 +129,7 @@ export function PredictionCard({ product, bestStore }: Props) {
         )}
 
         {/* BEKLE → Slider-based target price */}
-        {isBekle && (
+        {isDusebilirOrYukseliste && (
           <div>
             {!sliderOpen ? (
               <button
@@ -191,7 +191,7 @@ export function PredictionCard({ product, bestStore }: Props) {
         )}
 
         {/* Social proof for AL */}
-        {isAl && campaignRequestCount > 0 && (
+        {isIyiFiyat && campaignRequestCount > 0 && (
           <p className="text-xs text-gray-500 text-center mt-3">
             {campaignRequestCount} kişi bu ürünü takip ediyor
           </p>

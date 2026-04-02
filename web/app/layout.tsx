@@ -47,6 +47,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr" className={inter.className}>
+      <head>
+        <link rel="preconnect" href="https://prial-app-production.up.railway.app" />
+        <link rel="dns-prefetch" href="https://cdn.dsmcdn.com" />
+        <link rel="dns-prefetch" href="https://productimages.hepsiburada.net" />
+      </head>
       <body className="min-h-screen flex flex-col bg-white text-gray-900">
         <WebSiteSchema />
         <OrganizationSchema />

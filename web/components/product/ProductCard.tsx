@@ -44,11 +44,13 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
 
       <Link href={href} className="flex flex-col flex-1">
         {/* Image — 4:3 on mobile, square on desktop */}
-        <div className="relative aspect-[4/3] sm:aspect-square bg-white p-3 sm:p-4 flex items-center justify-center overflow-hidden">
+        <div className="relative aspect-[4/3] sm:aspect-square bg-white overflow-hidden">
           <ProductImage
             src={product.image_url}
             alt={`${product.brand ? product.brand + " " : ""}${product.title} - fiyat karşılaştırma`}
-            className="max-w-full max-h-full object-contain block mx-auto group-hover:scale-105 transition-transform"
+            fill
+            className="object-contain p-3 sm:p-4 group-hover:scale-105 transition-transform"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           />
           {discount && discount > 0 && (
             <span className="absolute top-1.5 left-1.5 bg-danger text-white text-[10px] sm:text-xs font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md">

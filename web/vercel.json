@@ -1,0 +1,11 @@
+{
+  "headers": [
+    {
+      "source": "/api/img",
+      "headers": [
+        { "key": "CDN-Cache-Control", "value": "public, s-maxage=604800" },
+        { "key": "Vercel-CDN-Cache-Control", "value": "public, s-maxage=604800" }
+      ]
+    }
+  ]
+}

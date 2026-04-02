@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 interface ProductImageProps {
   src: string | null | undefined;
@@ -8,6 +9,23 @@ interface ProductImageProps {
   className?: string;
   width?: number;
   height?: number;
+  fill?: boolean;
+  sizes?: string;
+  priority?: boolean;
+}
+
+function needsProxy(url: string): boolean {
+  return (
+    url.includes("cdn.dsmcdn.com") ||
+    url.includes("trendyol.com") ||
+    url.includes("hepsiburada.net") ||
+    url.includes("hepsiburada.com") ||
+    url.includes("mediamarkt")
+  );
+}
+
+function resolveImageSrc(src: string): string {
+  return needsProxy(src) ? `/api/img?url=${encodeURIComponent(src)}` : src;
 }
 
 export function ProductImage({
@@ -16,6 +34,9 @@ export function ProductImage({
   className = "",
   width,
   height,
+  fill,
+  sizes,
+  priority = false,
 }: ProductImageProps) {
   const [error, setError] = useState(false);
 
@@ -37,27 +58,31 @@ export function ProductImage({
     );
   }
 
-  // Use our image proxy for CDN images that need Referer headers
-  const needsProxy =
-    src.includes("cdn.dsmcdn.com") ||
-    src.includes("trendyol.com") ||
-    src.includes("hepsiburada.net") ||
-    src.includes("hepsiburada.com") ||
-    src.includes("mediamarkt");
+  const imgSrc = resolveImageSrc(src);
 
-  const imgSrc = needsProxy
-    ? `/api/img?url=${encodeURIComponent(src)}`
-    : src;
+  if (fill) {
+    return (
+      <Image
+        src={imgSrc}
+        alt={alt}
+        fill
+        className={className}
+        sizes={sizes ?? "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"}
+        priority={priority}
+        onError={() => setError(true)}
+      />
+    );
+  }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src={imgSrc}
       alt={alt}
       className={className}
-      width={width}
-      height={height}
-      loading="lazy"
+      width={width ?? 400}
+      height={height ?? 400}
+      sizes={sizes}
+      priority={priority}
       onError={() => setError(true)}
     />
   );

@@ -1,26 +1,26 @@
 /**
- * AL/BEKLE sinyal göstergesi — trafik lambası konsepti.
- * Yeşil daire = AL, turuncu daire = BEKLE, kırmızı daire = GÜÇLÜ BEKLE.
+ * İyi Fiyat / Fiyat Düşebilir sinyal göstergesi — trafik lambası konsepti.
+ * Yeşil daire = İyi Fiyat, turuncu daire = Fiyat Düşebilir, kırmızı daire = Fiyat Yükselişte.
  */
 
-type Recommendation = "AL" | "BEKLE" | "GUCLU_BEKLE";
+type Recommendation = "IYI_FIYAT" | "FIYAT_DUSEBILIR" | "FIYAT_YUKSELISTE";
 type Size = "sm" | "md" | "lg";
 
 const CONFIG = {
-  AL: {
+  IYI_FIYAT: {
     color: "bg-success",
     glow: "shadow-[0_0_6px_rgba(22,163,74,0.5)]",
-    label: "AL",
+    label: "İyi Fiyat",
   },
-  BEKLE: {
+  FIYAT_DUSEBILIR: {
     color: "bg-bekle",
     glow: "shadow-[0_0_6px_rgba(245,158,11,0.5)]",
-    label: "BEKLE",
+    label: "Fiyat Düşebilir",
   },
-  GUCLU_BEKLE: {
+  FIYAT_YUKSELISTE: {
     color: "bg-danger",
     glow: "shadow-[0_0_6px_rgba(220,38,38,0.5)]",
-    label: "BEKLE",
+    label: "Fiyat Yükselişte",
   },
 } as const;
 

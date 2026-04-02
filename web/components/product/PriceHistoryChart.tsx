@@ -24,20 +24,48 @@ const RANGES = [
   { label: "1Y", days: 365 },
 ] as const;
 
-export function PriceHistoryChart({ data }: Props) {
-  // Outlier filtresi: negatif ve medyandan %90+ sapan değerleri kaldır
-  const rawPrices = data.map((d) => d.price).filter((p) => p > 0);
-  const sorted = [...rawPrices].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)] || 0;
-  const lowerBound = median * 0.1;
-  const upperBound = median * 3;
+/** Tekrarlayan sahte fiyat tespiti (222222, 999999 gibi) */
+function isPlaceholderPrice(price: number): boolean {
+  const s = String(Math.round(price));
+  if (s.length >= 5 && new Set(s).size === 1) return true; // 11111, 22222, ...
+  if (s.length >= 6 && /^(\d)\1+$/.test(s)) return true; // 999999 vb.
+  return false;
+}
 
+/** IQR tabanlı outlier sınırları hesapla */
+function computeIQRBounds(prices: number[]): { lower: number; upper: number } {
+  const sorted = [...prices].sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n < 4) {
+    // Yeterli veri yoksa gevşek sınır
+    const median = sorted[Math.floor(n / 2)] || 0;
+    return { lower: median * 0.3, upper: median * 2.5 };
+  }
+  const q1 = sorted[Math.floor(n * 0.25)];
+  const q3 = sorted[Math.floor(n * 0.75)];
+  const iqr = q3 - q1;
+  // 2.5x IQR — 1.5x çok agresif olabilir gerçek fiyat değişimlerinde
+  return {
+    lower: Math.max(q1 - 2.5 * iqr, 0),
+    upper: q3 + 2.5 * iqr,
+  };
+}
+
+export function PriceHistoryChart({ data }: Props) {
+  // Outlier filtresi: IQR yöntemi + placeholder fiyat tespiti
   const cleanData = useMemo(() => {
-    const filtered = data.filter(
-      (d) => d.price > lowerBound && d.price < upperBound
-    );
-    return filtered.length > 1 ? filtered : data;
-  }, [data, lowerBound, upperBound]);
+    // 1. Negatif/sıfır ve placeholder fiyatları çıkar
+    const valid = data.filter((d) => d.price > 0 && !isPlaceholderPrice(d.price));
+    if (valid.length < 2) return data;
+
+    // 2. IQR sınırlarını hesapla
+    const prices = valid.map((d) => d.price);
+    const { lower, upper } = computeIQRBounds(prices);
+
+    // 3. Sınırlar içinde kalan verileri filtrele
+    const filtered = valid.filter((d) => d.price >= lower && d.price <= upper);
+    return filtered.length > 1 ? filtered : valid;
+  }, [data]);
 
   // Varsayılan aralık: veri 90 günden azsa tümünü göster, yoksa 6A
   const defaultRange = cleanData.length <= 90 ? 365 : 180;

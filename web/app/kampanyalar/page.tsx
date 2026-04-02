@@ -174,11 +174,13 @@ function AlarmCard({ alarm }: { alarm: AlarmResponse }) {
       className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-brand/30 transition-all"
     >
       {/* Product image */}
-      <div className="w-16 h-16 flex-shrink-0 bg-white rounded-lg overflow-hidden">
+      <div className="relative w-16 h-16 flex-shrink-0 bg-white rounded-lg overflow-hidden">
         <ProductImage
           src={product.image_url}
           alt={product.title}
-          className="w-full h-full object-contain"
+          fill
+          className="object-contain"
+          sizes="64px"
         />
       </div>
 

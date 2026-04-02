@@ -77,7 +77,7 @@ export interface ProductResponse {
   l1y_highest_price: number | null;
   akakce_url: string | null;
   alarm_count: number;
-  recommendation: "AL" | "BEKLE" | "GUCLU_BEKLE" | null;
+  recommendation: "IYI_FIYAT" | "FIYAT_DUSEBILIR" | "FIYAT_YUKSELISTE" | null;
   reasoning_text: string | null;
   reasoning_pros: string[] | null;
   reasoning_cons: string[] | null;
@@ -92,7 +92,7 @@ export interface ProductResponse {
 
 export interface PredictionResponse {
   status: "ok" | "no_prediction";
-  recommendation?: "AL" | "BEKLE" | "GUCLU_BEKLE";
+  recommendation?: "IYI_FIYAT" | "FIYAT_DUSEBILIR" | "FIYAT_YUKSELISTE";
   confidence?: number;
   reasoning_text?: string;
   reasoning_pros?: string[];

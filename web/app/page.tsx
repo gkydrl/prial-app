@@ -66,10 +66,10 @@ export default async function HomePage() {
           </h1>
           <p className="mt-4 text-lg md:text-xl text-blue-100 max-w-2xl mx-auto">
             Prial, takip ettiğin ürünlerin fiyat geçmişini analiz eder.{" "}
-            <SignalBadge recommendation="AL" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
-            sinyali verince al,{" "}
-            <SignalBadge recommendation="BEKLE" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
-            diyince bekle — paranı boşa harcama.
+            <SignalBadge recommendation="IYI_FIYAT" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
+            sinyali gelince al,{" "}
+            <SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
+            diyorsa takip et — paranı boşa harcama.
           </p>
 
           {/* Stats */}
@@ -114,7 +114,7 @@ export default async function HomePage() {
           <section className="py-10">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <SignalBadge recommendation="AL" size="md" showLabel={false} />
+                <SignalBadge recommendation="IYI_FIYAT" size="md" showLabel={false} />
                 <h2 className="text-2xl font-bold text-gray-900">
                   Şimdi Almaya Değer
                 </h2>
@@ -139,19 +139,19 @@ export default async function HomePage() {
           <section className="py-10">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <SignalBadge recommendation="BEKLE" size="md" showLabel={false} />
+                <SignalBadge recommendation="FIYAT_DUSEBILIR" size="md" showLabel={false} />
                 <h2 className="text-2xl font-bold text-gray-900">
                   Fiyatı Düşecek Ürünler
                 </h2>
               </div>
               <span className="text-xs font-medium px-2 py-1 rounded-full bg-bekle text-white">
-                Bekle
+                Fiyat Düşebilir
               </span>
             </div>
             <p className="text-sm text-gray-500 -mt-4 mb-5 flex items-center flex-wrap gap-1">
               AI analizine göre yakın zamanda fiyat düşüşü beklenen ürünler.
-              <SignalBadge recommendation="BEKLE" size="sm" inline />
-              — daha uygun fiyata al.
+              <SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline />
+              — takipte kal, daha uygun fiyata al.
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {aiWaitPicks.slice(0, 10).map((product) => (
@@ -224,9 +224,9 @@ export default async function HomePage() {
             <p className="text-sm text-gray-500 leading-relaxed">
               Prial, yapay zeka destekli alışveriş asistanıdır. Her gün binlerce
               ürünü analiz eder ve{" "}
-              <SignalBadge recommendation="AL" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
+              <SignalBadge recommendation="IYI_FIYAT" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
               veya{" "}
-              <SignalBadge recommendation="BEKLE" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
+              <SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline className="inline-flex align-middle mx-0.5" />{" "}
               tavsiyesi verir. Fiyat geçmişini
               incele, mağazaları karşılaştır ve doğru zamanda alışveriş yap.
               Trendyol, Hepsiburada, Amazon, n11, MediaMarkt ve daha fazlasında

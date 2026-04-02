@@ -31,9 +31,9 @@ export function HowItWorks() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           }
-          title={<><SignalBadge recommendation="AL" size="sm" inline className="inline-flex align-middle" /> veya <SignalBadge recommendation="BEKLE" size="sm" inline className="inline-flex align-middle" /></>}
-          description={<>Analiz sonucuna göre net bir tavsiye alırsın: <SignalBadge recommendation="AL" size="sm" inline className="inline-flex align-middle" /> sinyali — şimdi al. <SignalBadge recommendation="BEKLE" size="sm" inline className="inline-flex align-middle" /> sinyali — daha uygun fiyat için bekle.</>}
-          detail={<>Her tavsiye, güven skoruyla birlikte gelir. Neden <SignalBadge recommendation="AL" size="sm" inline className="inline-flex align-middle" /> veya <SignalBadge recommendation="BEKLE" size="sm" inline className="inline-flex align-middle" /> dendiğini Türkçe açıklamayla görürsün.</>}
+          title={<><SignalBadge recommendation="IYI_FIYAT" size="sm" inline className="inline-flex align-middle" /> veya <SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline className="inline-flex align-middle" /></>}
+          description={<>Analiz sonucuna göre net bir tavsiye alırsın: <SignalBadge recommendation="IYI_FIYAT" size="sm" inline className="inline-flex align-middle" /> sinyali — fiyat uygun, şimdi al. <SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline className="inline-flex align-middle" /> sinyali — fiyat düşebilir, takipte kal.</>}
+          detail={<>Her tavsiye, güven skoruyla birlikte gelir. Neden <SignalBadge recommendation="IYI_FIYAT" size="sm" inline className="inline-flex align-middle" /> veya <SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline className="inline-flex align-middle" /> dendiğini Türkçe açıklamayla görürsün.</>}
         />
         <Step
           number={3}
@@ -43,7 +43,7 @@ export function HowItWorks() {
             </svg>
           }
           title="Kampanya Talep Et"
-          description={<><SignalBadge recommendation="BEKLE" size="sm" inline className="inline-flex align-middle" /> tavsiyesi aldığında hedef fiyatını belirle. Binlerce kişiyle birlikte mağazalardan kampanya talep et.</>}
+          description={<><SignalBadge recommendation="FIYAT_DUSEBILIR" size="sm" inline className="inline-flex align-middle" /> sinyali gördüğünde hedef fiyatını belirle. Binlerce kişiyle birlikte mağazalardan kampanya talep et.</>}
           detail="Topluluk gücüyle mağazalar seni dinlesin. Fiyat düşünce anında haberdar ol."
         />
       </div>

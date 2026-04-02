@@ -4,7 +4,12 @@ import { getProduct, getProductPriceHistory } from "@/lib/api";
 import { comparisonMeta } from "@/lib/metaTags";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { ProductImage } from "@/components/product/ProductImage";
-import { PriceHistoryChart } from "@/components/product/PriceHistoryChart";
+import dynamic from "next/dynamic";
+
+const PriceHistoryChart = dynamic(
+  () => import("@/components/product/PriceHistoryChart").then((m) => m.PriceHistoryChart),
+  { loading: () => <div className="h-[400px] bg-gray-50 rounded-xl animate-pulse" /> }
+);
 import { formatPrice } from "@/lib/formatPrice";
 
 interface Props {
@@ -106,11 +111,13 @@ export default async function ComparisonPage({ params }: Props) {
                   DAHA UCUZ
                 </span>
               )}
-              <div className="flex justify-center mb-4">
+              <div className="relative h-40 mb-4">
                 <ProductImage
                   src={product.image_url}
                   alt={product.title}
-                  className="h-40 w-auto object-contain"
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h2 className="text-lg font-bold text-gray-900 text-center">
