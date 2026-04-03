@@ -257,7 +257,12 @@ async def generate_reasoning_text(
         f"{daily_section}\n\n"
         f"Kurallar:\n"
         f"- JSON formatında yanıt ver: {{\"summary\": \"...\", \"pros\": [\"...\", \"...\"], \"cons\": [\"...\", \"...\"]}}\n"
-        f"- summary: Max 3-4 cümle, sade ve samimi Türkçe paragraf\n"
+        f"- summary paragrafı şu sırayı takip etmeli:\n"
+        f"  1) 1-2 cümle ürünün genel özellikleri ve ne işe yaradığı\n"
+        f"  2) Kullanıcı yorumları varsa 1 cümle (örn. 'Kullanıcılar pil ömrünü ve ses kalitesini övüyor.')\n"
+        f"  3) 2-3 cümle mevcut fiyat ve geçmiş fiyat analizi (somut rakamlar, yüzdeler)\n"
+        f"  4) Taksit/kargo avantajı varsa 1 cümle\n"
+        f"- summary toplamda 5-7 cümle, sade ve samimi Türkçe\n"
         f"- pros: 2-4 maddelik artılar listesi (kısa, 1 cümlelik)\n"
         f"- cons: 1-3 maddelik eksiler/riskler listesi (kısa, 1 cümlelik)\n"
         f"- Somut rakamlar kullan (fiyat, yüzde, gün sayısı)\n"
@@ -267,11 +272,13 @@ async def generate_reasoning_text(
     )
 
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-        print(f"[reasoning_generator] Claude çağrısı: {product_title[:40]}...", flush=True)
+        client = anthropic.AsyncAnthropic(
+            api_key=settings.anthropic_api_key,
+            timeout=15.0,
+        )
         message = await client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=300,
+            max_tokens=450,
             messages=[{"role": "user", "content": prompt}],
         )
         result = message.content[0].text.strip()
