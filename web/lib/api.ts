@@ -50,11 +50,22 @@ function normalizeRecommendation(rec: string | null | undefined): Recommendation
   return RECOMMENDATION_MAP[rec] ?? null;
 }
 
+/** Extract summary from reasoning_text if it's a JSON string */
+function cleanReasoningText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (typeof parsed === "object" && parsed.summary) return parsed.summary;
+  } catch { /* not JSON, use as-is */ }
+  return text;
+}
+
 /** Normalize product recommendation fields from API response */
-function normalizeProduct<T extends { recommendation?: string | null }>(product: T): T {
+function normalizeProduct<T extends { recommendation?: string | null; reasoning_text?: string | null }>(product: T): T {
   return {
     ...product,
     recommendation: normalizeRecommendation(product.recommendation),
+    reasoning_text: cleanReasoningText(product.reasoning_text),
   };
 }
 
