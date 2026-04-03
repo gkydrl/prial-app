@@ -351,6 +351,7 @@ async def predict_and_save(
         predicted_direction=result.direction,
     )
     db.add(prediction)
+    await db.flush()  # prediction.id'yi set et — autoflush'tan önce
 
     # wait_days: önce önceki prediction'ın target_date'inden countdown hesapla
     wait_days = await _countdown_or_compute(product_id, result.recommendation, features, db)
