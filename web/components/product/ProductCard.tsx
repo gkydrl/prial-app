@@ -4,7 +4,6 @@ import Link from "next/link";
 import type { ProductResponse } from "@/lib/api";
 import { formatPrice, formatDiscount } from "@/lib/formatPrice";
 import { productSlug } from "@/lib/slugify";
-import { storeLabel } from "@/lib/stores";
 import { ProductImage } from "./ProductImage";
 import { SignalBadge } from "@/components/ui/SignalBadge";
 
@@ -92,16 +91,12 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
 
           {/* Bottom row */}
           <div className="mt-1.5 sm:mt-2 flex items-center justify-between gap-1 flex-wrap">
-            {activeStores.length > 1 ? (
+            {(product.alarm_count ?? 0) > 0 ? (
               <span className="inline-flex items-center whitespace-nowrap gap-0.5 sm:gap-1 text-[10px] sm:text-xs font-medium text-brand bg-brand/5 px-1.5 sm:px-2 py-0.5 rounded-full">
                 <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                {activeStores.length} mağaza
-              </span>
-            ) : bestStore ? (
-              <span className="text-[10px] sm:text-xs text-gray-500 truncate">
-                {storeLabel(bestStore.store)}
+                {product.alarm_count} kampanya talebi
               </span>
             ) : <span />}
 
