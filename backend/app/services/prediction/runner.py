@@ -2,10 +2,12 @@
 Gunluk tahmin runner — tum urunler icin AL/BEKLE tahmini uretir.
 Scheduler'dan cagrilir.
 
-V2: 1 yıl minimum veri filtresi, fiyat değişmezse Haiku skip.
+V3: Concurrent execution (asyncio.Semaphore), timeout koruması,
+    Railway restart'a dayanıklı batch commit.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import date, timedelta
 from decimal import Decimal
@@ -23,59 +25,95 @@ from app.services.prediction.analyzer import compute_features, PricePoint
 from app.services.prediction.predictor import predict_and_save
 from app.services.prediction.reasoning_generator import generate_reasoning_text
 
+# Concurrent Haiku çağrıları — API rate limit'e dikkat
+CONCURRENCY = 15
+# Tek ürün için max süre (Haiku timeout dahil)
+PER_PRODUCT_TIMEOUT = 45
+
 
 async def run_daily_predictions() -> dict:
     """
     Tum aktif urunler icin gunluk tahmin uret.
     Returns: {"total": N, "predicted": N, "skipped": N}
     """
-    stats = {"total": 0, "predicted": 0, "skipped": 0, "errors": 0, "haiku_skipped": 0}
+    stats = {
+        "total": 0, "predicted": 0, "skipped": 0,
+        "errors": 0, "haiku_skipped": 0, "timeout": 0,
+    }
 
     async with AsyncSessionLocal() as db:
-        # Store'u olan tüm ürünleri getir (current_price olmasına gerek yok,
-        # fiyat geçmişinden alınabilir)
+        # Store'u olan tüm ürünleri getir
         result = await db.execute(
-            select(Product)
-            .options(selectinload(Product.category))
+            select(Product.id)
             .where(
                 Product.id.in_(
                     select(ProductStore.product_id).distinct()
                 )
             )
         )
-        products = result.scalars().all()
+        product_ids = [row[0] for row in result.all()]
 
-        print(f"[prediction/runner] {len(products)} ürün için tahmin üretilecek", flush=True)
+    total = len(product_ids)
+    stats["total"] = total
+    print(f"[prediction/runner] {total} ürün için tahmin üretilecek (concurrency={CONCURRENCY})", flush=True)
 
-    # Her ürün için ayrı session — uzun transaction'ı önle
-    for i, product in enumerate(products):
-        stats["total"] += 1
-        try:
-            async with AsyncSessionLocal() as db:
-                db_product = await db.get(Product, product.id, options=[selectinload(Product.category)])
-                if not db_product:
-                    stats["skipped"] += 1
-                    continue
-                result = await predict_for_product(db_product, db)
-                if result is None:
-                    stats["skipped"] += 1
-                else:
-                    predicted, haiku_skipped = result
-                    stats["predicted"] += 1
-                    if haiku_skipped:
-                        stats["haiku_skipped"] += 1
-                    await db.commit()
-        except Exception as e:
-            stats["errors"] += 1
-            if stats["errors"] <= 10:  # İlk 10 hatayı logla
-                print(f"[prediction/runner] Hata ({product.title[:40]}): {e}", flush=True)
+    semaphore = asyncio.Semaphore(CONCURRENCY)
+    progress = {"done": 0}
 
-        # Her 100 üründe progress logla
-        if (i + 1) % 100 == 0:
-            print(f"[prediction/runner] İlerleme: {i+1}/{len(products)} — {stats}", flush=True)
+    async def _process_one(product_id):
+        async with semaphore:
+            try:
+                result = await asyncio.wait_for(
+                    _predict_one(product_id, stats),
+                    timeout=PER_PRODUCT_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                stats["timeout"] += 1
+            except Exception as e:
+                stats["errors"] += 1
+                if stats["errors"] <= 10:
+                    print(f"[prediction/runner] Hata: {e}", flush=True)
+            finally:
+                progress["done"] += 1
+                done = progress["done"]
+                if done % 200 == 0 or done == total:
+                    print(
+                        f"[prediction/runner] {done}/{total} — "
+                        f"predicted={stats['predicted']} skip={stats['skipped']} "
+                        f"err={stats['errors']} timeout={stats['timeout']} "
+                        f"haiku_skip={stats['haiku_skipped']}",
+                        flush=True,
+                    )
+
+    # Concurrent execution
+    tasks = [_process_one(pid) for pid in product_ids]
+    await asyncio.gather(*tasks, return_exceptions=True)
 
     print(f"[prediction/runner] Tamamlandı: {stats}", flush=True)
     return stats
+
+
+async def _predict_one(product_id, stats: dict) -> None:
+    """Tek ürün için tahmin — kendi session'ında."""
+    try:
+        async with AsyncSessionLocal() as db:
+            product = await db.get(Product, product_id, options=[selectinload(Product.category)])
+            if not product:
+                stats["skipped"] += 1
+                return
+            result = await predict_for_product(product, db)
+            if result is None:
+                stats["skipped"] += 1
+            else:
+                predicted, haiku_skipped = result
+                stats["predicted"] += 1
+                if haiku_skipped:
+                    stats["haiku_skipped"] += 1
+                await db.commit()
+    except Exception as e:
+        stats["errors"] += 1
+        if stats["errors"] <= 10:
+            print(f"[prediction/runner] _predict_one hata ({product_id}): {type(e).__name__}: {e}", flush=True)
 
 
 async def predict_for_product(
