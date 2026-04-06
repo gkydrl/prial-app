@@ -20,11 +20,11 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Prial - Akıllı Alışveriş Asistanın | Fiyat Karşılaştırma & Takip",
+  title: "Prial - Akıllı Alışveriş Asistanı | Fiyat Karşılaştırma & Takip",
   description:
     "Binlerce üründe fiyat karşılaştırması, fiyat geçmişi ve düşüş bildirimi. Trendyol, Hepsiburada, Amazon ve daha fazlasında en ucuz fiyatı bul.",
   openGraph: {
-    title: "Prial - Akıllı Alışveriş Asistanın",
+    title: "Prial - Akıllı Alışveriş Asistanı",
     description:
       "Binlerce üründe fiyat karşılaştırması, fiyat geçmişi ve düşüş bildirimi.",
     url: "https://prial.io",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Prial - Akıllı Alışveriş Asistanın",
+    title: "Prial - Akıllı Alışveriş Asistanı",
     description:
       "Binlerce üründe fiyat karşılaştırması, fiyat geçmişi ve düşüş bildirimi.",
   },

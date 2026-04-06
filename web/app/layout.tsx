@@ -15,7 +15,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Prial - Akıllı Alışveriş Asistanın | Fiyat Karşılaştırma & Takip",
+    default: "Prial - Akıllı Alışveriş Asistanı | Fiyat Karşılaştırma & Takip",
     template: "%s | Prial",
   },
   description:
