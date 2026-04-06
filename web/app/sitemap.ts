@@ -44,6 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const brands = new Set<string>();
   const seen = new Set<string>();
 
+  // Add category URLs
   for (const cat of categories) {
     entries.push({
       url: `${BASE}/${cat.slug}`,
@@ -51,29 +52,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "hourly",
       priority: 0.8,
     });
+  }
 
-    // Products for this category
-    try {
-      const rawProducts = await getCategoryProducts(cat.slug, 1, 200, "alarm_count", 3600);
-      const products = filterDisplayable(rawProducts);
+  // Fetch all category products in parallel (was sequential → timeout)
+  const results = await Promise.allSettled(
+    categories.map((cat) =>
+      getCategoryProducts(cat.slug, 1, 50, "alarm_count", 3600).then(
+        (raw) => ({ cat, products: filterDisplayable(raw) })
+      )
+    )
+  );
 
-      for (const p of products) {
-        if (seen.has(p.id)) continue;
-        seen.add(p.id);
+  for (const result of results) {
+    if (result.status !== "fulfilled") {
+      console.error("[sitemap] getCategoryProducts failed:", result.reason);
+      continue;
+    }
 
-        const catSlug = p.category_slug ?? cat.slug;
-        const pSlug = productSlug(p.title, p.id);
-        entries.push({
-          url: `${BASE}/${catSlug}/${pSlug}`,
-          lastModified: new Date(),
-          changeFrequency: "hourly",
-          priority: 0.9,
-        });
+    const { cat, products } = result.value;
 
-        if (p.brand) brands.add(p.brand);
-      }
-    } catch (e) {
-      console.error(`[sitemap] getCategoryProducts(${cat.slug}) failed:`, e);
+    for (const p of products) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+
+      const catSlug = p.category_slug ?? cat.slug;
+      const pSlug = productSlug(p.title, p.id);
+      entries.push({
+        url: `${BASE}/${catSlug}/${pSlug}`,
+        lastModified: new Date(),
+        changeFrequency: "hourly",
+        priority: 0.9,
+      });
+
+      if (p.brand) brands.add(p.brand);
     }
   }
 

@@ -1,7 +1,18 @@
 import Link from "next/link";
 import Image from "next/image";
+import { getCategories } from "@/lib/api";
 
-export default function Footer() {
+export default async function Footer() {
+  let categories: { name: string; slug: string }[] = [];
+  try {
+    const all = await getCategories(3600);
+    categories = all
+      .filter((c) => (c.product_count ?? 0) > 0)
+      .sort((a, b) => (b.product_count ?? 0) - (a.product_count ?? 0));
+  } catch {
+    // fallback to empty — footer still renders
+  }
+
   return (
     <footer className="bg-gray-50 border-t border-gray-200 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -19,29 +30,19 @@ export default function Footer() {
           {/* Categories */}
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-3">
-              Popüler Kategoriler
+              Kategoriler
             </h3>
-            <ul className="space-y-2 text-sm text-gray-500">
-              <li>
-                <Link href="/akilli-telefon" className="hover:text-brand">
-                  Akıllı Telefon
-                </Link>
-              </li>
-              <li>
-                <Link href="/laptop" className="hover:text-brand">
-                  Laptop
-                </Link>
-              </li>
-              <li>
-                <Link href="/tablet" className="hover:text-brand">
-                  Tablet
-                </Link>
-              </li>
-              <li>
-                <Link href="/kulaklik" className="hover:text-brand">
-                  Kulaklık
-                </Link>
-              </li>
+            <ul
+              className="text-sm text-gray-500 columns-2 gap-x-4"
+              style={{ columnFill: "balance" }}
+            >
+              {categories.map((cat) => (
+                <li key={cat.slug} className="mb-2 break-inside-avoid">
+                  <Link href={`/${cat.slug}`} className="hover:text-brand">
+                    {cat.name}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
