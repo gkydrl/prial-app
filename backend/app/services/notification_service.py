@@ -148,8 +148,8 @@ async def send_alarm_notifications(
                 db=db,
             )
 
-            # E-posta — pasife alındı, yeni versiyon ile aktif edilecek
-            if False and user.email_notifications_enabled:
+            # E-posta
+            if user.email_notifications_enabled:
                 email_status = NotificationStatus.PENDING
                 error_msg = None
                 try:
