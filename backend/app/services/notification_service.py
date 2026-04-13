@@ -41,6 +41,9 @@ async def _send_push(
     db: AsyncSession | None = None,
 ) -> None:
     """Expo Push API ile bildirim gonderir ve Notification kaydi olusturur."""
+    # Push bildirimleri pasife alındı — yeni versiyon ile yeni senaryolar kurulacak
+    return
+
     if not user.push_notifications_enabled or not user.firebase_token:
         return
 
@@ -145,8 +148,8 @@ async def send_alarm_notifications(
                 db=db,
             )
 
-            # E-posta
-            if user.email_notifications_enabled:
+            # E-posta — pasife alındı, yeni versiyon ile aktif edilecek
+            if False and user.email_notifications_enabled:
                 email_status = NotificationStatus.PENDING
                 error_msg = None
                 try:
