@@ -6,6 +6,20 @@ import { formatPrice, formatDiscount } from "@/lib/formatPrice";
 import { productSlug } from "@/lib/slugify";
 import { ProductImage } from "./ProductImage";
 import { SignalBadge } from "@/components/ui/SignalBadge";
+import Image from "next/image";
+
+function extractSummary(text: string): string {
+  if (text.trimStart().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(text);
+      return parsed.summary || text;
+    } catch {
+      const match = text.match(/"summary"\s*:\s*"([^"]+)"/);
+      if (match) return match[1];
+    }
+  }
+  return text;
+}
 
 export function ProductCard({ product, categorySlug }: { product: ProductResponse; categorySlug?: string }) {
   const catSlug = categorySlug ?? product.category_slug ?? "urun";
@@ -69,10 +83,10 @@ export function ProductCard({ product, categorySlug }: { product: ProductRespons
           )}
 
           {product.reasoning_text && (
-            <div className="mt-1 flex items-start gap-1 hidden sm:flex">
-              <span className="text-[10px] sm:text-xs text-brand font-semibold shrink-0">Prial:</span>
+            <div className="mt-1 items-start gap-1 hidden sm:flex">
+              <Image src="/logo-icon.png" alt="Prial" width={40} height={14} className="shrink-0 mt-0.5" />
               <p className="text-[10px] sm:text-xs text-gray-400 line-clamp-2">
-                {product.reasoning_text.split(".").slice(0, 2).join(".").trim()}.
+                {extractSummary(product.reasoning_text).split(".").slice(0, 2).join(".").trim()}.
               </p>
             </div>
           )}

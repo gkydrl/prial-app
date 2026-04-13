@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, case, cast, Integer, literal
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta, timezone
 
@@ -27,6 +27,15 @@ PERIOD_HOURS: dict[str, int] = {
 def _since(period: str) -> datetime:
     hours = PERIOD_HOURS.get(period, 24)
     return datetime.now(timezone.utc) - timedelta(hours=hours)
+
+
+def _review_count_expr():
+    """Total review count from review_summary JSONB (sum of all stores' count)."""
+    return func.coalesce(
+        cast(Product.review_summary["trendyol"]["count"].astext, Integer), literal(0)
+    ) + func.coalesce(
+        cast(Product.review_summary["hepsiburada"]["count"].astext, Integer), literal(0)
+    )
 
 
 def _price_before_subquery(since: datetime):
@@ -374,11 +383,14 @@ async def ai_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """IYI_FIYAT tavsiyeleri — bugün yoksa son 7 güne fallback."""
+    """IYI_FIYAT tavsiyeleri — bugün yoksa son 7 güne fallback. Review sayısına göre sıralı."""
     from datetime import date as date_cls, timedelta as td
 
     today = date_cls.today()
     week_ago = today - td(days=7)
+
+    # Total review count from review_summary JSONB
+    total_reviews = _review_count_expr()
 
     # Bugünkü prediction'ları dene, yoksa son 7 güne genişlet
     for since_date in [today, week_ago]:
@@ -394,7 +406,7 @@ async def ai_picks(
                 selectinload(Product.stores),
                 selectinload(Product.variants),
             )
-            .order_by(desc(PricePrediction.prediction_date), desc(PricePrediction.confidence))
+            .order_by(desc(total_reviews), desc(PricePrediction.confidence))
             .limit(limit)
         )
         products = result.scalars().all()
@@ -410,11 +422,13 @@ async def ai_wait_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — bugün yoksa son 7 güne fallback."""
+    """FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — bugün yoksa son 7 güne fallback. Review sayısına göre sıralı."""
     from datetime import date as date_cls, timedelta as td
 
     today = date_cls.today()
     week_ago = today - td(days=7)
+
+    total_reviews = _review_count_expr()
 
     for since_date in [today, week_ago]:
         result = await db.execute(
@@ -429,7 +443,7 @@ async def ai_wait_picks(
                 selectinload(Product.stores),
                 selectinload(Product.variants),
             )
-            .order_by(desc(PricePrediction.prediction_date), desc(PricePrediction.confidence))
+            .order_by(desc(total_reviews), desc(PricePrediction.confidence))
             .limit(limit)
         )
         products = result.scalars().all()

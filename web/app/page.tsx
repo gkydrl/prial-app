@@ -102,9 +102,12 @@ export default async function HomePage() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <SignalBadge recommendation="IYI_FIYAT" size="md" showLabel={false} />
-                <h2 className="text-2xl font-bold text-gray-900">
+                <Link href="/kampanyalar?tab=iyi-fiyat" className="text-2xl font-bold text-gray-900 hover:text-brand transition-colors group/link flex items-center gap-1.5">
                   Şimdi Almaya Değer
-                </h2>
+                  <svg className="w-5 h-5 text-gray-300 group-hover/link:text-brand group-hover/link:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               </div>
               <span className="text-xs font-medium px-2 py-1 rounded-full bg-success text-white">
                 AI Tavsiyesi
@@ -127,9 +130,12 @@ export default async function HomePage() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <SignalBadge recommendation="FIYAT_DUSEBILIR" size="md" showLabel={false} />
-                <h2 className="text-2xl font-bold text-gray-900">
+                <Link href="/kampanyalar?tab=fiyat-dusecek" className="text-2xl font-bold text-gray-900 hover:text-brand transition-colors group/link flex items-center gap-1.5">
                   Fiyatı Düşecek Ürünler
-                </h2>
+                  <svg className="w-5 h-5 text-gray-300 group-hover/link:text-brand group-hover/link:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               </div>
               <span className="text-xs font-medium px-2 py-1 rounded-full bg-bekle text-white">
                 Fiyat Düşebilir

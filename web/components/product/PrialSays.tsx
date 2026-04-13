@@ -19,7 +19,21 @@ function buildPrialParagraph(product: ProductResponse, bestPrice: number | null)
   const parts: string[] = [];
 
   if (product.reasoning_text) {
-    parts.push(product.reasoning_text);
+    let text = product.reasoning_text;
+    // Handle case where reasoning_text contains raw JSON
+    if (text.trimStart().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(text);
+        text = parsed.summary || "";
+      } catch {
+        // If JSON parse fails, try to extract summary with regex
+        const match = text.match(/"summary"\s*:\s*"([^"]+)"/);
+        if (match) {
+          text = match[1];
+        }
+      }
+    }
+    if (text) parts.push(text);
   }
 
   if (product.reasoning_pros && product.reasoning_pros.length > 0) {
@@ -63,10 +77,7 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
   const l1yValid = l1yLowest && l1yLowest >= bestPrice * 0.3 && l1yLowest < bestPrice;
   const sliderMin = l1yValid ? Math.round(l1yLowest) : Math.round(bestPrice * 0.7);
   const sliderMax = Math.round(bestPrice);
-  const defaultTarget = l1yValid ? Math.round(l1yLowest) : Math.round(bestPrice * 0.85);
-  const [targetPrice, setTargetPrice] = useState(
-    Math.max(sliderMin, Math.min(sliderMax, defaultTarget))
-  );
+  const [targetPrice, setTargetPrice] = useState(sliderMax);
   const [sliderOpen, setSliderOpen] = useState(false);
 
   const campaignRequestCount = product.alarm_count || 0;
@@ -99,7 +110,7 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
         <div className="flex items-center justify-between mb-3">
           <span className="text-lg font-bold text-gray-900 flex items-center gap-1.5">
             <Image src="/logo-icon.png" alt="Prial" width={56} height={20} className="inline-block" />
-            <span className="text-gray-400 font-normal">der ki:</span>
+            <span className="text-gray-400 font-normal">&#39;in Yorumu:</span>
           </span>
           <SignalBadge recommendation={rec} size="md" />
         </div>
@@ -189,7 +200,13 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
                 <p className="text-xs text-gray-500">Hedef fiyat</p>
                 <p className="text-xl font-bold text-gray-900">{formatPrice(targetPrice)}</p>
               </div>
-              <div>
+              <div className="relative">
+                <div className="relative h-2 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand to-brand-dark transition-all duration-150"
+                    style={{ width: `${((targetPrice - sliderMin) / (sliderMax - sliderMin)) * 100}%` }}
+                  />
+                </div>
                 <input
                   type="range"
                   min={sliderMin}
@@ -198,9 +215,9 @@ export function PrialSays({ product, bestStore, secondBestStore }: PrialSaysProp
                   value={targetPrice}
                   onChange={(e) => setTargetPrice(Number(e.target.value))}
                   aria-label="Hedef fiyat seçici"
-                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand"
+                  className="absolute inset-0 w-full h-2 appearance-none cursor-pointer bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-brand [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
                 />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <div className="flex justify-between text-xs text-gray-400 mt-2">
                   <span>{formatPrice(sliderMin)}</span>
                   <span>{formatPrice(sliderMax)}</span>
                 </div>
