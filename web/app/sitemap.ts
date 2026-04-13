@@ -36,7 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Categories + products + brands
   let categories: Awaited<ReturnType<typeof getCategories>> = [];
   try {
-    categories = await getCategories(3600);
+    categories = await getCategories(300);
   } catch (e) {
     console.error("[sitemap] getCategories failed:", e);
   }
@@ -57,7 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Fetch all category products in parallel (was sequential → timeout)
   const results = await Promise.allSettled(
     categories.map((cat) =>
-      getCategoryProducts(cat.slug, 1, 50, "alarm_count", 3600).then(
+      getCategoryProducts(cat.slug, 1, 50, "alarm_count", 300).then(
         (raw) => ({ cat, products: filterDisplayable(raw) })
       )
     )
