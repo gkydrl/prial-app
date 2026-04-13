@@ -378,21 +378,27 @@ async def most_alarmed(
     return products
 
 
+def _recent_review_filter():
+    """Son 7 günde review_summary güncellenen ürünleri filtreler."""
+    seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    return Product.review_summary["updated_at"].astext >= seven_days_ago
+
+
 @router.get("/ai-picks", response_model=list[ProductResponse])
 async def ai_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """IYI_FIYAT tavsiyeleri — bugün yoksa son 7 güne fallback. Review sayısına göre sıralı."""
+    """IYI_FIYAT tavsiyeleri — son 1 haftada review datası yakalanan ürünler, review sayısına göre sıralı."""
     from datetime import date as date_cls, timedelta as td
 
     today = date_cls.today()
     week_ago = today - td(days=7)
 
-    # Total review count from review_summary JSONB
     total_reviews = _review_count_expr()
+    products = []
 
-    # Bugünkü prediction'ları dene, yoksa son 7 güne genişlet
+    # 1) Son 1 haftada review datası olan + bugünkü/haftalık prediction
     for since_date in [today, week_ago]:
         result = await db.execute(
             select(Product)
@@ -406,12 +412,39 @@ async def ai_picks(
                 selectinload(Product.stores),
                 selectinload(Product.variants),
             )
+            .where(Product.review_summary.isnot(None))
+            .where(_recent_review_filter())
             .order_by(desc(total_reviews), desc(PricePrediction.confidence))
             .limit(limit)
         )
         products = result.scalars().all()
-        if products:
+        if len(products) >= limit:
             break
+
+    # 2) Yeterli değilse review filtresi olmadan doldur
+    if len(products) < limit:
+        seen_ids = {p.id for p in products}
+        result = await db.execute(
+            select(Product)
+            .join(
+                PricePrediction,
+                (PricePrediction.product_id == Product.id)
+                & (PricePrediction.prediction_date >= week_ago)
+                & (PricePrediction.recommendation == Recommendation.IYI_FIYAT),
+            )
+            .options(
+                selectinload(Product.stores),
+                selectinload(Product.variants),
+            )
+            .order_by(desc(total_reviews), desc(PricePrediction.confidence))
+            .limit(limit)
+        )
+        for p in result.scalars().all():
+            if p.id not in seen_ids:
+                products.append(p)
+                seen_ids.add(p.id)
+                if len(products) >= limit:
+                    break
 
     await attach_predictions(products, db)
     return products
@@ -422,14 +455,17 @@ async def ai_wait_picks(
     limit: int = Query(default=10, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — bugün yoksa son 7 güne fallback. Review sayısına göre sıralı."""
+    """FIYAT_DUSEBILIR/FIYAT_YUKSELISTE tavsiyeleri — son 1 haftada review datası yakalanan ürünler, review sayısına göre sıralı."""
     from datetime import date as date_cls, timedelta as td
 
     today = date_cls.today()
     week_ago = today - td(days=7)
 
     total_reviews = _review_count_expr()
+    recs = [Recommendation.FIYAT_DUSEBILIR, Recommendation.FIYAT_YUKSELISTE]
+    products = []
 
+    # 1) Son 1 haftada review datası olan + bugünkü/haftalık prediction
     for since_date in [today, week_ago]:
         result = await db.execute(
             select(Product)
@@ -437,7 +473,31 @@ async def ai_wait_picks(
                 PricePrediction,
                 (PricePrediction.product_id == Product.id)
                 & (PricePrediction.prediction_date >= since_date)
-                & (PricePrediction.recommendation.in_([Recommendation.FIYAT_DUSEBILIR, Recommendation.FIYAT_YUKSELISTE])),
+                & (PricePrediction.recommendation.in_(recs)),
+            )
+            .options(
+                selectinload(Product.stores),
+                selectinload(Product.variants),
+            )
+            .where(Product.review_summary.isnot(None))
+            .where(_recent_review_filter())
+            .order_by(desc(total_reviews), desc(PricePrediction.confidence))
+            .limit(limit)
+        )
+        products = result.scalars().all()
+        if len(products) >= limit:
+            break
+
+    # 2) Yeterli değilse review filtresi olmadan doldur
+    if len(products) < limit:
+        seen_ids = {p.id for p in products}
+        result = await db.execute(
+            select(Product)
+            .join(
+                PricePrediction,
+                (PricePrediction.product_id == Product.id)
+                & (PricePrediction.prediction_date >= week_ago)
+                & (PricePrediction.recommendation.in_(recs)),
             )
             .options(
                 selectinload(Product.stores),
@@ -446,9 +506,12 @@ async def ai_wait_picks(
             .order_by(desc(total_reviews), desc(PricePrediction.confidence))
             .limit(limit)
         )
-        products = result.scalars().all()
-        if products:
-            break
+        for p in result.scalars().all():
+            if p.id not in seen_ids:
+                products.append(p)
+                seen_ids.add(p.id)
+                if len(products) >= limit:
+                    break
 
     await attach_predictions(products, db)
     return products

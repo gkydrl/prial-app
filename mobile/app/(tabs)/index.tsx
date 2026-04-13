@@ -1,17 +1,19 @@
 import { useState, useEffect, Fragment } from 'react';
-import { ScrollView, View, Text, Image, TouchableOpacity, RefreshControl } from 'react-native';
+import { ScrollView, View, Text, Image, TouchableOpacity, RefreshControl, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useNotificationStore } from '@/store/notificationStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SectionHeader } from '@/components/home/SectionHeader';
-import { TopDropCard } from '@/components/home/TopDropCard';
 import { ProductCard } from '@/components/product/ProductCard';
-import { DailyBanner } from '@/components/home/DailyBanner';
 import { OnboardingModal } from '@/components/home/OnboardingModal';
 import { useAuthStore } from '@/store/authStore';
 import { useHome } from '@/hooks/useHome';
 import { homeApi } from '@/api/home';
+import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { imageSource } from '@/utils/imageSource';
+import type { ProductResponse } from '@/types/api';
 import Animated from 'react-native-reanimated';
 import { useFadeIn } from '@/hooks/useFadeIn';
 
@@ -96,12 +98,118 @@ function EmptySection({ message }: { message: string }) {
   );
 }
 
+// ─── Editörün Seçimleri Banner ────────────────────────────────────────────────
+
+const SCREEN_W = Dimensions.get('window').width;
+const BANNER_W = SCREEN_W - 32;
+
+function EditorPicksBanner({ items }: { items: ProductResponse[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    setActiveIndex(Math.round(x / (BANNER_W + 32)));
+  };
+
+  const getBestPrice = (product: ProductResponse): number | null => {
+    const prices = product.stores
+      .filter(s => s.in_stock && s.current_price != null && s.store !== 'other')
+      .map(s => Number(s.current_price));
+    return prices.length > 0 ? Math.min(...prices) : null;
+  };
+
+  return (
+    <View style={{ marginTop: 16, marginBottom: 8 }}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        snapToInterval={BANNER_W + 32}
+      >
+        {items.map((product, i) => {
+          const price = getBestPrice(product);
+          return (
+            <TouchableOpacity
+              key={product.id}
+              activeOpacity={0.92}
+              onPress={() => router.push(`/product/${product.id}`)}
+              style={{ width: BANNER_W, marginHorizontal: 16 }}
+            >
+              <LinearGradient
+                colors={i === 0 ? ['#0D2060', '#1A47C4'] : ['#1A1A2E', '#2D1B69']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ borderRadius: 18, padding: 14, overflow: 'hidden' }}
+              >
+                <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_600SemiBold', marginBottom: 8 }}>
+                  ✦ Editörün Seçimi
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                  <View style={{
+                    width: 80, height: 80,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                  }}>
+                    <ExpoImage
+                      source={imageSource(product.image_url)}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="contain"
+                    />
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Text
+                      style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_600SemiBold', lineHeight: 19 }}
+                      numberOfLines={2}
+                    >
+                      {product.short_title || product.title}
+                    </Text>
+                    {price != null && (
+                      <Text style={{ color: '#FFFFFF', fontSize: 20, fontFamily: 'Inter_700Bold' }}>
+                        {Math.round(price).toLocaleString('tr-TR')} ₺
+                      </Text>
+                    )}
+                    {product.alarm_count > 0 && (
+                      <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_400Regular' }}>
+                        {product.alarm_count.toLocaleString('tr-TR')} kişi talep etti
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {items.length > 1 && (
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 }}>
+          {items.map((_, i) => (
+            <View
+              key={i}
+              style={{
+                width: i === activeIndex ? 18 : 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: i === activeIndex ? '#1D4ED8' : '#334155',
+              }}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── Ana Ekran ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
   const [modalDismissed, setModalDismissed] = useState(false);
-  const { dailyDeals, topDrops, mostAlarmed, isLoading, refresh } = useHome();
+  const { dailyDeals, aiPicks, aiWaitPicks, isLoading, refresh } = useHome();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   const showOnboarding = !hasCompletedOnboarding && !modalDismissed;
@@ -161,77 +269,58 @@ export default function HomeScreen() {
           <RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#1D4ED8" />
         }
       >
-        {/* Günlük Banner */}
-        {topDrops.length > 0 && <DailyBanner items={topDrops} />}
+        {/* Editörün Seçimleri Banner */}
+        {aiPicks.length >= 2 && <EditorPicksBanner items={aiPicks.slice(0, 2)} />}
 
         {/* İstatistikler */}
         <StatsCard />
 
-        {/* Bugünün Fırsatları */}
+        {/* Şimdi Almaya Değer — AI Picks */}
         <View style={{ marginBottom: 24 }}>
           <SectionHeader
-            title="Bugünün Fırsatları"
-            subtitle="En çok oransal düşüş yaşayan ürünler"
-            onSeeAll={() => router.push('/feed/daily-deals')}
+            title="Şimdi Almaya Değer"
+            subtitle="AI önerisiyle en uygun fiyatlı ürünler"
+            onSeeAll={() => router.push('/feed/ai-picks')}
           />
-          {dailyDeals.length > 0 ? (
+          {aiPicks.length > 0 ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
             >
-              {dailyDeals.map((item, i) => (
-                <TopDropCard key={i} item={item} badge="percent" />
-              ))}
-            </ScrollView>
-          ) : (
-            !isLoading && <EmptySection message="Henüz indirimli ürün yok" />
-          )}
-        </View>
-
-        {/* En Çok Düşenler */}
-        <View style={{ marginBottom: 24 }}>
-          <SectionHeader
-            title="En Çok Düşenler"
-            subtitle="En çok fiyat düşüşü yaşanan ürünler"
-            onSeeAll={() => router.push('/feed/top-drops')}
-          />
-          {topDrops.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-            >
-              {topDrops.map((item, i) => (
-                <TopDropCard key={i} item={item} badge="amount" />
-              ))}
-            </ScrollView>
-          ) : (
-            !isLoading && <EmptySection message="Fiyat düşüşü kaydedilmedi" />
-          )}
-        </View>
-
-        {/* En Çok Talep Edilen */}
-        <View style={{ marginBottom: 100 }}>
-          <SectionHeader
-            title="En Çok Talep Edilen"
-            subtitle="Topluluğun en çok beklediği ürünler"
-            onSeeAll={() => router.push('/feed/most-alarmed')}
-          />
-          {mostAlarmed.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-            >
-              {mostAlarmed.map((item) => (
+              {aiPicks.map((item) => (
                 <ProductCard key={item.id} product={item} />
               ))}
             </ScrollView>
           ) : (
-            !isLoading && <EmptySection message="Henüz talep edilen ürün yok" />
+            !isLoading && <EmptySection message="Henüz öneri yok" />
           )}
         </View>
+
+        {/* Fiyatı Düşecek — AI Wait Picks */}
+        <View style={{ marginBottom: 24 }}>
+          <SectionHeader
+            title="Fiyatı Düşecek"
+            subtitle="Beklemenizi önerdiklerimiz"
+            onSeeAll={() => router.push('/feed/ai-wait-picks')}
+          />
+          {aiWaitPicks.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            >
+              {aiWaitPicks.map((item) => (
+                <ProductCard key={item.id} product={item} />
+              ))}
+            </ScrollView>
+          ) : (
+            !isLoading && <EmptySection message="Henüz öneri yok" />
+          )}
+        </View>
+
+        {/* Bottom spacer */}
+        <View style={{ height: 100 }} />
       </ScrollView>
       </Animated.View>
     </SafeAreaView>

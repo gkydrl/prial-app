@@ -269,7 +269,7 @@ export default function SettingsScreen() {
               onPress={() =>
                 Share.share({
                   message: 'Prial ile ürün fiyatlarını takip et, fiyat düşünce anında haber al! 🎯\nhttps://prial.app',
-                  title: 'Prial — Fiyat Talep Platformu',
+                  title: 'Prial — Akıllı Alışveriş Asistanı',
                 })
               }
             />

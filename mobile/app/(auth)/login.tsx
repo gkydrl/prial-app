@@ -76,11 +76,11 @@ export default function LoginScreen() {
             >
               <Image
                 source={require('../../assets/images/logo.png')}
-                style={{ width: 180, height: 90 }}
+                style={{ width: 150, height: 70 }}
                 resizeMode="contain"
               />
             </View>
-            <Text style={{ color: '#FFFFFF', fontSize: 16 }}>Fiyat Talep Platformu</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16 }}>Akıllı Alışveriş Asistanı</Text>
           </View>
 
           {/* Social login buttons */}
@@ -103,9 +103,13 @@ export default function LoginScreen() {
                 <ActivityIndicator size="small" color="#1D4ED8" />
               ) : (
                 <>
-                  <Ionicons name="logo-google" size={20} color="#4285F4" />
+                  <Image
+                    source={{ uri: 'https://www.google.com/s2/favicons?sz=64&domain=google.com' }}
+                    style={{ width: 20, height: 20 }}
+                    resizeMode="contain"
+                  />
                   <Text style={{ color: '#1F2937', fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>
-                    Google ile devam et
+                    Google ile Giriş Yap
                   </Text>
                 </>
               )}
@@ -132,7 +136,7 @@ export default function LoginScreen() {
                   <>
                     <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
                     <Text style={{ color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>
-                      Apple ile devam et
+                      Apple ile Giriş Yap
                     </Text>
                   </>
                 )}

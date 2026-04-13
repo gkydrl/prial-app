@@ -4,11 +4,26 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DiscountBadge } from '@/components/ui/DiscountBadge';
+import { SignalBadge } from '@/components/ui/SignalBadge';
 import { useAuthStore } from '@/store/authStore';
 import { openAlarmSheet } from '@/store/alarmSheetStore';
 import { showAlert } from '@/store/alertStore';
 import type { ProductResponse, ProductStoreResponse, StoreName } from '@/types/api';
 import { imageSource } from '@/utils/imageSource';
+
+function extractCardSummary(text: string): string {
+  let clean = text;
+  if (clean.trimStart().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(clean);
+      clean = parsed.summary || clean;
+    } catch {
+      const match = clean.match(/"summary"\s*:\s*"([^"]+)"/);
+      if (match) clean = match[1];
+    }
+  }
+  return clean.split('.').slice(0, 2).join('.').trim() + '.';
+}
 
 interface ProductCardProps {
   product: ProductResponse;
@@ -92,9 +107,8 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
     });
   };
 
-  // Birden fazla mağaza varsa chip'leri göster
-  const showStoreChips = bestPerStore.length > 1;
-  const cardHeight = showStoreChips ? 224 : 200;
+  const imgSrc = imageSource(product.image_url);
+  const hasImage = !!imgSrc && !imgError;
 
   return (
     <TouchableOpacity
@@ -102,18 +116,17 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
       activeOpacity={0.85}
       style={{
         width,
-        height: cardHeight,
         backgroundColor: '#1E293B',
         borderRadius: 8,
         overflow: 'hidden',
       }}
     >
       {/* Görsel alanı */}
-      <View style={{ width: '100%', height: 140, backgroundColor: '#1E293B', padding: 8 }}>
+      <View style={{ width: '100%', aspectRatio: 1, backgroundColor: '#1E293B', padding: 8 }}>
         <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 10, overflow: 'hidden' }}>
-          {product.image_url && !imgError ? (
+          {hasImage ? (
             <Image
-              source={imageSource(product.image_url)}
+              source={imgSrc}
               style={{ width: '100%', height: '100%' }}
               contentFit="contain"
               onError={() => setImgError(true)}
@@ -125,6 +138,13 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
           )}
           {/* İndirim badge — sol üst */}
           {!!discount && <DiscountBadge percent={discount} />}
+
+          {/* SignalBadge — sol alt */}
+          {product.recommendation && (
+            <View style={{ position: 'absolute', bottom: 6, left: 6 }}>
+              <SignalBadge recommendation={product.recommendation} size="sm" showLabel={false} />
+            </View>
+          )}
 
           {/* Talep oluştur — sağ üst yuvarlak buton */}
           <TouchableOpacity
@@ -143,35 +163,26 @@ export function ProductCard({ product, store, width = 160 }: ProductCardProps & 
       </View>
 
       {/* Yazı alanı */}
-      <View style={{ flex: 1, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'space-between' }}>
+      <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 8, gap: 4 }}>
         <Text
           style={{ color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 15 }}
-          numberOfLines={1}
+          numberOfLines={2}
         >
-          {product.title}
+          {product.short_title || product.title}
         </Text>
 
-        {/* Mağaza fiyatları */}
-        {showStoreChips ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-            {bestPerStore.slice(0, 3).map((s) => (
-              <StorePriceChip key={s.store} store={s} />
-            ))}
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-              {price != null ? price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' ₺' : '-'}
-            </Text>
+        {/* Fiyat */}
+        <Text style={{ color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' }}>
+          {price != null ? Math.round(Number(price)).toLocaleString('tr-TR') + ' ₺' : '-'}
+        </Text>
 
-            {product.alarm_count > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1D4ED820', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 }}>
-                <Ionicons name="pricetag-outline" size={11} color="#93C5FD" />
-                <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: 'Inter_700Bold' }}>
-                  {product.alarm_count.toLocaleString('tr-TR')} Talep
-                </Text>
-              </View>
-            )}
+        {/* Talep sayısı */}
+        {product.alarm_count > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Ionicons name="pricetag-outline" size={10} color="#93C5FD" />
+            <Text style={{ color: '#93C5FD', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>
+              {product.alarm_count.toLocaleString('tr-TR')} talep
+            </Text>
           </View>
         )}
       </View>

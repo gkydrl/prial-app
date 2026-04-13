@@ -1,8 +1,8 @@
 const formatter = new Intl.NumberFormat('tr-TR', {
   style: 'currency',
   currency: 'TRY',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 });
 
 export function formatTRY(value: number | null | undefined): string {

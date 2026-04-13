@@ -19,7 +19,16 @@ import { useProduct } from '@/hooks/useProduct';
 import { imageSource } from '@/utils/imageSource';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { AlarmSetupSheet } from '@/components/product/AlarmSetupSheet';
-import type { ProductStoreResponse, PromoCodeResponse, AssignedPromoResponse } from '@/types/api';
+import { PrialSays } from '@/components/product/PrialSays';
+import { PriceSummary } from '@/components/product/PriceSummary';
+import { PriceHistoryChart } from '@/components/product/PriceHistoryChart';
+import { VariantSelector } from '@/components/product/VariantSelector';
+import { ProductCard } from '@/components/product/ProductCard';
+import { SignalBadge } from '@/components/ui/SignalBadge';
+import { storeLabel, storeColor, storeShipping, storeInstallment } from '@/constants/stores';
+import { discoverApi } from '@/api/discover';
+import { normalizeProducts } from '@/utils/normalizeProduct';
+import type { ProductResponse, ProductStoreResponse, PromoCodeResponse, AssignedPromoResponse } from '@/types/api';
 
 const BG = '#0A1628';
 const CARD = '#1E293B';
@@ -298,7 +307,7 @@ export default function ProductDetailScreen() {
   const { product, history, isLoading, error } = useProduct(id);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const alarmSheetRef = useRef<BottomSheet>(null);
-  const stores = (product?.stores ?? []).filter(s => s.in_stock === true);
+  const stores = (product?.stores ?? []).filter(s => s.in_stock === true && s.store !== 'other' && s.store !== 'akakce');
   const lowestStore = useMemo(() => {
     return stores.reduce<typeof stores[0] | null>((min, s) => {
       if (!s.current_price) return min;
@@ -310,6 +319,21 @@ export default function ProductDetailScreen() {
   // Decimal → string olarak gelebilir, Number() ile normalize et
   const currentPrice = lowestStore?.current_price != null ? Number(lowestStore.current_price) : null;
   const alarmCount = product?.alarm_count ?? 0;
+
+  // Related products
+  const [relatedProducts, setRelatedProducts] = useState<ProductResponse[]>([]);
+  useEffect(() => {
+    if (!product?.category_slug) return;
+    discoverApi.categoryProducts(product.category_slug, 1, 'alarm_count')
+      .then(res => {
+        const filtered = normalizeProducts(res.data)
+          .filter(p => p.id !== product.id && p.image_url && p.recommendation
+            && p.stores?.some(s => s.current_price != null && s.in_stock))
+          .slice(0, 6);
+        setRelatedProducts(filtered);
+      })
+      .catch(() => {});
+  }, [product?.id, product?.category_slug]);
 
   const low30d = useMemo(() => {
     if (!history.length) return null;
@@ -324,7 +348,6 @@ export default function ProductDetailScreen() {
     return buildDemandBars(currentPrice, Math.max(alarmCount, 50));
   }, [currentPrice, alarmCount]);
 
-  const dropScore = useMemo(() => Math.floor(Math.random() * 40) + 40, [product?.id]);
   const maxBarValue = useMemo(
     () => Math.max(...(demandBars.map((b) => b.value)), 1),
     [demandBars]
@@ -385,12 +408,18 @@ export default function ProductDetailScreen() {
         {/* ── Ürün görseli ── */}
         <View style={{ width: '100%', height: 280, backgroundColor: BG, padding: 16 }}>
           <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden' }}>
-            <Image
-              source={imageSource(product.image_url)}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="contain"
-              placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-            />
+            {imageSource(product.image_url) ? (
+              <Image
+                source={imageSource(product.image_url)}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="contain"
+                placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+              />
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="cube-outline" size={64} color="#94A3B8" />
+              </View>
+            )}
             {/* Mağaza pill overlay */}
             {stores.length > 0 && (
               <View style={{
@@ -413,20 +442,30 @@ export default function ProductDetailScreen() {
           {/* ── Başlık & Fiyat & Badge ── */}
           <View style={{ gap: 10 }}>
             {product.brand && (
-              <Text style={{ color: MUTED, fontSize: 12, fontFamily: 'Inter_500Medium', letterSpacing: 1.2, textTransform: 'uppercase' }}>
-                {product.brand}
-              </Text>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/discover/search', params: { q: product.brand! } })}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: BRAND, fontSize: 12, fontFamily: 'Inter_500Medium', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                  {product.brand}
+                </Text>
+              </TouchableOpacity>
             )}
             <Text style={{ color: WHITE, fontSize: 20, fontFamily: 'Inter_700Bold', lineHeight: 28 }}>
               {product.title}
             </Text>
 
-            {/* Fiyat + Talep badge */}
+            {/* Fiyat + SignalBadge */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
               <View style={{ gap: 2 }}>
-                <Text style={{ color: WHITE, fontSize: 28, fontFamily: 'Inter_700Bold' }}>
-                  {fmt(currentPrice)}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ color: WHITE, fontSize: 28, fontFamily: 'Inter_700Bold' }}>
+                    {fmt(currentPrice)}
+                  </Text>
+                  {product.recommendation && (
+                    <SignalBadge recommendation={product.recommendation} size="md" />
+                  )}
+                </View>
                 {lowestStore?.original_price && lowestStore.original_price !== lowestStore.current_price && (
                   <Text style={{ color: MUTED, fontSize: 15, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' }}>
                     {fmt(lowestStore.original_price)}
@@ -434,7 +473,7 @@ export default function ProductDetailScreen() {
                 )}
               </View>
 
-              {/* "X kişi talep etti" badge */}
+              {/* "X kişi kampanya talep etti" badge */}
               <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -448,7 +487,7 @@ export default function ProductDetailScreen() {
               }}>
                 <Ionicons name="people" size={14} color={BRAND_GREEN} />
                 <Text style={{ color: BRAND_GREEN, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
-                  {alarmCount.toLocaleString('tr-TR')} kişi talep etti
+                  {alarmCount.toLocaleString('tr-TR')} kişi kampanya talep etti
                 </Text>
               </View>
             </View>
@@ -483,6 +522,17 @@ export default function ProductDetailScreen() {
               );
             })()}
           </View>
+
+          {/* ── Varyantlar ── */}
+          {product.variants && product.variants.length > 1 && (
+            <VariantSelector variants={product.variants} />
+          )}
+
+          {/* ── Prial der ki (Hero) ── */}
+          <PrialSays product={product} bestPrice={currentPrice} />
+
+          {/* ── Fiyat Özeti ── */}
+          <PriceSummary product={product} bestPrice={currentPrice} stores={stores} />
 
           {/* ── Talep Fiyat Dağılımı ── */}
           {demandBars.length > 0 && (
@@ -544,34 +594,121 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
-          {/* ── Düşüş Tahmini ── */}
-          {(() => {
-            const scoreColor = dropScore > 60 ? BRAND_GREEN : dropScore >= 40 ? '#F59E0B' : '#EF4444';
-            return (
-              <View style={{ backgroundColor: CARD, borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                {/* Sol: büyük skor */}
-                <View style={{ alignItems: 'center', minWidth: 72 }}>
-                  <Text style={{ color: scoreColor, fontSize: 38, fontFamily: 'Inter_700Bold', lineHeight: 44 }}>
-                    %{dropScore}
-                  </Text>
-                </View>
-                {/* Dikey ayraç */}
-                <View style={{ width: 1, height: 56, backgroundColor: '#334155' }} />
-                {/* Sağ: açıklama */}
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={{ color: WHITE, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
-                    Düşüş Tahmini
-                  </Text>
-                  <Text style={{ color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16 }}>
-                    Önümüzdeki 30 günde fiyatın düşme ihtimali
-                  </Text>
-                  <Text style={{ color: scoreColor, fontSize: 10, fontFamily: 'Inter_500Medium', marginTop: 2 }}>
-                    {dropScore > 60 ? 'Düşüş bekleniyor' : dropScore >= 40 ? 'Belirsiz seyir' : 'Düşüş beklenmiyor'}
-                  </Text>
-                </View>
-              </View>
-            );
-          })()}
+          {/* ── Mağaza Karşılaştırma ── */}
+          {stores.filter(s => s.store !== 'other').length > 0 && (
+            <View style={{ gap: 12 }}>
+              <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+                Mağaza Karşılaştırma
+              </Text>
+              {[...stores]
+                .filter(s => s.store !== 'other')
+                .sort((a, b) => Number(a.current_price ?? Infinity) - Number(b.current_price ?? Infinity))
+                .map((s, i) => {
+                  const isCheapest = i === 0;
+                  const shipping = s.delivery_text || storeShipping(s.store);
+                  const installment = s.installment_text || storeInstallment(s.store);
+                  const logoUrl = getLogoUrl(s.store, s.url);
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      onPress={() => Linking.openURL(s.url)}
+                      activeOpacity={0.75}
+                      style={{
+                        backgroundColor: CARD,
+                        borderRadius: 12,
+                        padding: 14,
+                        gap: 8,
+                        borderWidth: isCheapest ? 1 : 0,
+                        borderColor: isCheapest ? BRAND_GREEN : 'transparent',
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={{
+                            width: 28, height: 28, borderRadius: 8,
+                            backgroundColor: '#FFFFFF',
+                            justifyContent: 'center', alignItems: 'center',
+                            overflow: 'hidden',
+                          }}>
+                            <RNImage
+                              source={{ uri: logoUrl }}
+                              style={{ width: 20, height: 20 }}
+                              resizeMode="contain"
+                            />
+                          </View>
+                          <Text style={{ color: WHITE, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+                            {storeLabel(s.store)}
+                          </Text>
+                          {isCheapest && (
+                            <View style={{ backgroundColor: `${BRAND_GREEN}20`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                              <Text style={{ color: BRAND_GREEN, fontSize: 9, fontFamily: 'Inter_700Bold' }}>EN UCUZ</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+                          {fmt(s.current_price)}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 12, paddingLeft: 38 }}>
+                        {shipping ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="cube-outline" size={12} color={MUTED} />
+                            <Text style={{ color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular' }}>{shipping}</Text>
+                          </View>
+                        ) : null}
+                        {installment ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="card-outline" size={12} color={MUTED} />
+                            <Text style={{ color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular' }}>{installment}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {s.discount_percent != null && s.discount_percent > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="pricetag" size={12} color="#EAB308" />
+                          <Text style={{ color: '#EAB308', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                            %{Math.round(s.discount_percent)} indirim
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
+          )}
+
+          {/* ── Fiyat Geçmişi ── */}
+          <PriceHistoryChart data={history} />
+
+          {/* ── Urun Aciklamasi ── */}
+          {product.description ? (
+            <View style={{ backgroundColor: CARD, borderRadius: 16, padding: 16, gap: 8 }}>
+              <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+Ürün Açıklaması
+              </Text>
+              <Text style={{ color: '#94A3B8', fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 20 }}>
+                {product.description}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* ── Benzer Urunler ── */}
+          {relatedProducts.length > 0 && (
+            <View style={{ gap: 12 }}>
+              <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
+                Benzer Ürünler
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {relatedProducts.map(rp => (
+                  <ProductCard key={rp.id} product={rp} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
         </View>
       </ScrollView>
@@ -601,7 +738,7 @@ export default function ProductDetailScreen() {
             if (!isAuthenticated) {
               showAlert(
                 'Giriş Gerekli',
-                'Talep oluşturmak için giriş yapmalısınız.',
+                'Kampanya talep oluşturmak için giriş yapmalısınız.',
                 [
                   { text: 'Vazgeç', style: 'cancel' },
                   {
@@ -622,7 +759,7 @@ export default function ProductDetailScreen() {
         >
           <Ionicons name="pricetag-outline" size={20} color={WHITE} />
           <Text style={{ color: WHITE, fontSize: 16, fontFamily: 'Inter_700Bold' }}>
-            Talep Et
+            Kampanya Talep Et
           </Text>
         </TouchableOpacity>
       </View>
