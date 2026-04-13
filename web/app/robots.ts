@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/ara", "/*?sort=", "/*?page="],
       },
     ],
-    sitemap: "https://prial.io/sitemap.xml",
+    sitemap: "https://www.prial.io/sitemap.xml",
   };
 }

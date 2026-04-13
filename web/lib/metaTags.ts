@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { formatPrice } from "./formatPrice";
 
 const SITE_NAME = "Prial";
-const BASE_URL = "https://prial.io";
+const BASE_URL = "https://www.prial.io";
 const CURRENT_YEAR = new Date().getFullYear();
 
 const twitterCard = { card: "summary_large_image" as const };

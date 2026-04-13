@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     title: "Prial - Akıllı Alışveriş Asistanı",
     description:
       "Binlerce üründe fiyat karşılaştırması, fiyat geçmişi ve düşüş bildirimi.",
-    url: "https://prial.io",
+    url: "https://www.prial.io",
     siteName: "Prial",
     type: "website",
     locale: "tr_TR",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
       "Binlerce üründe fiyat karşılaştırması, fiyat geçmişi ve düşüş bildirimi.",
   },
   alternates: {
-    canonical: "https://prial.io",
+    canonical: "https://www.prial.io",
   },
 };
 

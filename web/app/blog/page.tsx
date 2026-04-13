@@ -13,7 +13,7 @@ export const metadata: Metadata = {
       "Fiyat takibi, kampanya rehberleri ve akıllı alışveriş ipuçları.",
   },
   alternates: {
-    canonical: "https://prial.io/blog",
+    canonical: "https://www.prial.io/blog",
   },
 };
 

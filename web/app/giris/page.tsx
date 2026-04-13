@@ -101,7 +101,7 @@ export default function LoginPage() {
       AppleID.auth.init({
         clientId: "io.prial.web.signin",
         scope: "name email",
-        redirectURI: "https://prial.io/api/auth/apple/callback",
+        redirectURI: "https://www.prial.io/api/auth/apple/callback",
         usePopup: true,
       });
 

@@ -13,24 +13,24 @@ export function ArticleSchema({ title, description, slug, date }: ArticleSchemaP
     description,
     datePublished: date,
     dateModified: date,
-    url: `https://prial.io/blog/${slug}`,
+    url: `https://www.prial.io/blog/${slug}`,
     author: {
       "@type": "Organization",
       name: "Prial",
-      url: "https://prial.io",
+      url: "https://www.prial.io",
     },
     publisher: {
       "@type": "Organization",
       name: "Prial",
-      url: "https://prial.io",
+      url: "https://www.prial.io",
       logo: {
         "@type": "ImageObject",
-        url: "https://prial.io/icon.png",
+        url: "https://www.prial.io/icon.png",
       },
     },
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": `https://prial.io/blog/${slug}`,
+      "@id": `https://www.prial.io/blog/${slug}`,
     },
     inLanguage: "tr",
   };

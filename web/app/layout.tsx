@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
   description:
     "Binlerce üründe fiyat karşılaştırması, fiyat geçmişi ve düşüş bildirimi. Trendyol, Hepsiburada, Amazon ve daha fazlasında en ucuz fiyatı bul.",
-  metadataBase: new URL("https://prial.io"),
+  metadataBase: new URL("https://www.prial.io"),
   openGraph: {
     type: "website",
     locale: "tr_TR",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   },
   alternates: {
     languages: {
-      "tr-TR": "https://prial.io",
+      "tr-TR": "https://www.prial.io",
     },
   },
   robots: {

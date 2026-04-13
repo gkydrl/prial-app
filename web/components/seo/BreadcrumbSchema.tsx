@@ -11,7 +11,7 @@ export function BreadcrumbSchema({ items }: { items: BreadcrumbItem[] }) {
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
-      item: `https://prial.io${item.href}`,
+      item: `https://www.prial.io${item.href}`,
     })),
   };
 

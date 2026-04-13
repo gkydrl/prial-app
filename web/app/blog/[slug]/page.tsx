@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: post.description,
       type: "article",
       publishedTime: post.date,
-      url: `https://prial.io/blog/${slug}`,
+      url: `https://www.prial.io/blog/${slug}`,
       siteName: "Prial",
       locale: "tr_TR",
     },
@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: post.description,
     },
     alternates: {
-      canonical: `https://prial.io/blog/${slug}`,
+      canonical: `https://www.prial.io/blog/${slug}`,
     },
   };
 }

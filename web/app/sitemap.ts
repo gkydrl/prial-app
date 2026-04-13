@@ -5,7 +5,7 @@ import { getCategories, getCategoryProducts, filterDisplayable } from "@/lib/api
 import { productSlug } from "@/lib/slugify";
 import { blogPosts } from "@/lib/blog";
 
-const BASE = "https://prial.io";
+const BASE = "https://www.prial.io";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [

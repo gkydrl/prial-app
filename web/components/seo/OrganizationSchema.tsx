@@ -3,8 +3,8 @@ export function OrganizationSchema() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Prial",
-    url: "https://prial.io",
-    logo: "https://prial.io/icon.png",
+    url: "https://www.prial.io",
+    logo: "https://www.prial.io/icon.png",
     description:
       "Fiyat karşılaştırma ve takip platformu. Trendyol, Hepsiburada, Amazon ve daha fazlasında en ucuz fiyatı bul.",
     sameAs: ["https://apps.apple.com/tr/app/prial/id6760142538"],
