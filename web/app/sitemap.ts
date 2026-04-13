@@ -91,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Brand pages
   for (const brand of brands) {
     entries.push({
-      url: `${BASE}/marka/${brand.toLowerCase().replace(/\s+/g, "-")}`,
+      url: `${BASE}/marka/${brand.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")}`,
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.6,
