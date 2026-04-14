@@ -23,17 +23,21 @@ async def lifespan(app: FastAPI):
     from app.services.prediction.runner import run_daily_predictions
     from app.services.prediction.evaluator import evaluate_predictions
     from app.services.exchange_rate import fetch_and_store_rates
-    from app.services.pipeline_monitor import run_monitored
+    from app.services.pipeline_monitor import run_monitored, cleanup_stale_runs
+
+    # Startup: eski 'running' pipeline'ları temizle (Railway restart sonrası)
+    await cleanup_stale_runs(max_hours=4)
     from app.services.data_quality import run_data_quality_check
     from app.services.akakce.verify_matches import run_daily_verification
     from app.services.seo_pipeline import seo_revalidate, seo_audit
+    from app.services.cross_validator import run_weekly_cross_validation
 
     # ── Yüksek frekanslı job'lar (monitörlenmez, çok sık) ──
 
     scheduler.add_job(
         check_due_prices,
-        trigger="interval",
-        minutes=15,
+        trigger="cron",
+        hour=1, minute=0,
         id="price_check",
         replace_existing=True,
     )
@@ -50,6 +54,8 @@ async def lifespan(app: FastAPI):
 
     # 02:00 — Akakce yeni ürün import
     async def _akakce_bulk():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("akakce_bulk_import", akakce_bulk_import(batch_size=50, only_new=True))
 
     scheduler.add_job(
@@ -62,6 +68,8 @@ async def lifespan(app: FastAPI):
 
     # 03:00 — Full enrichment (tüm ürünler, ~90dk)
     async def _enrichment_full():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("akakce_enrichment_full", akakce_daily_enrichment_full())
 
     scheduler.add_job(
@@ -74,6 +82,8 @@ async def lifespan(app: FastAPI):
 
     # 04:00 — Ürün keşfi
     async def _discover():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("product_discovery", discover_daily())
 
     scheduler.add_job(
@@ -86,6 +96,8 @@ async def lifespan(app: FastAPI):
 
     # 04:30 — Katalog crawl (mağazasız ürünler için store ara — her gün)
     async def _daily_crawl():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("daily_catalog_crawl", crawl_all_variants(new_only=True))
 
     scheduler.add_job(
@@ -96,13 +108,16 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # 05:00 — Review enrichment (500 ürün/gün — Haiku'yu besler)
+    # 05:00 — Review enrichment (haftada bir, Çarşamba — 500 ürün/batch)
     async def _review():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("review_enrichment", enrich_reviews_daily(batch_size=500))
 
     scheduler.add_job(
         _review,
         trigger="cron",
+        day_of_week="wed",
         hour=5, minute=0,
         id="review_enrichment",
         replace_existing=True,
@@ -134,6 +149,8 @@ async def lifespan(app: FastAPI):
 
     # 07:30 — Akakce eşleşme doğrulama (yanlış eşleşmeleri bul ve düzelt)
     async def _verify_akakce():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("akakce_verify_matches", run_daily_verification())
 
     scheduler.add_job(
@@ -192,8 +209,25 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
+    # Haftalık — Cumartesi 02:00 cross-validation
+    async def _cross_validate():
+        if not settings.scraper_enabled:
+            return
+        await run_monitored("weekly_cross_validation", run_weekly_cross_validation())
+
+    scheduler.add_job(
+        _cross_validate,
+        trigger="cron",
+        day_of_week="sat",
+        hour=2, minute=0,
+        id="weekly_cross_validation",
+        replace_existing=True,
+    )
+
     # Haftalık — Pazar 03:00 katalog taraması
     async def _catalog_crawl():
+        if not settings.scraper_enabled:
+            return
         await run_monitored("catalog_crawl", crawl_all_variants(new_only=True))
 
     scheduler.add_job(
